@@ -2,6 +2,7 @@ extends Node2D
 
 const StackScene = preload("res://stack.tscn")
 const StackScript = preload("res://stack.gd")
+const SlotOverlayBgScript = preload("res://slot_overlay_bg.gd")
 const BackgroundTexture = preload("res://Imagenes/fondo2-verde.png")
 const MixIconTexture = preload("res://Imagenes/icono-mezclar.png")
 const HammerIconTexture = preload("res://Imagenes/icono-martillo.png")
@@ -40,14 +41,14 @@ const BOARD_PAD_Y_SLOTS = 0.04
 const PANEL_CONTENT_PADDING_RATIO = 0.004
 ## Posición vertical del panel (área útil sobre el banner).
 const BOARD_PANEL_TOP_RATIO = 0.17
-## Colores del tablero — verde menta transparente (estilo portada).
-const BOARD_BG_COLOR := Color(0.54, 0.82, 0.64, 0.36)
-const BOARD_GLOSS_COLOR := Color(0.88, 0.98, 0.90, 0.12)
-const BOARD_SHADOW_BASE := Color(0.18, 0.32, 0.22)
-const BOARD_ROW_COLOR := Color(0.50, 0.78, 0.60, 0.28)
-const BOARD_SLOT_ACTIVE_COLOR := Color(0.46, 0.72, 0.54, 0.40)
-const BOARD_SLOT_INACTIVE_COLOR := Color(0.56, 0.84, 0.66, 0.16)
-const BOARD_SLOT_TEMP_COLOR := Color(0.48, 0.74, 0.56, 0.24)
+## Colores del tablero — celeste suave transparente + slots rosa.
+const BOARD_BG_COLOR := Color(0.88, 0.94, 0.98, 0.28)
+const BOARD_GLOSS_COLOR := Color(0.98, 0.99, 1.0, 0.10)
+const BOARD_SHADOW_BASE := Color(0.20, 0.28, 0.36)
+const BOARD_ROW_COLOR := Color(0.86, 0.92, 0.97, 0.18)
+const BOARD_SLOT_ACTIVE_COLOR := Color(0.98, 0.76, 0.86, 0.34)
+const BOARD_SLOT_INACTIVE_COLOR := Color(0.98, 0.80, 0.90, 0.26)
+const BOARD_SLOT_TEMP_COLOR := Color(0.96, 0.78, 0.88, 0.22)
 ## Chips superiores (home, vidas, estrellas, settings).
 const HUD_SIZE_MULTIPLIER = 1.0
 const HUD_CHIP_HEIGHT = 58.0
@@ -79,7 +80,9 @@ const WILDCARD_LOCKED_MODULATE := Color(0.70, 0.70, 0.70, 0.82)
 const TEMP_SLOT_COST_DIAMONDS := 200
 const TEMP_SLOT_DURATION_SEC := 60.0
 const TEMP_LOCKED_PANEL_GREEN := Color(0.14, 0.38, 0.22, 1.0)
-const TEMP_LOCKED_PANEL_CREAM := Color(0.98, 0.94, 0.86, 1.0)
+const SLOT_OVERLAY_GRAD_CELESTE := Color(0.62, 0.82, 0.97, 0.94)
+const SLOT_OVERLAY_GRAD_ROSA := Color(0.98, 0.68, 0.84, 0.94)
+const SLOT_OVERLAY_GRAD_VERDE := Color(0.66, 0.88, 0.68, 0.94)
 ## Ranura temporal: celda arriba a la derecha (fila 0, col 4 → índice 4). Bloqueada hasta pagar.
 const TEMP_SLOT_BOARD_INDEX := 4
 ## Compra opcional al lado de la última pila habilitada (estrellas mock); precio se duplica en cada compra.
@@ -168,7 +171,7 @@ var temp_slot_time_remaining: float = 0.0
 var temp_slot_bonus_active: bool = false
 ## UI ranura bloqueada (crema, reloj de arena, 60 seg, precio); no recibe clics (IGNORE).
 var temp_slot_locked_root: Control = null
-var temp_slot_locked_panel: Panel = null
+var temp_slot_locked_panel: TextureRect = null
 var temp_slot_locked_hourglass: Label = null
 var temp_slot_locked_lbl_60: Label = null
 var temp_slot_locked_lbl_seg: Label = null
@@ -180,7 +183,7 @@ var temp_slot_locked_cost_icon: TextureRect = null
 var temp_slot_timer_label: Label = null
 ## Oferta de ranura extra (panel crema como temporal; precio = número + icono-estrella).
 var adjacent_slot_offer_root: Control = null
-var adjacent_slot_offer_panel: Panel = null
+var adjacent_slot_offer_panel: TextureRect = null
 var adjacent_slot_offer_lbl_level: Label = null
 var adjacent_slot_offer_lbl_lock: Label = null
 var adjacent_slot_offer_price_row: HBoxContainer = null
@@ -895,6 +898,7 @@ func print_status() -> void:
 		print(">>> Sin jugadas entre pilas, pero se puede repartir (", free_slots, " huecos).")
 
 func _draw() -> void:
+	adjacent_offer_board_index = find_adjacent_extra_slot_offer_board_index()
 	var board_rect = get_board_rect()
 	var corner = get_panel_corner_radius()
 	# Sombra suave multicapa para elevacion leve.
@@ -944,6 +948,10 @@ func _draw() -> void:
 		draw_style_box(row_style, row_rect)
 
 	for i in range(TOTAL_SLOTS):
+		if i == TEMP_SLOT_BOARD_INDEX and not temp_slot_bonus_active:
+			continue
+		if i == adjacent_offer_board_index and adjacent_offer_board_index >= 0:
+			continue
 		var slot_rect = get_slot_rect(i)
 		var slot_style := StyleBoxFlat.new()
 		if i == TEMP_SLOT_BOARD_INDEX and not temp_slot_bonus_active:
@@ -1107,8 +1115,7 @@ func build_adjacent_slot_offer_ui() -> void:
 	adjacent_slot_offer_root.z_index = 12
 	hud_layer.add_child(adjacent_slot_offer_root)
 
-	adjacent_slot_offer_panel = Panel.new()
-	adjacent_slot_offer_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	adjacent_slot_offer_panel = SlotOverlayBgScript.new()
 	adjacent_slot_offer_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
 	adjacent_slot_offer_panel.offset_left = 0
 	adjacent_slot_offer_panel.offset_top = 0
@@ -1124,7 +1131,7 @@ func build_adjacent_slot_offer_ui() -> void:
 	var vbox := VBoxContainer.new()
 	vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	vbox.add_theme_constant_override("separation", 4)
+	vbox.add_theme_constant_override("separation", 6)
 	center.add_child(vbox)
 
 	adjacent_slot_offer_lbl_level = Label.new()
@@ -1141,7 +1148,7 @@ func build_adjacent_slot_offer_ui() -> void:
 
 	var spacer := Control.new()
 	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	spacer.custom_minimum_size = Vector2(0, 2)
+	spacer.custom_minimum_size = Vector2(0, 4)
 	vbox.add_child(spacer)
 
 	adjacent_slot_offer_price_row = HBoxContainer.new()
@@ -1247,29 +1254,31 @@ func update_adjacent_slot_offer_ui() -> void:
 		layout_adjacent_slot_star_error_label()
 		return
 	var gr := get_adjacent_extra_slot_offer_global_rect()
-	var sc := get_layout_scale()
-	var inset := 4.0 * sc
+	var inset := maxf(2.0, gr.size.x * 0.025)
 	adjacent_slot_offer_root.visible = true
 	adjacent_slot_offer_root.global_position = gr.position + Vector2(inset, inset)
 	adjacent_slot_offer_root.size = gr.size - Vector2(inset * 2.0, inset * 2.0)
-	var corner_px := int(clampf(22.0 * sc, 16.0, 30.0))
-	adjacent_slot_offer_panel.add_theme_stylebox_override("panel", _make_temp_slot_locked_panel_style(corner_px))
+	var fit := minf(adjacent_slot_offer_root.size.x, adjacent_slot_offer_root.size.y)
+	var corner_px := int(clampf(fit * 0.14, 14.0, 28.0))
+	_apply_slot_overlay_panel_style(adjacent_slot_offer_panel, corner_px, adjacent_slot_offer_root.size)
 
 	var g := TEMP_LOCKED_PANEL_GREEN
 	if adjacent_slot_offer_lbl_level != null:
 		adjacent_slot_offer_lbl_level.text = "Gratis al nivel %d" % ADJACENT_EXTRA_SLOT_FREE_AT_LEVEL
-		adjacent_slot_offer_lbl_level.add_theme_font_size_override("font_size", int(clampf(19.0 * sc, 16.0, 26.0)))
+		adjacent_slot_offer_lbl_level.add_theme_font_size_override("font_size", int(clampf(fit * 0.15, 16.0, 30.0)))
 		adjacent_slot_offer_lbl_level.add_theme_color_override("font_color", g)
 	if adjacent_slot_offer_lbl_lock != null:
-		adjacent_slot_offer_lbl_lock.add_theme_font_size_override("font_size", int(clampf(48.0 * sc, 40.0, 60.0)))
+		adjacent_slot_offer_lbl_lock.add_theme_font_size_override("font_size", int(clampf(fit * 0.40, 52.0, 82.0)))
 		adjacent_slot_offer_lbl_lock.add_theme_color_override("font_color", g)
 	if adjacent_slot_offer_lbl_cost != null:
 		adjacent_slot_offer_lbl_cost.text = str(adjacent_slot_next_price)
-		adjacent_slot_offer_lbl_cost.add_theme_font_size_override("font_size", int(clampf(28.0 * sc, 22.0, 36.0)))
+		adjacent_slot_offer_lbl_cost.add_theme_font_size_override("font_size", int(clampf(fit * 0.22, 20.0, 38.0)))
 		adjacent_slot_offer_lbl_cost.add_theme_color_override("font_color", g)
 	if adjacent_slot_offer_cost_icon != null:
-		var icon_px := int(clampf(32.0 * sc, 26.0, 40.0))
+		var icon_px := int(clampf(fit * 0.24, 24.0, 42.0))
 		adjacent_slot_offer_cost_icon.custom_minimum_size = Vector2(icon_px, icon_px)
+	if adjacent_slot_offer_price_row != null:
+		adjacent_slot_offer_price_row.add_theme_constant_override("separation", int(clampf(fit * 0.04, 5.0, 10.0)))
 	layout_adjacent_slot_star_error_label()
 
 
@@ -1277,28 +1286,26 @@ func _sync_slot_overlay_controls() -> void:
 	update_temp_slot_overlay_label()
 	update_adjacent_slot_offer_ui()
 
-func _make_temp_slot_locked_panel_style(corner_px: int) -> StyleBoxFlat:
-	var s := StyleBoxFlat.new()
-	s.bg_color = TEMP_LOCKED_PANEL_CREAM
-	s.border_color = Color(0.22, 0.44, 0.28, 0.5)
-	s.border_width_left = 2
-	s.border_width_top = 2
-	s.border_width_right = 2
-	s.border_width_bottom = 2
-	s.corner_radius_top_left = corner_px
-	s.corner_radius_top_right = corner_px
-	s.corner_radius_bottom_left = corner_px
-	s.corner_radius_bottom_right = corner_px
-	return s
+func _apply_slot_overlay_panel_style(panel_bg: TextureRect, corner_px: int, panel_size: Vector2) -> void:
+	if panel_bg == null:
+		return
+	if panel_bg.has_method("configure"):
+		panel_bg.configure(
+			corner_px,
+			SLOT_OVERLAY_GRAD_CELESTE,
+			SLOT_OVERLAY_GRAD_ROSA,
+			SLOT_OVERLAY_GRAD_VERDE,
+			panel_size
+		)
 
 func build_temp_slot_locked_ui() -> void:
 	temp_slot_locked_root = Control.new()
 	temp_slot_locked_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	temp_slot_locked_root.visible = false
+	temp_slot_locked_root.z_index = 12
 	hud_layer.add_child(temp_slot_locked_root)
 
-	temp_slot_locked_panel = Panel.new()
-	temp_slot_locked_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	temp_slot_locked_panel = SlotOverlayBgScript.new()
 	temp_slot_locked_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
 	temp_slot_locked_panel.offset_left = 0
 	temp_slot_locked_panel.offset_top = 0
@@ -1374,20 +1381,22 @@ func update_temp_slot_overlay_label() -> void:
 	if not temp_slot_bonus_active:
 		temp_slot_locked_root.visible = true
 		temp_slot_timer_label.visible = false
-		var inset = maxf(2.0, gr.size.x * 0.04)
+		var inset = maxf(2.0, gr.size.x * 0.025)
 		temp_slot_locked_root.global_position = gr.position + Vector2(inset, inset)
 		temp_slot_locked_root.size = gr.size - Vector2(inset * 2.0, inset * 2.0)
 		var fit := minf(temp_slot_locked_root.size.x, temp_slot_locked_root.size.y)
 		var corner_px := int(clampf(fit * 0.14, 10.0, 22.0))
-		temp_slot_locked_panel.add_theme_stylebox_override("panel", _make_temp_slot_locked_panel_style(corner_px))
+		_apply_slot_overlay_panel_style(temp_slot_locked_panel, corner_px, temp_slot_locked_root.size)
 
 		var g = TEMP_LOCKED_PANEL_GREEN
-		var hourglass_fs := int(clampf(fit * 0.24, 18.0, 36.0))
-		var duration_fs := int(clampf(fit * 0.18, 14.0, 28.0))
-		var cost_fs := int(clampf(fit * 0.17, 14.0, 26.0))
-		var icon_px := clampf(fit * 0.20, 18.0, 32.0)
+		var hourglass_fs := int(clampf(fit * 0.38, 28.0, 52.0))
+		var duration_fs := int(clampf(fit * 0.24, 18.0, 34.0))
+		var cost_fs := int(clampf(fit * 0.22, 18.0, 32.0))
+		var icon_px := clampf(fit * 0.26, 22.0, 40.0)
 		if temp_slot_locked_vbox != null:
-			temp_slot_locked_vbox.add_theme_constant_override("separation", int(clampf(fit * 0.04, 2.0, 6.0)))
+			temp_slot_locked_vbox.add_theme_constant_override("separation", int(clampf(fit * 0.05, 3.0, 8.0)))
+		if temp_slot_locked_cost_row != null:
+			temp_slot_locked_cost_row.add_theme_constant_override("separation", int(clampf(fit * 0.03, 4.0, 8.0)))
 
 		temp_slot_locked_hourglass.add_theme_font_size_override("font_size", hourglass_fs)
 		temp_slot_locked_hourglass.add_theme_color_override("font_color", g)
