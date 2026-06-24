@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://cydaih53shfck"]
+
+[ext_resource type="Script" uid="uid://uaytsp4j8qkb" path="res://stack.gd" id="1_hmspu"]
+
+[node name="Stack" type="Node2D" unique_id=294333098]
+script = ExtResource("1_hmspu")

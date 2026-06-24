@@ -1,0 +1,9 @@
+# Godot 4+ specific ignores
+.godot/
+/android/
+.cursor/
+
+# Builds / export
+*.apk
+*.idsig
+export_credentials.cfg
