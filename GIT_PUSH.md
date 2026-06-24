@@ -17,8 +17,13 @@ Host github-emanuel
 	IdentitiesOnly yes
 ```
 
-3. Repositorio vacío en GitHub (sin README si ya commiteaste acá):
-   - https://github.com/emanueljeronimo/coin-stack-puzzle
+3. Repositorio vacío en GitHub (sin README ni .gitignore si ya commiteaste acá):
+   - Crear en: https://github.com/new
+   - Owner: **emanueljeronimo**
+   - Nombre sugerido: **coin-stack-puzzle**
+   - Visibility: la que prefieras
+   - **No** marques "Add a README file"
+   - URL final: https://github.com/emanueljeronimo/coin-stack-puzzle
 
 ## Probar la conexión
 
