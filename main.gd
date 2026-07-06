@@ -3,13 +3,17 @@ extends Node2D
 const StackScene = preload("res://stack.tscn")
 const StackScript = preload("res://stack.gd")
 const SlotOverlayBgScript = preload("res://slot_overlay_bg.gd")
-const BackgroundTexture = preload("res://Imagenes/fondo2-verde.png")
 const MixIconTexture = preload("res://Imagenes/icono-mezclar.png")
 const HammerIconTexture = preload("res://Imagenes/icono-martillo.png")
 const GloveIconTexture = preload("res://Imagenes/icono-mano.png")
 const DiamondIconTexture = preload("res://Imagenes/icono-estrella.png")
 const LifeIconTexture = preload("res://Imagenes/icono-vidas.png")
-const HomeScenePath := "res://Home.tscn"
+const StarIconTexture = preload("res://Imagenes/icono-estrella.png")
+const HomeIconTexture = preload("res://Imagenes/icono-home.png")
+const SettingsIconTexture = preload("res://Imagenes/icono-settings.png")
+const MenuButtonTexture = preload("res://Imagenes/boton-menu.png")
+const UiFont = preload("res://Fonts/Chewy-Regular.ttf")
+const LobbyScenePath := "res://Lobby.tscn"
 
 const TOTAL_SLOTS = 15
 const SLOT_COLUMNS = 5
@@ -30,7 +34,9 @@ const SLOT_ROW_GAP_RATIO = 0.06
 const SLOT_COLUMN_GAP_RATIO = 0.05
 ## Cuánto de la pantalla puede ocupar la grilla (ancho / alto útil).
 const GRID_FILL_WIDTH_RATIO = 0.98
+const GRID_FILL_WIDTH_RATIO_COMPACT = 0.90
 const GRID_FILL_HEIGHT_RATIO = 0.80
+const BOARD_COMPACT_VIEWPORT_MAX_W := 720.0
 const LAYOUT_SCALE_MIN = 0.50
 const LAYOUT_SCALE_MAX = 2.50
 const BOARD_GRID_WIDTH_PADDING = 1.0
@@ -46,23 +52,54 @@ const BOARD_BG_COLOR := Color(0.88, 0.94, 0.98, 0.28)
 const BOARD_GLOSS_COLOR := Color(0.98, 0.99, 1.0, 0.10)
 const BOARD_SHADOW_BASE := Color(0.20, 0.28, 0.36)
 const BOARD_ROW_COLOR := Color(0.86, 0.92, 0.97, 0.18)
-const BOARD_SLOT_ACTIVE_COLOR := Color(0.98, 0.76, 0.86, 0.34)
-const BOARD_SLOT_INACTIVE_COLOR := Color(0.98, 0.80, 0.90, 0.26)
-const BOARD_SLOT_TEMP_COLOR := Color(0.96, 0.78, 0.88, 0.22)
+const BOARD_SLOT_ACTIVE_COLOR := Color(0.98, 0.76, 0.86, 0.38)
+const BOARD_SLOT_INACTIVE_COLOR := Color(0.98, 0.82, 0.92, 0.20)
+const BOARD_SLOT_TEMP_COLOR := Color(0.96, 0.78, 0.88, 0.26)
+const BOARD_SLOT_BORDER_ACTIVE := Color(0.90, 0.52, 0.70, 0.82)
+const BOARD_SLOT_BORDER_INACTIVE := Color(0.84, 0.70, 0.82, 0.50)
+const BOARD_SLOT_BORDER_TEMP := Color(0.88, 0.58, 0.74, 0.62)
+const BOARD_SLOT_BORDER_SELECTED := Color(0.42, 0.72, 0.98, 0.95)
+const BOARD_SLOT_SELECTED_FILL := Color(0.62, 0.86, 1.0, 0.22)
+const BOARD_SLOT_BORDER_WIDTH := 3
+const BOARD_SLOT_INSET := 3.0
 ## Chips superiores (home, vidas, estrellas, settings).
 const HUD_SIZE_MULTIPLIER = 1.0
-const HUD_CHIP_HEIGHT = 58.0
-const HUD_CORNER_SIZE = 56.0
-const HUD_CHIP_LIFE_W = 148.0
-const HUD_CHIP_STARS_W = 130.0
+const HUD_CHIP_HEIGHT = 50.0
+const HUD_CORNER_SIZE = 70.0
+const HUD_CHIP_STAT_W = 172.0
+const HUD_BOARD_STAT_FONT_SIZE = 30
+const HUD_BOARD_LONG_ICON_RATIO = 0.56
+const HUD_BOARD_ROUND_ICON_RATIO = 0.74
 const HUD_CHIP_GAP = 26.0
 const HUD_CHIP_TO_PROGRESS_GAP = 26.0
 const HUD_EDGE_MARGIN = 14.0
+const HUD_PILL_TEXT := Color(0.95, 0.98, 0.92)
+const HUD_PILL_RADIUS := 34
+## Barra de progreso — violeta pastel acorde al tablero.
+const PROGRESS_TRACK_BG := Color(0.84, 0.80, 0.96, 0.92)
+const PROGRESS_TRACK_BORDER := Color(0.72, 0.66, 0.88, 0.88)
+const PROGRESS_KNOB_BG := Color(0.91, 0.87, 0.99, 0.97)
+const PROGRESS_KNOB_BORDER := Color(0.74, 0.68, 0.90, 0.9)
+const PROGRESS_TEXT := Color(0.44, 0.36, 0.58)
+const PROGRESS_FONT_SIZE := 30
+const PROGRESS_PERCENT_FONT_SIZE := 26
+const DIALOG_BTN_HEIGHT := 118.0
+const DIALOG_BTN_RADIUS := 36
+const DIALOG_TITLE_FONT_SIZE := 72
+const DIALOG_SUBTITLE_FONT_SIZE := 52
+const DIALOG_BTN_FONT_SIZE := 42
+const DIALOG_COMPACT_BTN_WIDTH_RATIO := 0.52
+const DIALOG_COMPACT_BTN_HEIGHT_RATIO := 0.70
+const DIALOG_COMPACT_BTN_FONT_SIZE := 50
+const WILDCARD_UNLOCK_CARD_HEIGHT := 760.0
+const WILDCARD_UNLOCK_TITLE_FONT_SIZE := 58
+const MENU_CARD_INNER_BTN_WIDTH_RATIO := 0.68
+const MENU_CARD_WIDTH_MAX := 920.0
 ## Botón Repartir y comodines.
 const CTA_WIDTH_RATIO = 0.40
 const CTA_HEIGHT = 62.0
 const CTA_FONT_SIZE = 38.0
-const WILDCARD_BUTTON_SIZE = 68.0
+const WILDCARD_BUTTON_SIZE = 76.0
 const WILDCARD_BUTTON_GAP = 24.0
 const AD_FOOTER_HEIGHT_RATIO = 0.16
 const AD_FOOTER_MIN_HEIGHT = 120.0
@@ -87,8 +124,9 @@ const SLOT_OVERLAY_GRAD_VERDE := Color(0.66, 0.88, 0.68, 0.94)
 const TEMP_SLOT_BOARD_INDEX := 4
 ## Compra opcional al lado de la última pila habilitada (estrellas mock); precio se duplica en cada compra.
 const ADJACENT_EXTRA_SLOT_BASE_PRICE := 600
-## Mock: al alcanzar este nivel de jugador la ranura extra sería gratis (solo texto UI).
-const ADJACENT_EXTRA_SLOT_FREE_AT_LEVEL := 8
+const INITIAL_PERMANENT_STACKS := 5
+const ADJACENT_SLOT_FREE_FIRST_LEVEL := 8
+const ADJACENT_SLOT_FREE_LEVEL_INTERVAL := 4
 ## Máximo de pilas en las otras 14 celdas; la 15ª pila solo aparece con ranura temporal activa.
 const MAX_PERMANENT_STACKS := 14
 const INITIAL_LIVES := 5
@@ -102,23 +140,23 @@ const AD_LIVES_AMOUNT := 1
 const CHECKPOINT_BASE_VALUE := 5
 ## "Más del 50 %": la pila tiene más de la mitad de su capacidad en fichas de ese valor.
 const CHECKPOINT_HALF_THRESHOLD := STACK_CAPACITY / 2
+## Tras crear la primera ficha de max_value, fusionar 10×(max_value-1) → max_value-1 otorga fichas max_value.
+const FUSION_BONUS_NEAR_CAP_COUNT := 9
+const FUSION_BONUS_FULL_AMOUNT := 2
+const FUSION_BONUS_REDUCED_AMOUNT := 1
 ## Orden de las 14 celdas permanentes: primero la fila de abajo (10→14) izq→der, luego la del medio, luego la de arriba sin la celda 4 (temporal).
 const PERMANENT_SLOT_ORDER := [10, 11, 12, 13, 14, 5, 6, 7, 8, 9, 0, 1, 2, 3]
-# --- Persistencia desactivada: siempre partida nueva al abrir el juego. ---
-# Antes: user://coin_stack_save.json (ruta virtual de Godot).
-# Windows (proyecto CoinStackPuzzle): %APPDATA%\Godot\app_userdata\CoinStackPuzzle\coin_stack_save.json
-# Para reactivar: restaurar SAVE_PATH/SAVE_VERSION, collect_save_dict/apply_save_dict, try_load en _ready,
-# save_game en _exit_tree, y cuerpos reales de save_game/try_load_saved_game.
-# const SAVE_PATH := "user://coin_stack_save.json"
-# const SAVE_VERSION := 2
+# --- Persistencia vía SaveManager (user://player_save.json) ---
 
-var active_stacks: int = 5
+var active_stacks: int = INITIAL_PERMANENT_STACKS
 var current_level: int = 1
 ## Nivel de checkpoint actual (el más alto alcanzado). Monótono: no baja aunque el tablero retroceda.
 ## Es el valor que se expone para save/load (ver get_current_level / collect_save_dict).
 var checkpoint_level: int = 1
 ## Tablero + progresión guardados al alcanzar cada checkpoint (GDD: inicio del último nivel alcanzado).
 var checkpoint_snapshot: Dictionary = {}
+## True cuando ya existe la primera ficha del objetivo actual (max_value).
+var fusion_target_bonus_unlocked: bool = false
 var max_value: int = 5
 var stacks: Array = []
 var selected_stack: Node = null
@@ -126,14 +164,21 @@ var board_locked: bool = false
 var hammer_mode_active: bool = false
 var background_sprite: Sprite2D = null
 var hud_layer: CanvasLayer = null
+var settings_layer: CanvasLayer = null
 var hud_root: Control = null
-var home_chip: Panel = null
-var life_chip: Panel = null
+var home_chip_shadow: Panel = null
+var home_chip: Control = null
+var home_chip_icon: TextureRect = null
+var life_chip_shadow: Panel = null
+var life_chip: Control = null
 var life_chip_icon: TextureRect = null
 var life_chip_label: Label = null
-var settings_chip: Panel = null
+var settings_chip_shadow: Panel = null
+var settings_chip: Control = null
+var settings_chip_icon: TextureRect = null
+var settings_ui: SettingsOverlay = null
 var progress_container: Panel = null
-var progress_fill: ColorRect = null
+var progress_fill: TextureRect = null
 var progress_knob: Panel = null
 var progress_left_label: Label = null
 var progress_right_label: Label = null
@@ -141,7 +186,7 @@ var progress_bar_max_width: float = 0.0
 var progress_bar_height: float = 0.0
 var progress_fill_tween: Tween = null
 var cta_shadow: Panel = null
-var cta_button: Panel = null
+var cta_button: Control = null
 var cta_label: Label = null
 var action_shadows: Array = []
 var action_pills: Array = []
@@ -162,7 +207,7 @@ var wildcard_unlock_granted := {
 ## Balance de gemas (diamantes); no hay chip en el HUD, solo lógica de compras.
 var gems: int = 756
 ## Mock para compras de ranura extra adyacente (no es la ranura temporal).
-var player_stars: int = 100000
+var player_stars: int = 1000000
 var adjacent_slot_next_price: int = ADJACENT_EXTRA_SLOT_BASE_PRICE
 ## Celda del tablero (0..14) donde se muestra la oferta; -1 si no aplica.
 var adjacent_offer_board_index: int = -1
@@ -191,7 +236,9 @@ var adjacent_slot_offer_lbl_cost: Label = null
 var adjacent_slot_offer_cost_icon: TextureRect = null
 var adjacent_slot_star_error_label: Label = null
 var adjacent_slot_star_error_tween: Tween = null
-var stars_chip: Panel = null
+var stars_chip_shadow: Panel = null
+var stars_chip: Control = null
+var stars_chip_icon: TextureRect = null
 var stars_chip_label: Label = null
 var purchase_overlay: ColorRect = null
 var purchase_card: Panel = null
@@ -210,40 +257,55 @@ var pending_purchase_type: String = ""
 var lives: int = INITIAL_LIVES
 ## Cartel "No hay movimientos" (bloqueo del tablero).
 var no_moves_overlay: ColorRect = null
-var no_moves_card: Panel = null
+var no_moves_card: Control = null
 var no_moves_margin: MarginContainer = null
 var no_moves_vbox: VBoxContainer = null
 var no_moves_title_label: Label = null
-var no_moves_restart_button: Button = null
-var no_moves_buy_button: Button = null
-var no_moves_ad_button: Button = null
+var no_moves_restart_button: Control = null
+var no_moves_buy_button: Control = null
+var no_moves_ad_button: Control = null
 ## Cartel al subir de nivel (checkpoint).
 var level_up_overlay: ColorRect = null
-var level_up_card: Panel = null
+var level_up_card: Control = null
 var level_up_margin: MarginContainer = null
 var level_up_vbox: VBoxContainer = null
 var level_up_title_label: Label = null
 var level_up_subtitle_label: Label = null
-var level_up_continue_button: Button = null
+var level_up_continue_button: Control = null
+## Cartel al desbloquear un comodín.
+var wildcard_unlock_overlay: ColorRect = null
+var wildcard_unlock_card: Control = null
+var wildcard_unlock_margin: MarginContainer = null
+var wildcard_unlock_vbox: VBoxContainer = null
+var wildcard_unlock_title_label: Label = null
+var wildcard_unlock_subtitle_label: Label = null
+var wildcard_unlock_continue_button: Control = null
+var _pending_wildcard_unlock_queue: Array[String] = []
 
 func _ready() -> void:
 	_apply_portrait_orientation()
 	_sync_player_resources_from_game_state()
 	randomize()
 	background_sprite = Sprite2D.new()
-	background_sprite.texture = BackgroundTexture
+	background_sprite.texture = GameState.get_background_theme_texture()
 	background_sprite.centered = false
 	background_sprite.z_as_relative = false
 	background_sprite.z_index = -100
 	add_child(background_sprite)
 	move_child(background_sprite, 0)
 	update_background_scale()
+	if not GameState.background_theme_changed.is_connected(_on_background_theme_changed):
+		GameState.background_theme_changed.connect(_on_background_theme_changed)
 	if not get_viewport().size_changed.is_connected(_on_viewport_resized):
 		get_viewport().size_changed.connect(_on_viewport_resized)
 	build_mock_ui()
-	# if not try_load_saved_game():
-	# 	setup_board()
-	setup_board()
+	SaveManager.register_session_collector(collect_save_dict)
+	try_load_saved_game()
+	if checkpoint_snapshot.is_empty():
+		setup_board()
+	else:
+		restore_checkpoint()
+	save_game()
 	configure_process_for_temp_slot()
 	queue_redraw()
 	print_status()
@@ -256,8 +318,7 @@ func _apply_portrait_orientation() -> void:
 	DisplayServer.screen_set_orientation(DisplayServer.SCREEN_PORTRAIT)
 
 func _exit_tree() -> void:
-	pass
-	# save_game()
+	save_game()
 
 func _process(delta: float) -> void:
 	if temp_slot_time_remaining <= 0.0:
@@ -320,23 +381,38 @@ func setup_board() -> void:
 	temp_slot_time_remaining = 0.0
 	configure_process_for_temp_slot()
 	adjacent_slot_next_price = ADJACENT_EXTRA_SLOT_BASE_PRICE
-	checkpoint_level = 1
+	checkpoint_level = maxi(1, GameState.player_level)
 	current_level = 1
 	max_value = CHECKPOINT_BASE_VALUE
-	active_stacks = 5
+	active_stacks = INITIAL_PERMANENT_STACKS
 	reset_wildcard_state()
 	clear_board_stacks()
 	create_stack_nodes(active_stacks)
 	fill_board_initial_random()
+	refresh_fusion_target_bonus_unlock()
+	try_unlock_adjacent_slots_by_level()
 	capture_checkpoint_snapshot()
 	_sync_slot_overlay_controls()
 	update_progress_bar(false)
 
 func save_game() -> void:
-	pass
+	_push_player_resources_to_game_state()
+	var session := collect_save_dict()
+	session["level"] = checkpoint_level
+	session["coins"] = player_stars
+	var pos := SaveManager.get_position()
+	session["position"] = {"x": pos.x, "y": pos.y}
+	SaveManager.merge_session_data(session)
+	SaveManager.save_game()
 
 func try_load_saved_game() -> bool:
-	return false
+	if not SaveManager.has_save_file():
+		return false
+	apply_save_dict(SaveManager.player_data)
+	var snap: Variant = SaveManager.player_data.get("checkpoint_snapshot", {})
+	if snap is Dictionary:
+		checkpoint_snapshot = snap.duplicate(true)
+	return true
 
 ## Estado persistible (save/load sigue desactivado; estos helpers quedan listos para reactivarlo).
 ## Incluye el nivel actual (checkpoint) como pide el sistema de checkpoints.
@@ -367,12 +443,12 @@ func apply_save_dict(data: Dictionary) -> void:
 	player_stars = int(data.get("player_stars", player_stars))
 
 func _input(event: InputEvent) -> void:
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		if is_control_clicked(home_chip, event.position):
-			go_to_home()
-			return
+	if settings_ui != null and settings_ui.is_open():
+		return
 	# Evitar click-through: si el cartel de subida de nivel está abierto, no procesar input del tablero.
 	if level_up_overlay != null and level_up_overlay.visible:
+		return
+	if wildcard_unlock_overlay != null and wildcard_unlock_overlay.visible:
 		return
 	# Evitar click-through: si el cartel de bloqueo está abierto, no procesar input del tablero.
 	if no_moves_overlay != null and no_moves_overlay.visible:
@@ -380,6 +456,10 @@ func _input(event: InputEvent) -> void:
 	# Evitar click-through: si el popup de compra está abierto, no procesar input del tablero.
 	if purchase_overlay != null and purchase_overlay.visible:
 		return
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		if is_control_clicked(home_chip, event.position):
+			go_to_home()
+			return
 	if board_locked:
 		return
 	if event.is_action_pressed("ui_accept"):
@@ -394,8 +474,6 @@ func _input(event: InputEvent) -> void:
 			return
 		if is_click_on_temp_slot_cell(event.position):
 			try_purchase_temp_slot()
-			return
-		if board_locked:
 			return
 		if hammer_mode_active:
 			var hammer_stack = get_stack_at_point(event.position)
@@ -424,6 +502,7 @@ func handle_click(mouse_pos: Vector2) -> void:
 	if selected_stack == null:
 		selected_stack = clicked_stack
 		selected_stack.set_selected(true)
+		queue_redraw()
 		return
 	if selected_stack == clicked_stack:
 		clear_selection()
@@ -452,21 +531,27 @@ func clear_selection() -> void:
 	if selected_stack != null:
 		selected_stack.set_selected(false)
 	selected_stack = null
+	queue_redraw()
 
 func go_to_home() -> void:
 	_push_player_resources_to_game_state()
 	save_game()
-	get_tree().change_scene_to_file(HomeScenePath)
+	SceneLoader.go_to(LobbyScenePath)
 
 func _sync_player_resources_from_game_state() -> void:
 	lives = GameState.lives
 	player_stars = GameState.player_stars
 	gems = GameState.gems
+	checkpoint_level = maxi(1, GameState.player_level)
+	if GameState.checkpoint_snapshot is Dictionary and not GameState.checkpoint_snapshot.is_empty():
+		checkpoint_snapshot = GameState.checkpoint_snapshot.duplicate(true)
 
 func _push_player_resources_to_game_state() -> void:
 	GameState.lives = lives
 	GameState.player_stars = player_stars
 	GameState.gems = gems
+	GameState.player_level = checkpoint_level
+	GameState.checkpoint_snapshot = checkpoint_snapshot.duplicate(true)
 
 func can_repartir() -> bool:
 	for stack in stacks:
@@ -527,11 +612,13 @@ func resolve_board_after_action() -> void:
 	if leveled_up:
 		_force_progress_bar_display(1.0)
 	if level_up_overlay == null or not level_up_overlay.visible:
-		board_locked = false
+		if wildcard_unlock_overlay == null or not wildcard_unlock_overlay.visible:
+			board_locked = false
 	print_status()
 	save_game()
 	if level_up_overlay == null or not level_up_overlay.visible:
-		check_blocked_state()
+		if wildcard_unlock_overlay == null or not wildcard_unlock_overlay.visible:
+			check_blocked_state()
 
 ## True si alguna pila tiene monedas en vuelo (animación de movimiento).
 func has_pending_coin_animations() -> bool:
@@ -544,6 +631,8 @@ func has_pending_coin_animations() -> bool:
 func check_blocked_state() -> void:
 	if level_up_overlay != null and level_up_overlay.visible:
 		return
+	if wildcard_unlock_overlay != null and wildcard_unlock_overlay.visible:
+		return
 	if no_moves_overlay != null and no_moves_overlay.visible:
 		return
 	if has_pending_coin_animations():
@@ -552,6 +641,9 @@ func check_blocked_state() -> void:
 		show_no_moves_panel()
 
 func resolve_fusions() -> void:
+	# El bonus solo aplica si ya había una ficha objetivo antes de esta cadena de fusiones.
+	# Si no, fusionar 4→5 y luego 3→4 en el mismo turno daría un 5 extra indebido.
+	var bonus_eligible := fusion_target_bonus_unlocked
 	var changed := true
 	var guard := 0
 	while changed and guard < 200:
@@ -566,8 +658,82 @@ func resolve_fusions() -> void:
 			if new_value < 0:
 				continue
 			stack.push(new_value)
+			if try_grant_fusion_create_bonus(new_value, stack, bonus_eligible) > 0:
+				changed = true
 			print("Fusion: ", base_value, "x10 -> ", new_value)
 			changed = true
+	refresh_fusion_target_bonus_unlock()
+
+func refresh_fusion_target_bonus_unlock() -> void:
+	fusion_target_bonus_unlocked = total_count_of_value(max_value) > 0
+
+func get_stack_board_row(stack_index: int) -> int:
+	var slot_index := get_board_slot_for_stack_index(stack_index)
+	return int(slot_index / SLOT_COLUMNS)
+
+func get_stack_indices_in_same_row(stack_index: int) -> Array:
+	var row := get_stack_board_row(stack_index)
+	var indices: Array = []
+	for i in range(stacks.size()):
+		if get_stack_board_row(i) == row:
+			indices.append(i)
+	return indices
+
+func try_grant_fusion_create_bonus(
+	fused_result_value: int,
+	fusion_stack: Node,
+	bonus_eligible: bool
+) -> int:
+	var trigger_value := max_value - 1
+	if trigger_value < 1 or fused_result_value != trigger_value:
+		return 0
+	if not bonus_eligible:
+		return 0
+	var on_board := total_count_of_value(max_value)
+	var amount := FUSION_BONUS_REDUCED_AMOUNT if on_board >= FUSION_BONUS_NEAR_CAP_COUNT else FUSION_BONUS_FULL_AMOUNT
+	return spawn_bonus_coins_on_fusion_row(fusion_stack, max_value, amount)
+
+func _pick_bonus_stack_in_row(row_stack_indices: Array, value: int, prefer_stack: Node) -> Node:
+	if prefer_stack != null and prefer_stack.can_receive_value(value):
+		return prefer_stack
+	for idx in row_stack_indices:
+		var stack = stacks[idx]
+		if stack == prefer_stack:
+			continue
+		if stack.top_value() == value and stack.can_receive_value(value):
+			return stack
+	for idx in row_stack_indices:
+		var stack = stacks[idx]
+		if stack.can_receive_value(value):
+			return stack
+	return null
+
+func spawn_bonus_coins_on_fusion_row(fusion_stack: Node, value: int, amount: int) -> int:
+	var fusion_idx := stacks.find(fusion_stack)
+	if fusion_idx < 0:
+		return 0
+	var row_indices := get_stack_indices_in_same_row(fusion_idx)
+	var placed := 0
+	for _i in range(amount):
+		var target := _pick_bonus_stack_in_row(row_indices, value, fusion_stack)
+		if target == null:
+			break
+		target.push(value)
+		placed += 1
+	if placed > 0:
+		print(
+			"Bonus objetivo %d: +%d ficha(s) en la misma fila (objetivo tablero: %d)"
+			% [value, placed, max_value]
+		)
+	return placed
+
+func total_count_of_value(value: int) -> int:
+	var total := 0
+	for stack in stacks:
+		for c in stack.coins:
+			if int(c) == value:
+				total += 1
+	return total
 
 func check_level_up() -> void:
 	var next_value = max_value + 1
@@ -580,6 +746,7 @@ func level_up() -> void:
 	current_level += 1
 	max_value += 1
 	print("Subiste al nivel ", current_level, ". Nuevo objetivo: ", max_value)
+	refresh_fusion_target_bonus_unlock()
 	if current_level % 2 == 0 and permanent_stack_count() < MAX_PERMANENT_STACKS:
 		active_stacks += 1
 		add_new_stack_for_level_unlock()
@@ -786,8 +953,10 @@ func update_progress_bar(animated: bool = false) -> void:
 		progress_fill_tween.tween_property(
 			progress_fill, "size", Vector2(target_w, progress_bar_height), 0.28
 		)
+		progress_fill_tween.finished.connect(_apply_progress_fill_gradient, CONNECT_ONE_SHOT)
 	else:
 		progress_fill.size = Vector2(target_w, progress_bar_height)
+	_apply_progress_fill_gradient()
 
 func _force_progress_bar_display(pct: float) -> void:
 	if progress_fill == null or progress_bar_max_width <= 0.0:
@@ -796,6 +965,28 @@ func _force_progress_bar_display(pct: float) -> void:
 	if progress_right_label != null:
 		progress_right_label.text = "%d%%" % int(round(pct * 100.0))
 	progress_fill.size = Vector2(progress_bar_max_width * pct, progress_bar_height)
+	_apply_progress_fill_gradient()
+
+func _apply_progress_fill_gradient() -> void:
+	if progress_fill == null or not progress_fill.has_method("configure"):
+		return
+	var fill_size := progress_fill.size
+	if fill_size.x < 2.0 or fill_size.y < 2.0:
+		return
+	var radius := int(maxi(fill_size.y * 0.45, 6.0))
+	progress_fill.configure(
+		radius,
+		HudTextureButtons.PILL_GRAD_CELESTE,
+		HudTextureButtons.PILL_GRAD_ROSA,
+		HudTextureButtons.PILL_GRAD_VERDE,
+		fill_size
+	)
+
+func _style_progress_label(lbl: Label, font_size: int) -> void:
+	if UiFont != null:
+		lbl.add_theme_font_override("font", UiFont)
+	lbl.add_theme_font_size_override("font_size", font_size)
+	lbl.add_theme_color_override("font_color", PROGRESS_TEXT)
 
 ## Actualiza el checkpoint de forma monótona (solo avanza). Devuelve true si subió.
 func update_checkpoint_level() -> bool:
@@ -803,9 +994,13 @@ func update_checkpoint_level() -> bool:
 	if lvl > checkpoint_level:
 		checkpoint_level = lvl
 		capture_checkpoint_snapshot()
+		GameState.player_level = checkpoint_level
+		GameState.checkpoint_snapshot = checkpoint_snapshot.duplicate(true)
 		sync_wildcard_unlocks()
+		try_unlock_adjacent_slots_by_level()
 		print("Checkpoint alcanzado: nivel ", checkpoint_level, " (tablero guardado)")
 		show_level_up_panel(checkpoint_level)
+		save_game()
 		return true
 	return false
 
@@ -866,6 +1061,8 @@ func restore_checkpoint() -> void:
 			for v in stack_data[i]:
 				stacks[i].push(int(v))
 	_restore_wildcard_state_from_snapshot()
+	refresh_fusion_target_bonus_unlock()
+	try_unlock_adjacent_slots_by_level()
 	_sync_slot_overlay_controls()
 	update_progress_bar(false)
 	queue_redraw()
@@ -953,14 +1150,30 @@ func _draw() -> void:
 		if i == adjacent_offer_board_index and adjacent_offer_board_index >= 0:
 			continue
 		var slot_rect = get_slot_rect(i)
+		var inset: float = BOARD_SLOT_INSET * get_layout_scale()
+		slot_rect = slot_rect.grow(-inset)
+		var selected_slot_idx := _get_selected_board_slot_index()
+		var is_selected_slot := selected_slot_idx >= 0 and i == selected_slot_idx
 		var slot_style := StyleBoxFlat.new()
 		if i == TEMP_SLOT_BOARD_INDEX and not temp_slot_bonus_active:
-			# Celda base suave; el cartel crema lo dibuja temp_slot_locked_root encima.
 			slot_style.bg_color = BOARD_SLOT_TEMP_COLOR
+			slot_style.border_color = BOARD_SLOT_BORDER_TEMP
+		elif is_selected_slot:
+			slot_style.bg_color = BOARD_SLOT_SELECTED_FILL
+			slot_style.border_color = BOARD_SLOT_BORDER_SELECTED
 		elif is_slot_active(i):
 			slot_style.bg_color = BOARD_SLOT_ACTIVE_COLOR
+			slot_style.border_color = BOARD_SLOT_BORDER_ACTIVE
 		else:
 			slot_style.bg_color = BOARD_SLOT_INACTIVE_COLOR
+			slot_style.border_color = BOARD_SLOT_BORDER_INACTIVE
+		var border_w := int(maxi(BOARD_SLOT_BORDER_WIDTH * get_layout_scale(), 2.0))
+		if is_selected_slot:
+			border_w += 1
+		slot_style.border_width_left = border_w
+		slot_style.border_width_top = border_w
+		slot_style.border_width_right = border_w
+		slot_style.border_width_bottom = border_w
 		slot_style.corner_radius_top_left = 18
 		slot_style.corner_radius_top_right = 18
 		slot_style.corner_radius_bottom_left = 18
@@ -974,6 +1187,7 @@ func _on_viewport_resized() -> void:
 	layout_purchase_dialog_controls()
 	layout_no_moves_dialog_controls()
 	layout_level_up_dialog_controls()
+	layout_wildcard_unlock_dialog_controls()
 	_sync_slot_overlay_controls()
 	queue_redraw()
 
@@ -981,11 +1195,18 @@ func update_background_scale() -> void:
 	var viewport_size = get_viewport_rect().size
 	if background_sprite == null:
 		return
-	if BackgroundTexture != null and BackgroundTexture.get_size().x > 0 and BackgroundTexture.get_size().y > 0:
+	var tex := background_sprite.texture
+	if tex != null and tex.get_size().x > 0 and tex.get_size().y > 0:
 		background_sprite.scale = Vector2(
-			viewport_size.x / BackgroundTexture.get_size().x,
-			viewport_size.y / BackgroundTexture.get_size().y
+			viewport_size.x / tex.get_size().x,
+			viewport_size.y / tex.get_size().y
 		)
+
+func _on_background_theme_changed(_theme_id: String) -> void:
+	if background_sprite == null:
+		return
+	background_sprite.texture = GameState.get_background_theme_texture()
+	update_background_scale()
 
 func get_unscaled_stack_footprint() -> Vector2:
 	return Vector2(float(StackScript.STACK_WIDTH), float(StackScript.get_visual_height()))
@@ -1089,6 +1310,29 @@ func _occupied_board_slot_index_set() -> Dictionary:
 		occ[bi] = true
 	return occ
 
+
+func get_adjacent_slot_free_unlock_level() -> int:
+	var tiers := maxi(0, active_stacks - INITIAL_PERMANENT_STACKS)
+	return ADJACENT_SLOT_FREE_FIRST_LEVEL + tiers * ADJACENT_SLOT_FREE_LEVEL_INTERVAL
+
+func try_unlock_adjacent_slots_by_level() -> void:
+	var unlocked := false
+	while active_stacks < MAX_PERMANENT_STACKS:
+		if find_adjacent_extra_slot_offer_board_index() < 0:
+			break
+		if checkpoint_level < get_adjacent_slot_free_unlock_level():
+			break
+		active_stacks += 1
+		add_new_stack_for_level_unlock()
+		unlocked = true
+	if unlocked:
+		refresh_all_stack_layout()
+		queue_redraw()
+		save_game()
+		print(
+			"Ranura extra gratis (nivel %d, próxima gratis: %d)"
+			% [checkpoint_level, get_adjacent_slot_free_unlock_level()]
+		)
 
 func find_adjacent_extra_slot_offer_board_index() -> int:
 	if stacks.is_empty() or active_stacks < 1:
@@ -1228,6 +1472,11 @@ func try_purchase_adjacent_extra_slot() -> void:
 		return
 	if active_stacks >= 14:
 		return
+	if checkpoint_level >= get_adjacent_slot_free_unlock_level():
+		try_unlock_adjacent_slots_by_level()
+		_sync_slot_overlay_controls()
+		queue_redraw()
+		return
 	if player_stars < adjacent_slot_next_price:
 		show_adjacent_slot_insufficient_stars_message()
 		return
@@ -1264,7 +1513,8 @@ func update_adjacent_slot_offer_ui() -> void:
 
 	var g := TEMP_LOCKED_PANEL_GREEN
 	if adjacent_slot_offer_lbl_level != null:
-		adjacent_slot_offer_lbl_level.text = "Gratis al nivel %d" % ADJACENT_EXTRA_SLOT_FREE_AT_LEVEL
+		var free_level := get_adjacent_slot_free_unlock_level()
+		adjacent_slot_offer_lbl_level.text = "Gratis al nivel %d" % free_level
 		adjacent_slot_offer_lbl_level.add_theme_font_size_override("font_size", int(clampf(fit * 0.15, 16.0, 30.0)))
 		adjacent_slot_offer_lbl_level.add_theme_color_override("font_color", g)
 	if adjacent_slot_offer_lbl_lock != null:
@@ -1466,12 +1716,23 @@ func get_ad_footer_height() -> float:
 	var viewport_height = get_viewport_rect().size.y
 	return clampf(viewport_height * AD_FOOTER_HEIGHT_RATIO, AD_FOOTER_MIN_HEIGHT, AD_FOOTER_MAX_HEIGHT)
 
+func _uses_compact_board_layout() -> bool:
+	var os_name := OS.get_name()
+	if os_name == "Android" or os_name == "iOS":
+		return true
+	return get_viewport_rect().size.x <= BOARD_COMPACT_VIEWPORT_MAX_W
+
+func get_board_fill_width_ratio() -> float:
+	if _uses_compact_board_layout():
+		return GRID_FILL_WIDTH_RATIO_COMPACT
+	return GRID_FILL_WIDTH_RATIO
+
 func get_layout_scale() -> float:
 	var viewport_size: Vector2 = get_viewport_rect().size
 	var avail_h: float = viewport_size.y - get_ad_footer_height()
 	var grid_size: Vector2 = get_unscaled_grid_size()
 	var width_scale: float = (
-		viewport_size.x * GRID_FILL_WIDTH_RATIO / (grid_size.x * BOARD_GRID_WIDTH_PADDING)
+		viewport_size.x * get_board_fill_width_ratio() / (grid_size.x * BOARD_GRID_WIDTH_PADDING)
 	)
 	var height_scale: float = (
 		avail_h * GRID_FILL_HEIGHT_RATIO / (grid_size.y * BOARD_GRID_HEIGHT_PADDING)
@@ -1495,12 +1756,80 @@ func get_panel_corner_radius() -> int:
 func get_hud_layout_scale() -> float:
 	return get_layout_scale() * HUD_SIZE_MULTIPLIER
 
-func _apply_chip_font(chip: Panel, font_size: int) -> void:
+func _apply_chip_font(_chip: Control, _font_size: int) -> void:
+	pass
+
+func _hud_pill_radius(scale: float) -> int:
+	return int(HUD_PILL_RADIUS * scale)
+
+func _apply_hud_chip_styles(shadow: Panel, pill: Control, radius: int, pill_size: Vector2) -> void:
+	HudTextureButtons.apply_shadow_corner_radius(shadow, radius)
+	HudTextureButtons.apply_gradient_pill_style(pill, radius, pill_size)
+
+func create_hud_text_label(text: String, font_size: int) -> Label:
+	var lbl := create_label(text, font_size, HUD_PILL_TEXT)
+	if UiFont != null:
+		lbl.add_theme_font_override("font", UiFont)
+	return lbl
+
+func layout_hud_pill_pair(shadow: Panel, panel: Control, pos: Vector2, size: Vector2, scale: float) -> void:
+	if panel != null:
+		panel.position = pos
+		panel.size = size
+	if shadow != null:
+		shadow.position = pos + Vector2(0, 6.0 * scale)
+		shadow.size = size
+
+func _bind_hud_chip_click(chip: Control, callback: Callable) -> void:
 	if chip == null:
 		return
-	var lbl: Label = chip.get_meta("chip_label")
-	if lbl != null:
-		lbl.add_theme_font_size_override("font_size", font_size)
+	chip.gui_input.connect(func(event: InputEvent) -> void:
+		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			callback.call()
+	)
+
+func _open_settings() -> void:
+	if settings_ui != null:
+		settings_ui.open()
+
+func _build_hud_icon_chip(icon_texture: Texture2D) -> Dictionary:
+	var radius := HUD_PILL_RADIUS
+	var shadow := create_shadow_panel(radius)
+	var panel := HudTextureButtons.create_gradient_pill()
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(center)
+	var icon := TextureRect.new()
+	icon.texture = icon_texture
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	center.add_child(icon)
+	return {"shadow": shadow, "panel": panel, "icon": icon}
+
+func _build_hud_stat_chip(icon_texture: Texture2D, text: String) -> Dictionary:
+	var radius := HUD_PILL_RADIUS
+	var shadow := create_shadow_panel(radius)
+	var panel := HudTextureButtons.create_gradient_pill()
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(center)
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 8)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	center.add_child(row)
+	var icon := TextureRect.new()
+	icon.texture = icon_texture
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(icon)
+	var lbl := create_hud_text_label(text, HUD_BOARD_STAT_FONT_SIZE)
+	row.add_child(lbl)
+	return {"shadow": shadow, "panel": panel, "icon": icon, "label": lbl}
 
 func build_mock_ui() -> void:
 	hud_layer = CanvasLayer.new()
@@ -1512,28 +1841,48 @@ func build_mock_ui() -> void:
 	hud_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hud_layer.add_child(hud_root)
 
-	home_chip = create_chip_panel("⌂", Color(0.97, 0.97, 0.93, 0.92), Color(0.84, 0.87, 0.79, 0.85), 30)
-	home_chip.mouse_filter = Control.MOUSE_FILTER_STOP
-	life_chip = create_chip_with_icon_panel(LifeIconTexture, "%d  Vidas" % lives, Color(0.97, 0.97, 0.93, 0.92), Color(0.84, 0.87, 0.79, 0.85), 24)
-	life_chip_icon = life_chip.get_meta("chip_icon")
-	life_chip_label = life_chip.get_meta("chip_label")
-	stars_chip = create_chip_panel("%d ⭐" % player_stars, Color(0.97, 0.97, 0.93, 0.92), Color(0.84, 0.87, 0.79, 0.85), 22)
-	stars_chip_label = stars_chip.get_meta("chip_label")
-	settings_chip = create_chip_panel("⚙", Color(0.97, 0.97, 0.93, 0.92), Color(0.84, 0.87, 0.79, 0.85), 30)
+	var home_parts := _build_hud_icon_chip(HomeIconTexture)
+	home_chip_shadow = home_parts.shadow
+	home_chip = home_parts.panel
+	home_chip_icon = home_parts.icon
+	var life_parts := _build_hud_stat_chip(
+		LifeIconTexture, HudTextureButtons.format_lives_text(lives)
+	)
+	life_chip_shadow = life_parts.shadow
+	life_chip = life_parts.panel
+	life_chip_icon = life_parts.icon
+	life_chip_label = life_parts.label
+	var stars_parts := _build_hud_stat_chip(
+		StarIconTexture, HudTextureButtons.format_stat_number(player_stars)
+	)
+	stars_chip_shadow = stars_parts.shadow
+	stars_chip = stars_parts.panel
+	stars_chip_icon = stars_parts.icon
+	stars_chip_label = stars_parts.label
+	var settings_parts := _build_hud_icon_chip(SettingsIconTexture)
+	settings_chip_shadow = settings_parts.shadow
+	settings_chip = settings_parts.panel
+	settings_chip_icon = settings_parts.icon
+	_bind_hud_chip_click(settings_chip, _open_settings)
+	hud_root.add_child(home_chip_shadow)
 	hud_root.add_child(home_chip)
+	hud_root.add_child(life_chip_shadow)
 	hud_root.add_child(life_chip)
+	hud_root.add_child(stars_chip_shadow)
 	hud_root.add_child(stars_chip)
+	hud_root.add_child(settings_chip_shadow)
 	hud_root.add_child(settings_chip)
 
-	progress_container = create_panel(Color(0.95, 0.96, 0.90, 0.94), Color(0.84, 0.88, 0.78, 0.9), 24)
-	progress_fill = ColorRect.new()
-	progress_fill.color = Color(0.56, 0.80, 0.30, 0.92)
+	progress_container = create_panel(PROGRESS_TRACK_BG, PROGRESS_TRACK_BORDER, 24)
+	progress_container.clip_contents = true
+	progress_fill = SlotOverlayBgScript.new()
 	progress_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	progress_fill.clip_contents = true
 	progress_container.add_child(progress_fill)
-	progress_knob = create_panel(Color(0.97, 0.98, 0.92, 0.96), Color(0.70, 0.82, 0.53, 0.9), 24)
-	progress_left_label = create_label("1", 30, Color(0.31, 0.46, 0.25))
-	progress_right_label = create_label("0%", 28, Color(0.31, 0.46, 0.25))
+	progress_knob = create_panel(PROGRESS_KNOB_BG, PROGRESS_KNOB_BORDER, 24)
+	progress_left_label = create_label("1", PROGRESS_FONT_SIZE, PROGRESS_TEXT)
+	_style_progress_label(progress_left_label, PROGRESS_FONT_SIZE)
+	progress_right_label = create_label("0%", PROGRESS_PERCENT_FONT_SIZE, PROGRESS_TEXT)
+	_style_progress_label(progress_right_label, PROGRESS_PERCENT_FONT_SIZE)
 	progress_container.add_child(progress_knob)
 	progress_container.add_child(progress_left_label)
 	progress_container.add_child(progress_right_label)
@@ -1541,15 +1890,16 @@ func build_mock_ui() -> void:
 
 	cta_shadow = create_shadow_panel(36)
 	hud_root.add_child(cta_shadow)
-	cta_button = create_panel(Color(0.64, 0.83, 0.43, 0.95), Color(0.75, 0.88, 0.58, 1.0), 34)
-	cta_label = create_label("Repartir", 52, Color(0.95, 0.98, 0.92))
+	cta_button = HudTextureButtons.create_gradient_pill()
+	cta_label = create_hud_text_label("Repartir", int(CTA_FONT_SIZE))
+	cta_label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	cta_button.add_child(cta_label)
 	hud_root.add_child(cta_button)
 
 	var action_index := 0
 	for action_text in ["Mezclar", "Martillo", "Guante"]:
-		var action_shadow = create_shadow_panel(42)
-		var action = create_panel(Color(0.96, 0.97, 0.92, 0.94), Color(0.84, 0.88, 0.78, 0.9), 40)
+		var action_shadow = create_shadow_panel(40)
+		var action = HudTextureButtons.create_gradient_pill()
 		var wildcard_type: String = WILDCARD_TYPES[action_index]
 		var icon = create_wildcard_icon_texture_rect(get_wildcard_icon_texture(wildcard_type))
 		var lbl = create_label(action_text, 24, Color(0.29, 0.45, 0.29))
@@ -1575,6 +1925,8 @@ func build_mock_ui() -> void:
 
 	build_level_up_dialog()
 
+	build_wildcard_unlock_dialog()
+
 	build_temp_slot_locked_ui()
 
 	temp_slot_timer_label = Label.new()
@@ -1585,6 +1937,12 @@ func build_mock_ui() -> void:
 	hud_layer.add_child(temp_slot_timer_label)
 
 	build_adjacent_slot_offer_ui()
+
+	settings_layer = CanvasLayer.new()
+	settings_layer.layer = 100
+	add_child(settings_layer)
+	settings_ui = SettingsOverlay.new()
+	settings_layer.add_child(settings_ui)
 
 	adjacent_slot_star_error_label = Label.new()
 	adjacent_slot_star_error_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1606,31 +1964,53 @@ func layout_mock_ui() -> void:
 	var viewport_size = get_viewport_rect().size
 	var board_rect = get_board_rect()
 	var scale = get_layout_scale()
-	var chip_y = maxf(12.0 * scale, board_rect.position.y - 132.0 * scale)
-	var chip_h = HUD_CHIP_HEIGHT * scale
+	var chip_y: float = maxf(12.0 * scale, board_rect.position.y - 132.0 * scale)
 	var gap = HUD_CHIP_GAP * scale
 	var edge_margin = HUD_EDGE_MARGIN * scale
-	var corner_size = HUD_CORNER_SIZE * scale
-	var life_w = HUD_CHIP_LIFE_W * scale
-	var stars_w = HUD_CHIP_STARS_W * scale
-	var total_w = life_w + stars_w + gap
+	var corner_w = HUD_CORNER_SIZE * scale
+	var stat_w = HUD_CHIP_STAT_W * scale
+	var chip_h: float = HUD_CHIP_HEIGHT * scale
+	var corner_size := Vector2(corner_w, chip_h)
+	var stat_size := Vector2(stat_w, chip_h)
+	var pill_radius := _hud_pill_radius(scale)
+	var total_w = stat_size.x + gap + stat_size.x
 	var start_x = (viewport_size.x - total_w) * 0.5
-	home_chip.position = Vector2(edge_margin, chip_y)
-	home_chip.size = Vector2(corner_size, chip_h)
-	life_chip.position = Vector2(start_x, chip_y)
-	life_chip.size = Vector2(life_w, chip_h)
+	var icon_corner := chip_h * HUD_BOARD_ROUND_ICON_RATIO
+	var icon_stat := chip_h * HUD_BOARD_LONG_ICON_RATIO
+	var stat_font := int(HUD_BOARD_STAT_FONT_SIZE * scale)
+
+	layout_hud_pill_pair(home_chip_shadow, home_chip, Vector2(edge_margin, chip_y), corner_size, scale)
+	_apply_hud_chip_styles(home_chip_shadow, home_chip, pill_radius, corner_size)
+	home_chip_icon.custom_minimum_size = Vector2(icon_corner, icon_corner)
+
+	layout_hud_pill_pair(life_chip_shadow, life_chip, Vector2(start_x, chip_y), stat_size, scale)
+	_apply_hud_chip_styles(life_chip_shadow, life_chip, pill_radius, stat_size)
+	life_chip_icon.custom_minimum_size = Vector2(icon_stat, icon_stat)
+	if life_chip_label != null:
+		life_chip_label.add_theme_font_size_override("font_size", stat_font)
+
 	if stars_chip != null:
-		stars_chip.position = Vector2(start_x + life_w + gap, chip_y)
-		stars_chip.size = Vector2(stars_w, chip_h)
-	settings_chip.position = Vector2(viewport_size.x - edge_margin - corner_size, chip_y)
-	settings_chip.size = Vector2(corner_size, chip_h)
-	_apply_chip_font(home_chip, int(30.0 * scale))
-	_apply_chip_font(settings_chip, int(30.0 * scale))
-	_apply_chip_font(life_chip, int(24.0 * scale))
-	_apply_chip_font(stars_chip, int(22.0 * scale))
-	if life_chip_icon != null:
-		var life_icon_size = chip_h * 0.72
-		life_chip_icon.custom_minimum_size = Vector2(life_icon_size, life_icon_size)
+		layout_hud_pill_pair(
+			stars_chip_shadow,
+			stars_chip,
+			Vector2(start_x + stat_size.x + gap, chip_y),
+			stat_size,
+			scale
+		)
+		_apply_hud_chip_styles(stars_chip_shadow, stars_chip, pill_radius, stat_size)
+		stars_chip_icon.custom_minimum_size = Vector2(icon_stat, icon_stat)
+		if stars_chip_label != null:
+			stars_chip_label.add_theme_font_size_override("font_size", stat_font)
+
+	layout_hud_pill_pair(
+		settings_chip_shadow,
+		settings_chip,
+		Vector2(viewport_size.x - edge_margin - corner_size.x, chip_y),
+		corner_size,
+		scale
+	)
+	_apply_hud_chip_styles(settings_chip_shadow, settings_chip, pill_radius, corner_size)
+	settings_chip_icon.custom_minimum_size = Vector2(icon_corner, icon_corner)
 
 	var progress_w = viewport_size.x * 0.78
 	var progress_h = 54 * scale
@@ -1647,6 +2027,8 @@ func layout_mock_ui() -> void:
 	progress_left_label.size = progress_knob.size
 	progress_right_label.position = Vector2(progress_w - 62 * scale, 0)
 	progress_right_label.size = Vector2(54 * scale, progress_h)
+	_style_progress_label(progress_left_label, int(PROGRESS_FONT_SIZE * scale))
+	_style_progress_label(progress_right_label, int(PROGRESS_PERCENT_FONT_SIZE * scale))
 	update_progress_bar(false)
 
 	var cta_w = board_rect.size.x * CTA_WIDTH_RATIO
@@ -1655,8 +2037,7 @@ func layout_mock_ui() -> void:
 	cta_button.size = Vector2(cta_w, cta_h)
 	cta_shadow.position = cta_button.position + Vector2(0, 6 * scale)
 	cta_shadow.size = cta_button.size
-	cta_label.position = Vector2(0, 0)
-	cta_label.size = cta_button.size
+	_apply_hud_chip_styles(cta_shadow, cta_button, pill_radius, cta_button.size)
 	if cta_label != null:
 		cta_label.add_theme_font_size_override("font_size", int(CTA_FONT_SIZE * scale))
 
@@ -1674,7 +2055,10 @@ func layout_mock_ui() -> void:
 		action_shadows[i].size = Vector2(action_size, action_size)
 		action_pills[i].position = Vector2(x, action_y)
 		action_pills[i].size = Vector2(action_size, action_size)
-		var icon_size = action_size * 0.88
+		_apply_hud_chip_styles(
+			action_shadows[i], action_pills[i], int(38 * scale), Vector2(action_size, action_size)
+		)
+		var icon_size = action_size * 0.62
 		action_icons[i].position = Vector2(
 			x + (action_size - icon_size) * 0.5,
 			action_y + (action_size - icon_size) * 0.5
@@ -1689,9 +2073,12 @@ func layout_mock_ui() -> void:
 
 	_sync_slot_overlay_controls()
 
+	if settings_ui != null:
+		settings_ui.layout_for_viewport(viewport_size)
+
 func update_life_display() -> void:
 	if life_chip_label != null:
-		life_chip_label.text = "%d  Vidas" % lives
+		life_chip_label.text = HudTextureButtons.format_lives_text(lives)
 
 func create_panel(bg: Color, border: Color, radius: int) -> Panel:
 	var panel = Panel.new()
@@ -1722,50 +2109,6 @@ func create_shadow_panel(radius: int) -> Panel:
 	panel.add_theme_stylebox_override("panel", style)
 	return panel
 
-func create_chip_panel(text: String, bg: Color, border: Color, font_size: int) -> Panel:
-	var panel = create_panel(bg, border, 28)
-	panel.clip_contents = true
-	var lbl = create_label(text, font_size, Color(0.24, 0.43, 0.25))
-	lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
-	lbl.offset_left = 0
-	lbl.offset_top = 0
-	lbl.offset_right = 0
-	lbl.offset_bottom = 0
-	panel.add_child(lbl)
-	panel.set_meta("chip_label", lbl)
-	return panel
-
-func create_chip_with_icon_panel(texture: Texture2D, text: String, bg: Color, border: Color, font_size: int) -> Panel:
-	var panel = create_panel(bg, border, 28)
-	panel.clip_contents = true
-	var content := HBoxContainer.new()
-	content.set_anchors_preset(Control.PRESET_FULL_RECT)
-	content.offset_left = 12
-	content.offset_top = 0
-	content.offset_right = -12
-	content.offset_bottom = 0
-	content.alignment = BoxContainer.ALIGNMENT_CENTER
-	content.add_theme_constant_override("separation", 8)
-	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	panel.add_child(content)
-
-	var icon := TextureRect.new()
-	icon.texture = texture
-	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	icon.custom_minimum_size = Vector2(font_size * 1.65, font_size * 1.65)
-	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	content.add_child(icon)
-
-	var lbl = create_label(text, font_size, Color(0.24, 0.43, 0.25))
-	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	content.add_child(lbl)
-
-	panel.set_meta("chip_label", lbl)
-	panel.set_meta("chip_icon", icon)
-	return panel
-
 func create_label(text: String, font_size: int, color: Color) -> Label:
 	var lbl = Label.new()
 	lbl.text = text
@@ -1781,6 +2124,17 @@ func is_slot_active(slot_index: int) -> bool:
 		if get_board_slot_for_stack_index(i) == slot_index:
 			return true
 	return false
+
+func _get_selected_board_slot_index() -> int:
+	if selected_stack == null:
+		return -1
+	var stack_idx: int = stacks.find(selected_stack)
+	if stack_idx < 0:
+		return -1
+	return get_board_slot_for_stack_index(stack_idx)
+
+func _dialog_inner_button_width(card_w: float) -> float:
+	return card_w * MENU_CARD_INNER_BTN_WIDTH_RATIO
 
 func is_control_clicked(ctrl: Control, point: Vector2) -> bool:
 	if ctrl == null or not ctrl.visible:
@@ -1941,8 +2295,11 @@ func sync_wildcard_unlocks() -> void:
 	for wildcard_type in WILDCARD_TYPES:
 		if is_wildcard_unlocked(wildcard_type):
 			if not wildcard_unlock_granted.get(wildcard_type, false):
+				var show_panel := int(wildcard_counts.get(wildcard_type, 0)) == 0
 				wildcard_counts[wildcard_type] = WILDCARD_INITIAL_USES
 				wildcard_unlock_granted[wildcard_type] = true
+				if show_panel:
+					queue_wildcard_unlock_panel(wildcard_type)
 				print(
 					"Comodín desbloqueado: %s (%d usos gratis)"
 					% [get_wildcard_display_name(wildcard_type), WILDCARD_INITIAL_USES]
@@ -1979,7 +2336,7 @@ func update_gem_display() -> void:
 
 func update_stars_display() -> void:
 	if stars_chip_label != null:
-		stars_chip_label.text = "%d ⭐" % player_stars
+		stars_chip_label.text = HudTextureButtons.format_stat_number(player_stars)
 
 func build_purchase_dialog() -> void:
 	purchase_overlay = ColorRect.new()
@@ -2150,9 +2507,20 @@ func get_wildcard_display_name(wildcard_type: String) -> String:
 		"hammer":
 			return "Martillo"
 		"glove":
-			return "Guante"
+			return "Mano"
 		_:
-			return "comodin"
+			return "Comodín"
+
+func get_wildcard_unlock_description(wildcard_type: String) -> String:
+	match wildcard_type:
+		"mix":
+			return "Se usa para reorganizar las fichas del tablero existentes por color."
+		"hammer":
+			return "Elimina una pila entera de fichas a elección."
+		"glove":
+			return "Aún no está disponible."
+		_:
+			return ""
 
 func get_wildcard_icon_texture(wildcard_type: String) -> Texture2D:
 	match wildcard_type:
@@ -2187,6 +2555,64 @@ func make_flat_style(bg: Color, border: Color, radius: int, border_width: int) -
 	style.corner_radius_bottom_right = radius
 	return style
 
+func _create_dialog_card(clip_contents: bool = true) -> Control:
+	var card := Control.new()
+	card.mouse_filter = Control.MOUSE_FILTER_STOP
+	card.clip_contents = clip_contents
+	var bg := TextureRect.new()
+	bg.texture = MenuButtonTexture
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.offset_left = 0
+	bg.offset_top = 0
+	bg.offset_right = 0
+	bg.offset_bottom = 0
+	bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	bg.stretch_mode = TextureRect.STRETCH_SCALE
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(bg)
+	return card
+
+func _style_dialog_title_label(lbl: Label, font_size: int) -> void:
+	if UiFont != null:
+		lbl.add_theme_font_override("font", UiFont)
+	lbl.add_theme_font_size_override("font_size", font_size)
+	lbl.add_theme_color_override("font_color", HudTextureButtons.BTN_TEXT_COLOR)
+	lbl.add_theme_color_override("font_outline_color", HudTextureButtons.BTN_TEXT_OUTLINE)
+	lbl.add_theme_constant_override("outline_size", 4)
+
+func make_dialog_gradient_button(text: String, font_size: int = DIALOG_BTN_FONT_SIZE, compact: bool = false) -> Control:
+	var btn := HudTextureButtons.create_gradient_pill()
+	btn.focus_mode = Control.FOCUS_NONE
+	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER if compact else Control.SIZE_EXPAND_FILL
+	btn.custom_minimum_size = Vector2(0, DIALOG_BTN_HEIGHT)
+	btn.set_meta("compact", compact)
+	var lbl := HudTextureButtons.create_button_label(text, font_size)
+	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
+	lbl.offset_left = 20
+	lbl.offset_right = -20
+	lbl.offset_top = 8
+	lbl.offset_bottom = -8
+	btn.add_child(lbl)
+	btn.set_meta("label", lbl)
+	return btn
+
+func _layout_dialog_gradient_button(btn: Control, btn_w: float, scale: float, font_size: int) -> void:
+	if btn == null:
+		return
+	var compact: bool = btn.get_meta("compact", false)
+	var width_ratio: float = DIALOG_COMPACT_BTN_WIDTH_RATIO if compact else 1.0
+	var height_ratio: float = DIALOG_COMPACT_BTN_HEIGHT_RATIO if compact else 1.0
+	var actual_w: float = btn_w * width_ratio
+	var btn_h: float = DIALOG_BTN_HEIGHT * scale * height_ratio
+	btn.custom_minimum_size = Vector2(actual_w, btn_h)
+	var radius := int(DIALOG_BTN_RADIUS * scale * (height_ratio if compact else 1.0))
+	HudTextureButtons.apply_gradient_pill_style(btn, radius, Vector2(actual_w, btn_h))
+	var lbl: Label = btn.get_meta("label")
+	if lbl != null:
+		lbl.add_theme_font_size_override("font_size", int(font_size * scale))
+
 func build_no_moves_dialog() -> void:
 	no_moves_overlay = ColorRect.new()
 	no_moves_overlay.color = Color(0.0, 0.0, 0.0, 0.45)
@@ -2198,8 +2624,7 @@ func build_no_moves_dialog() -> void:
 	no_moves_overlay.z_index = 320
 	hud_layer.add_child(no_moves_overlay)
 
-	no_moves_card = create_panel(Color(0.95, 0.97, 0.92, 0.985), Color(0.86, 0.91, 0.81, 1.0), 48)
-	no_moves_card.mouse_filter = Control.MOUSE_FILTER_STOP
+	no_moves_card = _create_dialog_card()
 	no_moves_card.z_as_relative = false
 	no_moves_card.z_index = 321
 	no_moves_overlay.add_child(no_moves_card)
@@ -2215,50 +2640,26 @@ func build_no_moves_dialog() -> void:
 	no_moves_vbox.add_theme_constant_override("separation", 28)
 	no_moves_margin.add_child(no_moves_vbox)
 
-	no_moves_title_label = create_label("No hay movimientos", 64, Color(0.24, 0.45, 0.26))
+	no_moves_title_label = create_label("No hay movimientos", DIALOG_TITLE_FONT_SIZE, HudTextureButtons.BTN_TEXT_COLOR)
+	_style_dialog_title_label(no_moves_title_label, DIALOG_TITLE_FONT_SIZE)
 	no_moves_title_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	no_moves_vbox.add_child(no_moves_title_label)
 
-	no_moves_restart_button = make_no_moves_button(
-		"Reiniciar", Color(0.61, 0.82, 0.41, 0.98), Color(0.74, 0.88, 0.56, 1.0)
-	)
-	no_moves_restart_button.pressed.connect(_on_no_moves_restart_pressed)
+	no_moves_restart_button = make_dialog_gradient_button("Reiniciar", DIALOG_COMPACT_BTN_FONT_SIZE, true)
+	_bind_hud_chip_click(no_moves_restart_button, _on_no_moves_restart_pressed)
 	no_moves_vbox.add_child(no_moves_restart_button)
 
-	no_moves_buy_button = make_no_moves_button(
-		"Comprar %d vidas por %d" % [BUY_LIVES_AMOUNT, BUY_LIVES_COST],
-		Color(0.61, 0.82, 0.41, 0.98), Color(0.74, 0.88, 0.56, 1.0)
+	no_moves_buy_button = make_dialog_gradient_button(
+		"Comprar %d vidas por %d" % [BUY_LIVES_AMOUNT, BUY_LIVES_COST]
 	)
-	no_moves_buy_button.pressed.connect(_on_no_moves_buy_lives_pressed)
+	_bind_hud_chip_click(no_moves_buy_button, _on_no_moves_buy_lives_pressed)
 	no_moves_vbox.add_child(no_moves_buy_button)
 
-	no_moves_ad_button = make_no_moves_button(
-		"Ver un anuncio para obtener 1 vida", Color(0.40, 0.62, 0.86, 0.98), Color(0.56, 0.74, 0.92, 1.0)
-	)
-	no_moves_ad_button.pressed.connect(_on_no_moves_watch_ad_pressed)
+	no_moves_ad_button = make_dialog_gradient_button("Ver un anuncio para obtener 1 vida")
+	_bind_hud_chip_click(no_moves_ad_button, _on_no_moves_watch_ad_pressed)
 	no_moves_vbox.add_child(no_moves_ad_button)
 
 	layout_no_moves_dialog_controls()
-
-func make_no_moves_button(text: String, bg: Color, border: Color) -> Button:
-	var btn := Button.new()
-	btn.focus_mode = Control.FOCUS_NONE
-	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	btn.custom_minimum_size = Vector2(0, 118)
-	btn.add_theme_stylebox_override("normal", make_flat_style(bg, border, 36, 1))
-	btn.add_theme_stylebox_override("hover", make_flat_style(bg.lightened(0.06), border, 36, 1))
-	btn.add_theme_stylebox_override("pressed", make_flat_style(bg.darkened(0.08), border, 36, 1))
-	var lbl := create_label(text, 36, Color(0.97, 0.99, 0.94))
-	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
-	lbl.offset_left = 20
-	lbl.offset_right = -20
-	lbl.offset_top = 8
-	lbl.offset_bottom = -8
-	btn.add_child(lbl)
-	btn.set_meta("label", lbl)
-	return btn
 
 func layout_no_moves_dialog_controls() -> void:
 	if no_moves_overlay == null or no_moves_card == null:
@@ -2277,15 +2678,12 @@ func layout_no_moves_dialog_controls() -> void:
 	if no_moves_vbox != null:
 		no_moves_vbox.add_theme_constant_override("separation", int(28 * scale))
 	if no_moves_title_label != null:
-		no_moves_title_label.add_theme_font_size_override("font_size", int(60 * scale))
+		_style_dialog_title_label(no_moves_title_label, int(DIALOG_TITLE_FONT_SIZE * scale))
 
-	for btn in [no_moves_restart_button, no_moves_buy_button, no_moves_ad_button]:
-		if btn == null:
-			continue
-		btn.custom_minimum_size = Vector2(0, 118 * scale)
-		var lbl: Label = btn.get_meta("label")
-		if lbl != null:
-			lbl.add_theme_font_size_override("font_size", int(36 * scale))
+	var btn_w: float = card_size.x - 108.0 * scale
+	_layout_dialog_gradient_button(no_moves_restart_button, btn_w, scale, DIALOG_COMPACT_BTN_FONT_SIZE)
+	_layout_dialog_gradient_button(no_moves_buy_button, btn_w, scale, DIALOG_BTN_FONT_SIZE)
+	_layout_dialog_gradient_button(no_moves_ad_button, btn_w, scale, DIALOG_BTN_FONT_SIZE)
 
 func show_no_moves_panel() -> void:
 	if no_moves_overlay == null:
@@ -2361,8 +2759,7 @@ func build_level_up_dialog() -> void:
 	level_up_overlay.z_index = 310
 	hud_layer.add_child(level_up_overlay)
 
-	level_up_card = create_panel(Color(0.95, 0.97, 0.92, 0.985), Color(0.86, 0.91, 0.81, 1.0), 48)
-	level_up_card.mouse_filter = Control.MOUSE_FILTER_STOP
+	level_up_card = _create_dialog_card()
 	level_up_card.z_as_relative = false
 	level_up_card.z_index = 311
 	level_up_overlay.add_child(level_up_card)
@@ -2378,47 +2775,45 @@ func build_level_up_dialog() -> void:
 	level_up_vbox.add_theme_constant_override("separation", 20)
 	level_up_margin.add_child(level_up_vbox)
 
-	level_up_title_label = create_label("¡Subiste de nivel!", 64, Color(0.24, 0.45, 0.26))
+	level_up_title_label = create_label("¡Subiste de nivel!", DIALOG_TITLE_FONT_SIZE, HudTextureButtons.BTN_TEXT_COLOR)
+	_style_dialog_title_label(level_up_title_label, DIALOG_TITLE_FONT_SIZE)
 	level_up_title_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	level_up_vbox.add_child(level_up_title_label)
 
-	level_up_subtitle_label = create_label("Nivel 2", 44, Color(0.35, 0.52, 0.32))
+	level_up_subtitle_label = create_label("Nivel 2", DIALOG_SUBTITLE_FONT_SIZE, HudTextureButtons.BTN_TEXT_COLOR)
+	_style_dialog_title_label(level_up_subtitle_label, DIALOG_SUBTITLE_FONT_SIZE)
 	level_up_subtitle_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	level_up_vbox.add_child(level_up_subtitle_label)
 
-	level_up_continue_button = make_no_moves_button(
-		"Continuar", Color(0.61, 0.82, 0.41, 0.98), Color(0.74, 0.88, 0.56, 1.0)
-	)
-	level_up_continue_button.pressed.connect(_on_level_up_continue_pressed)
+	level_up_continue_button = make_dialog_gradient_button("Continuar", DIALOG_COMPACT_BTN_FONT_SIZE, true)
+	_bind_hud_chip_click(level_up_continue_button, _on_level_up_continue_pressed)
 	level_up_vbox.add_child(level_up_continue_button)
 
 	layout_level_up_dialog_controls()
+	layout_wildcard_unlock_dialog_controls()
 
 func layout_level_up_dialog_controls() -> void:
 	if level_up_overlay == null or level_up_card == null:
 		return
 	var viewport_size = get_viewport_rect().size
 	var scale = clampf(min(viewport_size.x / 1080.0, viewport_size.y / 1920.0), 0.75, 1.2)
-	var card_size = Vector2(min(viewport_size.x * 0.88, 780.0 * scale), 520.0 * scale)
+	var card_size = Vector2(min(viewport_size.x * 0.90, 780.0 * scale), 560.0 * scale)
 	level_up_card.size = card_size
 	level_up_card.position = (viewport_size - card_size) * 0.5
 
 	if level_up_margin != null:
-		level_up_margin.add_theme_constant_override("margin_left", int(54 * scale))
-		level_up_margin.add_theme_constant_override("margin_right", int(54 * scale))
-		level_up_margin.add_theme_constant_override("margin_top", int(64 * scale))
-		level_up_margin.add_theme_constant_override("margin_bottom", int(58 * scale))
+		level_up_margin.add_theme_constant_override("margin_left", int(48 * scale))
+		level_up_margin.add_theme_constant_override("margin_right", int(48 * scale))
+		level_up_margin.add_theme_constant_override("margin_top", int(52 * scale))
+		level_up_margin.add_theme_constant_override("margin_bottom", int(48 * scale))
 	if level_up_vbox != null:
-		level_up_vbox.add_theme_constant_override("separation", int(24 * scale))
+		level_up_vbox.add_theme_constant_override("separation", int(20 * scale))
 	if level_up_title_label != null:
-		level_up_title_label.add_theme_font_size_override("font_size", int(60 * scale))
+		_style_dialog_title_label(level_up_title_label, int(DIALOG_TITLE_FONT_SIZE * scale))
 	if level_up_subtitle_label != null:
-		level_up_subtitle_label.add_theme_font_size_override("font_size", int(44 * scale))
-	if level_up_continue_button != null:
-		level_up_continue_button.custom_minimum_size = Vector2(0, 118 * scale)
-		var lbl: Label = level_up_continue_button.get_meta("label")
-		if lbl != null:
-			lbl.add_theme_font_size_override("font_size", int(36 * scale))
+		_style_dialog_title_label(level_up_subtitle_label, int(DIALOG_SUBTITLE_FONT_SIZE * scale))
+	var btn_w: float = _dialog_inner_button_width(card_size.x)
+	_layout_dialog_gradient_button(level_up_continue_button, btn_w, scale, DIALOG_COMPACT_BTN_FONT_SIZE)
 
 func show_level_up_panel(level: int) -> void:
 	if level_up_overlay == null:
@@ -2448,4 +2843,121 @@ func hide_level_up_panel() -> void:
 
 func _on_level_up_continue_pressed() -> void:
 	hide_level_up_panel()
+	try_show_wildcard_unlock_panel()
+	check_blocked_state()
+
+func build_wildcard_unlock_dialog() -> void:
+	wildcard_unlock_overlay = ColorRect.new()
+	wildcard_unlock_overlay.color = Color(0.0, 0.0, 0.0, 0.40)
+	wildcard_unlock_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	wildcard_unlock_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	wildcard_unlock_overlay.visible = false
+	wildcard_unlock_overlay.z_as_relative = false
+	wildcard_unlock_overlay.z_index = 315
+	hud_layer.add_child(wildcard_unlock_overlay)
+
+	wildcard_unlock_card = _create_dialog_card(false)
+	wildcard_unlock_card.z_as_relative = false
+	wildcard_unlock_card.z_index = 316
+	wildcard_unlock_overlay.add_child(wildcard_unlock_card)
+
+	wildcard_unlock_margin = MarginContainer.new()
+	wildcard_unlock_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	wildcard_unlock_margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	wildcard_unlock_card.add_child(wildcard_unlock_margin)
+
+	wildcard_unlock_vbox = VBoxContainer.new()
+	wildcard_unlock_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	wildcard_unlock_vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	wildcard_unlock_vbox.add_theme_constant_override("separation", 20)
+	wildcard_unlock_margin.add_child(wildcard_unlock_vbox)
+
+	wildcard_unlock_title_label = create_label(
+		"Desbloqueado: comodín Mezclar", WILDCARD_UNLOCK_TITLE_FONT_SIZE, HudTextureButtons.BTN_TEXT_COLOR
+	)
+	_style_dialog_title_label(wildcard_unlock_title_label, WILDCARD_UNLOCK_TITLE_FONT_SIZE)
+	wildcard_unlock_title_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	wildcard_unlock_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	wildcard_unlock_vbox.add_child(wildcard_unlock_title_label)
+
+	wildcard_unlock_subtitle_label = create_label(
+		"", DIALOG_SUBTITLE_FONT_SIZE, HudTextureButtons.BTN_TEXT_COLOR
+	)
+	_style_dialog_title_label(wildcard_unlock_subtitle_label, DIALOG_SUBTITLE_FONT_SIZE)
+	wildcard_unlock_subtitle_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	wildcard_unlock_subtitle_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	wildcard_unlock_vbox.add_child(wildcard_unlock_subtitle_label)
+
+	wildcard_unlock_continue_button = make_dialog_gradient_button("Continuar", DIALOG_COMPACT_BTN_FONT_SIZE, true)
+	_bind_hud_chip_click(wildcard_unlock_continue_button, _on_wildcard_unlock_continue_pressed)
+	wildcard_unlock_vbox.add_child(wildcard_unlock_continue_button)
+
+	layout_wildcard_unlock_dialog_controls()
+
+func layout_wildcard_unlock_dialog_controls() -> void:
+	if wildcard_unlock_overlay == null or wildcard_unlock_card == null:
+		return
+	var viewport_size = get_viewport_rect().size
+	var scale = clampf(min(viewport_size.x / 1080.0, viewport_size.y / 1920.0), 0.75, 1.2)
+	var card_size = Vector2(min(viewport_size.x * 0.92, MENU_CARD_WIDTH_MAX * scale), WILDCARD_UNLOCK_CARD_HEIGHT * scale)
+	wildcard_unlock_card.size = card_size
+	wildcard_unlock_card.position = (viewport_size - card_size) * 0.5
+
+	if wildcard_unlock_margin != null:
+		wildcard_unlock_margin.add_theme_constant_override("margin_left", int(52 * scale))
+		wildcard_unlock_margin.add_theme_constant_override("margin_right", int(52 * scale))
+		wildcard_unlock_margin.add_theme_constant_override("margin_top", int(52 * scale))
+		wildcard_unlock_margin.add_theme_constant_override("margin_bottom", int(48 * scale))
+	if wildcard_unlock_vbox != null:
+		wildcard_unlock_vbox.add_theme_constant_override("separation", int(16 * scale))
+	if wildcard_unlock_title_label != null:
+		_style_dialog_title_label(wildcard_unlock_title_label, int(WILDCARD_UNLOCK_TITLE_FONT_SIZE * scale))
+	if wildcard_unlock_subtitle_label != null:
+		_style_dialog_title_label(wildcard_unlock_subtitle_label, int(44 * scale))
+	var btn_w: float = _dialog_inner_button_width(card_size.x)
+	_layout_dialog_gradient_button(wildcard_unlock_continue_button, btn_w, scale, DIALOG_COMPACT_BTN_FONT_SIZE)
+
+func queue_wildcard_unlock_panel(wildcard_type: String) -> void:
+	if wildcard_type.is_empty():
+		return
+	_pending_wildcard_unlock_queue.append(wildcard_type)
+	call_deferred("try_show_wildcard_unlock_panel")
+
+func try_show_wildcard_unlock_panel() -> void:
+	if wildcard_unlock_overlay == null:
+		return
+	if wildcard_unlock_overlay.visible:
+		return
+	if level_up_overlay != null and level_up_overlay.visible:
+		return
+	if no_moves_overlay != null and no_moves_overlay.visible:
+		return
+	if _pending_wildcard_unlock_queue.is_empty():
+		return
+	show_wildcard_unlock_panel(_pending_wildcard_unlock_queue.pop_front())
+
+func show_wildcard_unlock_panel(wildcard_type: String) -> void:
+	if wildcard_unlock_overlay == null:
+		return
+	hide_no_moves_panel()
+	board_locked = true
+	clear_selection()
+	hammer_mode_active = false
+	var wildcard_name := get_wildcard_display_name(wildcard_type)
+	if wildcard_unlock_title_label != null:
+		wildcard_unlock_title_label.text = "Desbloqueado: comodín %s" % wildcard_name
+	if wildcard_unlock_subtitle_label != null:
+		wildcard_unlock_subtitle_label.text = get_wildcard_unlock_description(wildcard_type)
+	wildcard_unlock_overlay.visible = true
+	wildcard_unlock_overlay.move_to_front()
+	layout_wildcard_unlock_dialog_controls()
+
+func hide_wildcard_unlock_panel() -> void:
+	if wildcard_unlock_overlay != null:
+		wildcard_unlock_overlay.visible = false
+	board_locked = false
+
+func _on_wildcard_unlock_continue_pressed() -> void:
+	hide_wildcard_unlock_panel()
+	try_show_wildcard_unlock_panel()
 	check_blocked_state()
