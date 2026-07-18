@@ -2,6 +2,14 @@ extends Node2D
 
 const StackScene = preload("res://stack.tscn")
 const StackScript = preload("res://stack.gd")
+const GameEngineScript = preload("res://game_engine.gd")
+const GameBoardEngineScript = preload("res://game_board_engine.gd")
+const GameFusionEngineScript = preload("res://game_fusion_engine.gd")
+const GameTurnEngineScript = preload("res://game_turn_engine.gd")
+const GameEconomyServiceScript = preload("res://game_economy_service.gd")
+const GameRulesScript = preload("res://game_rules.gd")
+const GameSessionServiceScript = preload("res://game_session_service.gd")
+const GameSlotServiceScript = preload("res://game_slot_service.gd")
 const SlotOverlayBgScript = preload("res://slot_overlay_bg.gd")
 const MixIconTexture = preload("res://Imagenes/icono-mezclar.png")
 const HammerIconTexture = preload("res://Imagenes/icono-martillo.png")
@@ -236,11 +244,16 @@ var gems: int = 756
 ## Mock para compras de ranura extra adyacente (no es la ranura temporal).
 var player_stars: int = 1000000
 var adjacent_slot_next_price: int = ADJACENT_EXTRA_SLOT_BASE_PRICE
+var next_free_slot_unlock_level: int = 1
 ## Celda del tablero (0..14) donde se muestra la oferta; -1 si no aplica.
 var adjacent_offer_board_index: int = -1
 var temp_slot_time_remaining: float = 0.0
 ## Solo true tras comprar la ranura temporal (hay una pila extra); no confundir con "última pila" del tablero normal.
 var temp_slot_bonus_active: bool = false
+## Cierre data-driven de ranura temporal por cantidad de acciones de juego.
+var temp_slot_actions_remaining: int = 0
+## Snapshot de partida en curso para restaurar estado exacto al volver desde Home.
+var runtime_snapshot: Dictionary = {}
 ## UI ranura bloqueada (crema, reloj de arena, 60 seg, precio); no recibe clics (IGNORE).
 var temp_slot_locked_root: Control = null
 var temp_slot_locked_panel: TextureRect = null
@@ -328,7 +341,9 @@ func _ready() -> void:
 	build_mock_ui()
 	SaveManager.register_session_collector(collect_save_dict)
 	try_load_saved_game()
-	if checkpoint_snapshot.is_empty():
+	if not runtime_snapshot.is_empty():
+		_restore_board_from_snapshot(runtime_snapshot)
+	elif checkpoint_snapshot.is_empty():
 		setup_board()
 	else:
 		restore_checkpoint()
@@ -446,9 +461,11 @@ func setup_board() -> void:
 	_pending_level_up_alerts.clear()
 	temp_slot_bonus_active = false
 	temp_slot_time_remaining = 0.0
+	temp_slot_actions_remaining = 0
 	_temp_slot_timer_shown_sec = -1
 	configure_process_for_temp_slot()
 	adjacent_slot_next_price = ADJACENT_EXTRA_SLOT_BASE_PRICE
+	next_free_slot_unlock_level = GameRulesScript.initial_free_slot_unlock_level(0)
 	checkpoint_level = maxi(1, GameState.player_level)
 	current_level = 1
 	max_value = CHECKPOINT_BASE_VALUE
@@ -459,7 +476,6 @@ func setup_board() -> void:
 	create_stack_nodes(active_stacks)
 	fill_board_initial_random()
 	refresh_fusion_target_bonus_unlock()
-	try_unlock_adjacent_slots_by_level()
 	capture_checkpoint_snapshot()
 	_sync_slot_overlay_controls()
 	update_progress_bar(false)
@@ -475,27 +491,21 @@ func _capture_stack_data() -> Array:
 	return stack_data
 
 func capture_board_snapshot() -> Dictionary:
-	# Guardar solo las pilas lógicas (permanentes + temporal activa).
-	# Evita que un desfase stacks/active_stacks “invente” ranuras al deshacer.
-	var expected := active_stacks + (1 if has_active_temp_stack() else 0)
-	var all_rows := _capture_stack_data()
-	var rows: Array = []
-	for i in range(mini(expected, all_rows.size())):
-		rows.append(all_rows[i])
-	while rows.size() < expected:
-		rows.append([])
-	return {
+	return GameSessionServiceScript.build_runtime_snapshot({
 		"current_level": current_level,
 		"checkpoint_level": checkpoint_level,
 		"max_value": max_value,
 		"roll_value_floor": roll_value_floor,
 		"fusion_target_bonus_unlocked": fusion_target_bonus_unlocked,
-		"checkpoint_snapshot": checkpoint_snapshot.duplicate(true),
+		"checkpoint_snapshot": checkpoint_snapshot,
 		"active_stacks": active_stacks,
+		"next_free_slot_unlock_level": next_free_slot_unlock_level,
 		"temp_slot_bonus_active": temp_slot_bonus_active and has_active_temp_stack(),
 		"temp_slot_time_remaining": temp_slot_time_remaining if has_active_temp_stack() else 0.0,
-		"stacks": rows,
-	}
+		"temp_slot_actions_remaining": temp_slot_actions_remaining,
+		"all_rows": _capture_stack_data(),
+		"has_active_temp_stack": has_active_temp_stack(),
+	})
 
 func _clear_undo_snapshot() -> void:
 	undo_snapshot.clear()
@@ -586,11 +596,24 @@ func _restore_board_from_snapshot(snap: Dictionary) -> void:
 	if snap_checkpoint is Dictionary:
 		checkpoint_snapshot = snap_checkpoint.duplicate(true)
 	active_stacks = maxi(1, int(snap.get("active_stacks", active_stacks)))
-	temp_slot_bonus_active = bool(snap.get("temp_slot_bonus_active", false))
-	temp_slot_time_remaining = float(snap.get("temp_slot_time_remaining", 0.0))
-	if temp_slot_bonus_active and temp_slot_time_remaining <= 0.05:
-		temp_slot_bonus_active = false
-		temp_slot_time_remaining = 0.0
+	next_free_slot_unlock_level = maxi(
+		1,
+		int(
+			snap.get(
+				"next_free_slot_unlock_level",
+				GameRulesScript.initial_free_slot_unlock_level(get_cycle_base_level())
+			)
+		)
+	)
+	temp_slot_actions_remaining = maxi(0, int(snap.get("temp_slot_actions_remaining", temp_slot_actions_remaining)))
+	var normalized_temp := GameRulesScript.normalize_temp_state(
+		bool(snap.get("temp_slot_bonus_active", false)),
+		float(snap.get("temp_slot_time_remaining", 0.0)),
+		_expected_stack_count_for_snapshot(snap),
+		active_stacks
+	)
+	temp_slot_bonus_active = bool(normalized_temp.get("temp_slot_bonus_active", false))
+	temp_slot_time_remaining = float(normalized_temp.get("temp_slot_time_remaining", 0.0))
 	configure_process_for_temp_slot()
 	board_revision += 1
 	for s in stacks:
@@ -633,6 +656,7 @@ func try_undo_last_move() -> void:
 
 func save_game() -> void:
 	_push_player_resources_to_game_state()
+	runtime_snapshot = capture_board_snapshot()
 	var session := collect_save_dict()
 	session["level"] = checkpoint_level
 	session["coins"] = player_stars
@@ -653,32 +677,52 @@ func try_load_saved_game() -> bool:
 ## Estado persistible (save/load sigue desactivado; estos helpers quedan listos para reactivarlo).
 ## Incluye el nivel actual (checkpoint) como pide el sistema de checkpoints.
 func collect_save_dict() -> Dictionary:
-	return {
+	runtime_snapshot = capture_board_snapshot()
+	return GameSessionServiceScript.build_save_payload({
 		"checkpoint_level": checkpoint_level,
-		"checkpoint_snapshot": checkpoint_snapshot.duplicate(true),
+		"checkpoint_snapshot": checkpoint_snapshot,
+		"runtime_snapshot": runtime_snapshot,
 		"current_level": current_level,
 		"max_value": max_value,
 		"roll_value_floor": roll_value_floor,
 		"active_stacks": active_stacks,
+		"next_free_slot_unlock_level": next_free_slot_unlock_level,
+		"temp_slot_actions_remaining": temp_slot_actions_remaining,
 		"lives": lives,
 		"gems": gems,
 		"player_stars": player_stars,
-	}
+	})
 
 func apply_save_dict(data: Dictionary) -> void:
 	if data.is_empty():
 		return
-	checkpoint_level = maxi(1, int(data.get("checkpoint_level", checkpoint_level)))
-	var snap = data.get("checkpoint_snapshot", {})
-	if snap is Dictionary and not snap.is_empty():
-		checkpoint_snapshot = snap.duplicate(true)
-	current_level = maxi(1, int(data.get("current_level", current_level)))
-	max_value = maxi(CHECKPOINT_BASE_VALUE, int(data.get("max_value", max_value)))
-	roll_value_floor = maxi(1, int(data.get("roll_value_floor", roll_value_floor)))
-	active_stacks = int(data.get("active_stacks", active_stacks))
-	lives = int(data.get("lives", lives))
-	gems = int(data.get("gems", gems))
-	player_stars = int(data.get("player_stars", data.get("coins", player_stars)))
+	var parsed := GameSessionServiceScript.parse_save_payload(data, {
+		"checkpoint_level": checkpoint_level,
+		"checkpoint_snapshot": checkpoint_snapshot,
+		"runtime_snapshot": runtime_snapshot,
+		"current_level": current_level,
+		"max_value": max_value,
+		"roll_value_floor": roll_value_floor,
+		"active_stacks": active_stacks,
+		"next_free_slot_unlock_level": GameRulesScript.initial_free_slot_unlock_level(get_cycle_base_level()),
+		"temp_slot_actions_remaining": temp_slot_actions_remaining,
+		"lives": lives,
+		"gems": gems,
+		"player_stars": player_stars,
+		"checkpoint_base_value": CHECKPOINT_BASE_VALUE,
+	})
+	checkpoint_level = int(parsed.get("checkpoint_level", checkpoint_level))
+	checkpoint_snapshot = (parsed.get("checkpoint_snapshot", {}) as Dictionary).duplicate(true)
+	current_level = int(parsed.get("current_level", current_level))
+	max_value = int(parsed.get("max_value", max_value))
+	roll_value_floor = int(parsed.get("roll_value_floor", roll_value_floor))
+	active_stacks = int(parsed.get("active_stacks", active_stacks))
+	next_free_slot_unlock_level = int(parsed.get("next_free_slot_unlock_level", next_free_slot_unlock_level))
+	temp_slot_actions_remaining = int(parsed.get("temp_slot_actions_remaining", temp_slot_actions_remaining))
+	lives = int(parsed.get("lives", lives))
+	gems = int(parsed.get("gems", gems))
+	player_stars = int(parsed.get("player_stars", player_stars))
+	runtime_snapshot = (parsed.get("runtime_snapshot", {}) as Dictionary).duplicate(true)
 	if not data.has("roll_value_floor") and not checkpoint_snapshot.has("roll_value_floor"):
 		var milestone := get_cycle_base_level()
 		roll_value_floor = 1 if milestone <= 0 else milestone - CHECKPOINT_BASE_VALUE
@@ -761,6 +805,7 @@ func handle_click(mouse_pos: Vector2) -> void:
 		undo_snapshot = pre_move_snapshot
 		_update_undo_button_state()
 		board_locked = true
+		_consume_temp_slot_action()
 	if moved == 0:
 		print("Movimiento invalido: destino lleno o tope incompatible.")
 	clear_selection(false)
@@ -827,23 +872,16 @@ func perform_roll() -> bool:
 		check_blocked_state()
 		return false
 
-	var values_to_roll: Array = []
-	# Misma lógica que get_roll_value(): tiro en [roll_value_floor .. max_value-1].
 	var max_roll_value = maxi(roll_value_floor, max_value - 1)
-	for value in range(roll_value_floor, max_roll_value + 1):
-		# Garantiza al menos una ficha de cada numero permitido en tirada.
-		values_to_roll.append(value)
-		# Y agrega variacion: ese numero puede salir 2 o 3 veces.
-		var extra_count = randi_range(0, 2)
-		for _i in range(extra_count):
-			values_to_roll.append(value)
+	var values_to_roll: Array = GameTurnEngineScript.build_roll_values(
+		roll_value_floor,
+		max_roll_value,
+		func() -> int:
+			return randi_range(0, 2)
+	)
 
 	values_to_roll.shuffle()
-	var roll_count = mini(values_to_roll.size(), total_free_slots)
-	## Anti-bloqueo: con 2+ huecos, dejar al menos 1 libre para no lockear el tablero en una sola tirada.
-	## Con un único hueco, permitir llenarlo: repartir es arriesgado y puede llenar el tablero → fin de vida.
-	if total_free_slots >= 2 and roll_count >= total_free_slots:
-		roll_count = total_free_slots - 1
+	var roll_count := GameTurnEngineScript.compute_roll_count(values_to_roll.size(), total_free_slots, true)
 	for i in range(roll_count):
 		var available_stacks: Array = []
 		for stack in target_stacks:
@@ -855,8 +893,18 @@ func perform_roll() -> bool:
 		available_stacks[idx].push(values_to_roll[i])
 
 	board_locked = false
+	_consume_temp_slot_action()
 	resolve_board_after_action()
 	return true
+
+func _consume_temp_slot_action() -> void:
+	var step := GameSlotServiceScript.consume_temp_action(
+		temp_slot_bonus_active,
+		temp_slot_actions_remaining
+	)
+	temp_slot_actions_remaining = int(step.get("actions_remaining", temp_slot_actions_remaining))
+	if bool(step.get("should_close", false)):
+		close_temporary_slot()
 
 func resolve_board_after_action(expected_revision: int = -1) -> void:
 	if expected_revision >= 0 and expected_revision != board_revision:
@@ -934,7 +982,10 @@ func check_blocked_state() -> void:
 func resolve_fusions() -> void:
 	# El bonus solo aplica si ya había una ficha objetivo antes de esta cadena de fusiones.
 	# Si no, fusionar 4→5 y luego 3→4 en el mismo turno daría un 5 extra indebido.
-	var bonus_eligible := fusion_target_bonus_unlocked
+	var bonus_eligible := GameFusionEngineScript.bonus_enabled(
+		GameRulesScript.ENABLE_FUSION_CREATE_BONUS,
+		fusion_target_bonus_unlocked
+	)
 	var changed := true
 	var guard := 0
 	var fusion_anims := 0
@@ -982,12 +1033,18 @@ func try_grant_fusion_create_bonus(
 	bonus_eligible: bool
 ) -> int:
 	var trigger_value := max_value - 1
-	if trigger_value < 1 or fused_result_value != trigger_value:
-		return 0
-	if not bonus_eligible:
-		return 0
 	var on_board := total_count_of_value(max_value)
-	var amount := FUSION_BONUS_REDUCED_AMOUNT if on_board >= FUSION_BONUS_NEAR_CAP_COUNT else FUSION_BONUS_FULL_AMOUNT
+	var amount := GameFusionEngineScript.bonus_amount_for_target(
+		fused_result_value,
+		trigger_value,
+		on_board,
+		FUSION_BONUS_NEAR_CAP_COUNT,
+		FUSION_BONUS_FULL_AMOUNT,
+		FUSION_BONUS_REDUCED_AMOUNT,
+		bonus_eligible
+	)
+	if amount <= 0:
+		return 0
 	return spawn_bonus_coins_on_fusion_row(fusion_stack, max_value, amount)
 
 func _pick_bonus_stack_in_row(row_stack_indices: Array, value: int, prefer_stack: Node) -> Node:
@@ -1033,22 +1090,18 @@ func total_count_of_value(value: int) -> int:
 	return total
 
 func check_level_up() -> void:
-	var next_value = max_value + 1
+	var tops: Array = []
 	for stack in stacks:
-		if stack.top_value() == next_value:
-			level_up()
-			return
+		tops.append(stack.top_value())
+	if GameBoardEngineScript.has_level_up(tops, max_value):
+		level_up()
 
 func level_up() -> void:
-	current_level += 1
-	max_value += 1
+	var next_state := GameBoardEngineScript.apply_level_up(current_level, max_value)
+	current_level = int(next_state.get("current_level", current_level + 1))
+	max_value = int(next_state.get("max_value", max_value + 1))
 	print("Subiste al nivel ", current_level, ". Nuevo objetivo: ", max_value)
 	refresh_fusion_target_bonus_unlock()
-	if current_level % 2 == 0 and permanent_stack_count() < MAX_PERMANENT_STACKS:
-		active_stacks += 1
-		add_new_stack_for_level_unlock()
-		_clear_undo_snapshot()
-		print("Ranura desbloqueada. Ranuras activas: ", active_stacks)
 	_sync_slot_overlay_controls()
 
 func add_new_stack_for_level_unlock() -> void:
@@ -1087,22 +1140,46 @@ func refresh_all_stack_layout() -> void:
 			stacks[i].normalize_coin_scales()
 
 func try_purchase_temp_slot() -> void:
-	if temp_slot_bonus_active:
+	var economy := GameEconomyServiceScript.purchase_temp_slot(
+		{
+			"player_stars": player_stars,
+			"temp_slot_bonus_active": temp_slot_bonus_active,
+			"has_active_temp_stack": has_active_temp_stack(),
+		},
+		{
+			"temp_slot_cost_stars": TEMP_SLOT_COST_STARS,
+			"temp_slot_duration_sec": TEMP_SLOT_DURATION_SEC,
+			"temp_slot_actions_to_close": GameRulesScript.TEMP_SLOT_ACTIONS_TO_CLOSE,
+		}
+	)
+	if not bool(economy.get("ok", false)):
+		var reason := str(economy.get("reason", ""))
+		if reason == "already_active":
+			print("Ya tenés una ranura temporal activa.")
+			return
+		if reason == "insufficient_stars":
+			print(
+				"Necesitás %d monedas para la ranura temporal (tenés %d)."
+				% [int(economy.get("required", TEMP_SLOT_COST_STARS)), int(economy.get("current", player_stars))]
+			)
+			return
+		return
+
+	if temp_slot_bonus_active and has_active_temp_stack():
 		print("Ya tenés una ranura temporal activa.")
 		return
-	# La temporal es la celda 15ª (aparte de las 14 permanentes); no depende de active_stacks.
-	if player_stars < TEMP_SLOT_COST_STARS:
-		print("Necesitás %d monedas para la ranura temporal (tenés %d)." % [TEMP_SLOT_COST_STARS, player_stars])
-		return
-	player_stars -= TEMP_SLOT_COST_STARS
+	player_stars = int(economy.get("player_stars", player_stars))
 	_clear_undo_snapshot()
-	temp_slot_bonus_active = true
+	temp_slot_bonus_active = bool(economy.get("temp_slot_bonus_active", true))
 	append_new_stack_node()
 	# Recalcular posiciones ahora que ya existe la pila temporal como última.
 	# Sin este refresh, puede quedar momentáneamente en una celda permanente.
 	refresh_all_stack_layout()
 	board_locked = false
-	temp_slot_time_remaining = TEMP_SLOT_DURATION_SEC
+	temp_slot_time_remaining = float(economy.get("temp_slot_time_remaining", TEMP_SLOT_DURATION_SEC))
+	temp_slot_actions_remaining = int(
+		economy.get("temp_slot_actions_remaining", GameRulesScript.TEMP_SLOT_ACTIONS_TO_CLOSE)
+	)
 	_temp_slot_timer_shown_sec = -1
 	update_stars_display()
 	configure_process_for_temp_slot()
@@ -1126,6 +1203,7 @@ func close_temporary_slot() -> void:
 			print("La ranura temporal está llena. Vaciala antes de que cierre.")
 			return
 	temp_slot_time_remaining = 0.0
+	temp_slot_actions_remaining = 0
 	if stacks.is_empty():
 		temp_slot_bonus_active = false
 		configure_process_for_temp_slot()
@@ -1150,35 +1228,37 @@ func configure_process_for_temp_slot() -> void:
 ## Índice de ciclo del tablero según resets hechos (piso de tirada), no según el checkpoint UI.
 ## 0 = aún no conseguiste la ficha 15; 1 = tras ficha 15; 2 = tras ficha 30; …
 func get_cycle_index() -> int:
-	if roll_value_floor <= 1:
-		return 0
-	return int((roll_value_floor + CHECKPOINT_BASE_VALUE) / BOARD_CYCLE_LEVELS)
+	return GameEngineScript.cycle_index(roll_value_floor, CHECKPOINT_BASE_VALUE, BOARD_CYCLE_LEVELS)
 
 ## Nivel base del ciclo actual (0, 15, 30, 45…).
 func get_cycle_base_level() -> int:
-	return get_cycle_index() * BOARD_CYCLE_LEVELS
+	return GameEngineScript.cycle_base_level(roll_value_floor, CHECKPOINT_BASE_VALUE, BOARD_CYCLE_LEVELS)
 
 ## Offset de valor de ficha para mapear el ciclo actual al patrón del ciclo 1.
 ## Ciclo 0: 0; tras ficha 15: 10; tras ficha 30: 25; …
 func get_cycle_coin_offset() -> int:
-	var idx := get_cycle_index()
-	if idx <= 0:
-		return 0
-	return idx * BOARD_CYCLE_LEVELS - CHECKPOINT_BASE_VALUE
+	return GameEngineScript.cycle_coin_offset(
+		roll_value_floor,
+		CHECKPOINT_BASE_VALUE,
+		BOARD_CYCLE_LEVELS
+	)
 
 ## Próximo valor de ficha que reinicia el tablero (15, 30, 45…).
 func get_next_cycle_coin_milestone() -> int:
-	return (get_cycle_index() + 1) * BOARD_CYCLE_LEVELS
+	return GameEngineScript.next_cycle_coin_milestone(
+		roll_value_floor,
+		CHECKPOINT_BASE_VALUE,
+		BOARD_CYCLE_LEVELS
+	)
 
 ## Si el tablero ya tiene la ficha hito del ciclo, devuelve ese valor (p.ej. 15); si no, 0.
 func get_reached_cycle_coin_milestone() -> int:
-	var hv := highest_coin_value_on_board()
-	var found := 0
-	var next_m := get_next_cycle_coin_milestone()
-	while next_m > 0 and next_m <= hv:
-		found = next_m
-		next_m += BOARD_CYCLE_LEVELS
-	return found
+	return GameEngineScript.reached_cycle_coin_milestone(
+		highest_coin_value_on_board(),
+		roll_value_floor,
+		CHECKPOINT_BASE_VALUE,
+		BOARD_CYCLE_LEVELS
+	)
 
 func get_roll_min_value() -> int:
 	return maxi(1, roll_value_floor)
@@ -1194,7 +1274,13 @@ func get_roll_value() -> int:
 ## Reinicia el tablero al conseguir la ficha hito (15, 30, 45…).
 ## 4 ranuras; objetivo = milestone; tiradas en (milestone-5)..(milestone-1).
 func reset_board_for_cycle_milestone(milestone_level: int) -> void:
-	if milestone_level < BOARD_CYCLE_LEVELS or milestone_level % BOARD_CYCLE_LEVELS != 0:
+	var cycle_state := GameBoardEngineScript.build_cycle_reset_state(milestone_level, {
+		"board_cycle_levels": BOARD_CYCLE_LEVELS,
+		"checkpoint_base_value": CHECKPOINT_BASE_VALUE,
+		"cycle_reset_stacks": CYCLE_RESET_STACKS,
+		"adjacent_slot_base_price": ADJACENT_EXTRA_SLOT_BASE_PRICE,
+	})
+	if not bool(cycle_state.get("valid", false)):
 		return
 	hammer_mode_active = false
 	clear_selection(false)
@@ -1202,14 +1288,16 @@ func reset_board_for_cycle_milestone(milestone_level: int) -> void:
 	_resolve_board_scheduled = false
 	temp_slot_bonus_active = false
 	temp_slot_time_remaining = 0.0
+	temp_slot_actions_remaining = 0
 	_temp_slot_timer_shown_sec = -1
 	configure_process_for_temp_slot()
-	adjacent_slot_next_price = ADJACENT_EXTRA_SLOT_BASE_PRICE
+	adjacent_slot_next_price = int(cycle_state.get("adjacent_slot_next_price", ADJACENT_EXTRA_SLOT_BASE_PRICE))
+	next_free_slot_unlock_level = GameRulesScript.initial_free_slot_unlock_level(milestone_level)
 
-	active_stacks = CYCLE_RESET_STACKS
-	current_level = 1
-	max_value = milestone_level
-	roll_value_floor = milestone_level - CHECKPOINT_BASE_VALUE
+	active_stacks = int(cycle_state.get("active_stacks", CYCLE_RESET_STACKS))
+	current_level = int(cycle_state.get("current_level", 1))
+	max_value = int(cycle_state.get("max_value", milestone_level))
+	roll_value_floor = int(cycle_state.get("roll_value_floor", milestone_level - CHECKPOINT_BASE_VALUE))
 
 	clear_board_stacks()
 	create_stack_nodes(active_stacks)
@@ -1274,63 +1362,35 @@ func max_count_of_value(value: int) -> int:
 ## En ciclos 2+ se mapean los valores restando el offset del ciclo (p.ej. 10→1 local).
 func evaluate_checkpoint_level() -> int:
 	var hv := highest_coin_value_on_board()
-	var offset := get_cycle_coin_offset()
-	var local_hv := hv - offset
-	var cycle_base := get_cycle_base_level()
-	if local_hv < CHECKPOINT_BASE_VALUE:
-		return 1 if cycle_base == 0 else cycle_base
-	var has_half := max_count_of_value(hv) > CHECKPOINT_HALF_THRESHOLD
-	var local_level := 2 * (local_hv - CHECKPOINT_BASE_VALUE) + 2 + (1 if has_half else 0)
-	if cycle_base == 0:
-		return local_level
-	# Ciclo N: el milestone (15/30/…) ya cuenta como base; el progreso local suma encima.
-	return cycle_base + local_level - 1
+	return GameEngineScript.evaluate_checkpoint_level(
+		hv,
+		max_count_of_value(hv),
+		roll_value_floor,
+		CHECKPOINT_BASE_VALUE,
+		CHECKPOINT_HALF_THRESHOLD,
+		BOARD_CYCLE_LEVELS
+	)
 
 ## Progreso 0..1 hacia un nivel objetivo (según el estado actual del tablero).
 func get_progress_toward_checkpoint_level(target_level: int) -> float:
-	if target_level <= 1:
-		return 0.0
-	# Mapear el nivel absoluto a "nivel local" del ciclo + valor de ficha equivalente.
-	var cycle_for_target := int(maxi(target_level - 1, 0) / BOARD_CYCLE_LEVELS)
-	var cycle_base := cycle_for_target * BOARD_CYCLE_LEVELS
-	var local_target := target_level if cycle_base == 0 else target_level - cycle_base + 1
-	var offset := 0 if cycle_for_target <= 0 else cycle_for_target * BOARD_CYCLE_LEVELS - CHECKPOINT_BASE_VALUE
-	if local_target <= 1:
-		return 0.0
-	var steps := local_target - 2
-	var local_v := CHECKPOINT_BASE_VALUE + int(steps / 2)
-	var v := local_v + offset
-	if steps % 2 == 0:
-		var hv := highest_coin_value_on_board()
-		if hv >= v:
-			return 1.0
-		var prev_v := maxi(offset + 1, v - 1)
-		var hv_part := clampf(float(hv - offset) / float(maxi(1, prev_v - offset)), 0.0, 1.0) * 0.35
-		var pile_part := clampf(
-			float(max_count_of_value(prev_v)) / float(STACK_CAPACITY), 0.0, 1.0
-		) * 0.65
-		return clampf(hv_part + pile_part, 0.0, 0.99)
-	var need := CHECKPOINT_HALF_THRESHOLD + 1
-	return clampf(float(max_count_of_value(v)) / float(need), 0.0, 1.0)
+	return GameEngineScript.progress_toward_checkpoint_level(
+		target_level,
+		highest_coin_value_on_board(),
+		Callable(self, "max_count_of_value"),
+		STACK_CAPACITY,
+		roll_value_floor,
+		CHECKPOINT_BASE_VALUE,
+		CHECKPOINT_HALF_THRESHOLD,
+		BOARD_CYCLE_LEVELS
+	)
 
 ## Texto descriptivo del hito alcanzado (N2..Nx).
 func get_checkpoint_level_description(level: int) -> String:
-	if level <= 1:
-		return ""
-	var cycle_for_level := int(maxi(level - 1, 0) / BOARD_CYCLE_LEVELS)
-	var cycle_base := cycle_for_level * BOARD_CYCLE_LEVELS
-	var local_level := level if cycle_base == 0 else level - cycle_base + 1
-	var offset := 0 if cycle_for_level <= 0 else cycle_for_level * BOARD_CYCLE_LEVELS - CHECKPOINT_BASE_VALUE
-	if local_level <= 1:
-		return ""
-	var steps := local_level - 2
-	var local_v := CHECKPOINT_BASE_VALUE + int(steps / 2)
-	var v := local_v + offset
-	if steps % 2 == 0:
-		if steps == 0:
-			return "Creaste la pila %d" % v
-		return "Completaste la pila %d" % (v - 1)
-	return "Pila %d: más de la mitad" % v
+	return GameEngineScript.checkpoint_level_description(
+		level,
+		CHECKPOINT_BASE_VALUE,
+		BOARD_CYCLE_LEVELS
+	)
 
 ## Progreso hacia el siguiente checkpoint guardado (0..1).
 func get_current_level_progress() -> float:
@@ -1401,21 +1461,19 @@ func update_checkpoint_level() -> bool:
 	var previous := checkpoint_level
 	var cycle_milestone := get_reached_cycle_coin_milestone()
 	var lvl := evaluate_checkpoint_level()
-	if cycle_milestone > 0:
-		# Conseguir la ficha hito: el checkpoint queda al menos en ese hito y se reinicia el tablero.
-		checkpoint_level = maxi(previous, cycle_milestone)
-		reset_board_for_cycle_milestone(cycle_milestone)
-	elif lvl > checkpoint_level:
-		checkpoint_level = lvl
-	else:
+	var decision := GameBoardEngineScript.decide_checkpoint_update(previous, lvl, cycle_milestone)
+	if not bool(decision.get("changed", false)):
 		return false
+	checkpoint_level = int(decision.get("checkpoint_level", checkpoint_level))
+	if bool(decision.get("did_cycle_reset", false)):
+		reset_board_for_cycle_milestone(cycle_milestone)
 	capture_checkpoint_snapshot()
 	GameState.player_level = checkpoint_level
 	GameState.checkpoint_snapshot = checkpoint_snapshot.duplicate(true)
 	sync_wildcard_unlocks()
-	# Tras un reset de ciclo no autodocumentar ranuras gratis por el nivel alto absoluto.
-	if cycle_milestone <= 0:
-		try_unlock_adjacent_slots_by_level()
+	# Tras un reset de ciclo no hay desbloqueo retroactivo de ranuras.
+	if not bool(decision.get("did_cycle_reset", false)):
+		_unlock_adjacent_slots_for_level_range(previous, checkpoint_level)
 	print("Checkpoint alcanzado: nivel ", checkpoint_level, " (tablero guardado)")
 	# Encolar cada nivel saltado para no perder carteles (ej. 1→3 muestra 2 y 3).
 	for alert_lvl in range(previous + 1, checkpoint_level + 1):
@@ -1438,17 +1496,18 @@ func _show_next_level_up_alert() -> void:
 
 ## Guarda tablero y progresión en el momento del checkpoint (para reinicio / save).
 func capture_checkpoint_snapshot() -> void:
-	checkpoint_snapshot = {
+	checkpoint_snapshot = GameSessionServiceScript.build_checkpoint_snapshot({
 		"checkpoint_level": checkpoint_level,
 		"current_level": current_level,
 		"max_value": max_value,
 		"roll_value_floor": roll_value_floor,
 		"active_stacks": active_stacks,
+		"next_free_slot_unlock_level": next_free_slot_unlock_level,
 		"adjacent_slot_next_price": adjacent_slot_next_price,
-		"wildcard_counts": wildcard_counts.duplicate(),
-		"wildcard_unlock_granted": wildcard_unlock_granted.duplicate(),
+		"wildcard_counts": wildcard_counts,
+		"wildcard_unlock_granted": wildcard_unlock_granted,
 		"stacks": _capture_stack_data(),
-	}
+	})
 
 ## Restaura el tablero al último checkpoint guardado (pérdida de vida, compra de vidas, anuncio).
 func restore_checkpoint() -> void:
@@ -1461,6 +1520,7 @@ func restore_checkpoint() -> void:
 	_pending_level_up_alerts.clear()
 	temp_slot_bonus_active = false
 	temp_slot_time_remaining = 0.0
+	temp_slot_actions_remaining = 0
 	_temp_slot_timer_shown_sec = -1
 	configure_process_for_temp_slot()
 	checkpoint_level = maxi(1, int(checkpoint_snapshot.get("checkpoint_level", checkpoint_level)))
@@ -1468,6 +1528,12 @@ func restore_checkpoint() -> void:
 	max_value = maxi(CHECKPOINT_BASE_VALUE, int(checkpoint_snapshot.get("max_value", CHECKPOINT_BASE_VALUE)))
 	roll_value_floor = maxi(1, int(checkpoint_snapshot.get("roll_value_floor", 1)))
 	active_stacks = maxi(1, int(checkpoint_snapshot.get("active_stacks", 5)))
+	next_free_slot_unlock_level = int(
+		checkpoint_snapshot.get(
+			"next_free_slot_unlock_level",
+			GameRulesScript.initial_free_slot_unlock_level(get_cycle_base_level())
+		)
+	)
 	adjacent_slot_next_price = int(checkpoint_snapshot.get(
 		"adjacent_slot_next_price", ADJACENT_EXTRA_SLOT_BASE_PRICE
 	))
@@ -1484,7 +1550,6 @@ func restore_checkpoint() -> void:
 				stacks[i].push(int(v))
 	_restore_wildcard_state_from_snapshot()
 	refresh_fusion_target_bonus_unlock()
-	try_unlock_adjacent_slots_by_level()
 	_sync_slot_overlay_controls()
 	update_progress_bar(false)
 	queue_redraw()
@@ -1754,20 +1819,30 @@ func _occupied_board_slot_index_set() -> Dictionary:
 
 
 func get_adjacent_slot_free_unlock_level() -> int:
-	var cycle_base := get_cycle_base_level()
-	var stack_base := CYCLE_RESET_STACKS if cycle_base > 0 else INITIAL_PERMANENT_STACKS
-	var tiers := maxi(0, active_stacks - stack_base)
-	return cycle_base + ADJACENT_SLOT_FREE_FIRST_LEVEL + tiers * ADJACENT_SLOT_FREE_LEVEL_INTERVAL
+	next_free_slot_unlock_level = GameSlotServiceScript.ensure_unlock_cursor(
+		next_free_slot_unlock_level,
+		get_cycle_base_level(),
+		ADJACENT_SLOT_FREE_FIRST_LEVEL
+	)
+	return next_free_slot_unlock_level
 
 func try_unlock_adjacent_slots_by_level() -> void:
+	_unlock_adjacent_slots_for_level_range(checkpoint_level - 1, checkpoint_level)
+
+func _unlock_adjacent_slots_for_level_range(previous_level: int, new_level: int) -> void:
 	var unlocked := false
 	while active_stacks < MAX_PERMANENT_STACKS:
 		if find_adjacent_extra_slot_offer_board_index() < 0:
 			break
-		if checkpoint_level < get_adjacent_slot_free_unlock_level():
+		var unlock_level := get_adjacent_slot_free_unlock_level()
+		if GameSlotServiceScript.is_stale_unlock(previous_level, unlock_level):
+			next_free_slot_unlock_level = GameRulesScript.next_free_slot_unlock_level(unlock_level)
+			continue
+		if not GameSlotServiceScript.can_grant_free_unlock(previous_level, new_level, unlock_level):
 			break
 		active_stacks += 1
 		add_new_stack_for_level_unlock()
+		next_free_slot_unlock_level = GameRulesScript.next_free_slot_unlock_level(unlock_level)
 		unlocked = true
 	if unlocked:
 		_clear_undo_snapshot()
@@ -1776,7 +1851,7 @@ func try_unlock_adjacent_slots_by_level() -> void:
 		save_game()
 		print(
 			"Ranura extra gratis (nivel %d, próxima gratis: %d)"
-			% [checkpoint_level, get_adjacent_slot_free_unlock_level()]
+			% [new_level, get_adjacent_slot_free_unlock_level()]
 		)
 
 func find_adjacent_extra_slot_offer_board_index() -> int:
@@ -1913,20 +1988,32 @@ func is_click_on_adjacent_extra_slot_offer(mouse_pos: Vector2) -> bool:
 
 
 func try_purchase_adjacent_extra_slot() -> void:
-	if adjacent_offer_board_index < 0:
+	var economy := GameEconomyServiceScript.purchase_adjacent_slot(
+		{
+			"adjacent_offer_board_index": adjacent_offer_board_index,
+			"active_stacks": active_stacks,
+			"max_permanent_stacks": MAX_PERMANENT_STACKS,
+			"checkpoint_level": checkpoint_level,
+			"next_free_slot_unlock_level": get_adjacent_slot_free_unlock_level(),
+			"player_stars": player_stars,
+			"adjacent_slot_next_price": adjacent_slot_next_price,
+		}
+	)
+	if not bool(economy.get("ok", false)):
+		if str(economy.get("reason", "")) == "insufficient_stars":
+			show_adjacent_slot_insufficient_stars_message()
 		return
-	if active_stacks >= 14:
-		return
-	if checkpoint_level >= get_adjacent_slot_free_unlock_level():
+	if str(economy.get("reason", "")) == "free_unlock":
 		try_unlock_adjacent_slots_by_level()
 		_sync_slot_overlay_controls()
 		queue_redraw()
 		return
-	if player_stars < adjacent_slot_next_price:
-		show_adjacent_slot_insufficient_stars_message()
-		return
-	player_stars -= adjacent_slot_next_price
-	adjacent_slot_next_price *= 2
+	player_stars = int(economy.get("player_stars", player_stars))
+	adjacent_slot_next_price = int(economy.get("adjacent_slot_next_price", adjacent_slot_next_price))
+	# Si compraste antes del hito gratis, consume también ese hito para evitar doble premio.
+	next_free_slot_unlock_level = GameRulesScript.next_free_slot_unlock_level(
+		int(economy.get("next_free_slot_unlock_level", get_adjacent_slot_free_unlock_level()))
+	)
 	_clear_undo_snapshot()
 	active_stacks += 1
 	# Mantener la pila temporal como última cuando está activa.
