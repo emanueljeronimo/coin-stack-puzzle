@@ -33,6 +33,8 @@ var pending_incoming_values: Array = []
 var is_selected := false
 var flash_alpha := 0.0
 var selection_tween: Tween = null
+var fusion_tween: Tween = null
+var move_tweens: Array = []
 
 func _ready() -> void:
 	queue_redraw()
@@ -81,12 +83,38 @@ func can_receive_value(value: int) -> bool:
 		return false
 	return _effective_top_value_for_receive() in [-1, value]
 
-func set_selected(selected: bool) -> void:
+func set_selected(selected: bool, animated: bool = true) -> void:
 	is_selected = selected
-	animate_selected_block_lift()
+	if animated:
+		animate_selected_block_lift()
+	else:
+		if selection_tween != null and selection_tween.is_valid():
+			selection_tween.kill()
+		selection_tween = null
+		update_coin_positions(false)
 	queue_redraw()
 
-func push(value: int) -> bool:
+func kill_all_tweens() -> void:
+	if selection_tween != null and selection_tween.is_valid():
+		selection_tween.kill()
+	selection_tween = null
+	if fusion_tween != null and fusion_tween.is_valid():
+		fusion_tween.kill()
+	fusion_tween = null
+	for tw in move_tweens:
+		if tw is Tween and tw.is_valid():
+			tw.kill()
+	move_tweens.clear()
+	for coin_node in coin_nodes:
+		_clear_coin_flight_tween_meta(coin_node)
+
+func has_active_move_animations() -> bool:
+	for tw in move_tweens:
+		if tw is Tween and tw.is_valid():
+			return true
+	return false
+
+func push(value: int, play_spawn: bool = true) -> bool:
 	if is_full():
 		return false
 	
@@ -100,7 +128,10 @@ func push(value: int) -> bool:
 	coin_nodes.append(coin_node)
 	refresh_visible_numbers()
 	update_coin_positions(false)
-	play_coin_spawn_animation(coin_node)
+	if play_spawn:
+		play_coin_spawn_animation(coin_node)
+	else:
+		coin_node.scale = get_coin_local_scale()
 	queue_redraw()
 	
 	return true
@@ -143,7 +174,9 @@ func pop() -> int:
 	# Eliminar la moneda visualmente
 	if coin_nodes.size() > 0:
 		var coin_node = coin_nodes.pop_back()
-		coin_node.queue_free()
+		if is_instance_valid(coin_node):
+			_kill_coin_flight_tween(coin_node)
+			coin_node.queue_free()
 	refresh_visible_numbers()
 	update_coin_positions(false)
 	
@@ -184,30 +217,68 @@ func normalize_coin_scales() -> void:
 			coin_node.scale = local_scale
 
 func play_fusion_animation() -> void:
+	if fusion_tween != null and fusion_tween.is_valid():
+		fusion_tween.kill()
 	var base_sc := get_board_layout_scale()
 	var punch_sc := base_sc * 1.05
-	var tween = create_tween()
-	tween.set_trans(Tween.TRANS_SINE)
-	tween.set_ease(Tween.EASE_OUT)
-	tween.tween_method(set_flash_alpha, flash_alpha, 0.65, 0.10)
-	tween.tween_method(set_flash_alpha, 0.65, 0.0, 0.22)
-	tween.parallel().tween_property(self, "scale", Vector2.ONE * punch_sc, 0.10)
-	tween.tween_property(self, "scale", Vector2.ONE * base_sc, 0.12)
+	fusion_tween = create_tween()
+	fusion_tween.set_trans(Tween.TRANS_SINE)
+	fusion_tween.set_ease(Tween.EASE_OUT)
+	fusion_tween.tween_method(set_flash_alpha, flash_alpha, 0.65, 0.10)
+	fusion_tween.tween_method(set_flash_alpha, 0.65, 0.0, 0.22)
+	fusion_tween.parallel().tween_property(self, "scale", Vector2.ONE * punch_sc, 0.10)
+	fusion_tween.tween_property(self, "scale", Vector2.ONE * base_sc, 0.12)
 
 func set_flash_alpha(v: float) -> void:
 	flash_alpha = v
 	queue_redraw()
 
 func play_coin_spawn_animation(coin_node: Node2D) -> void:
+	if not is_instance_valid(coin_node) or not is_inside_tree():
+		return
+	_kill_coin_flight_tween(coin_node)
 	coin_node.scale = Vector2(0.25, 0.25)
 	var tween = create_tween()
+	move_tweens.append(tween)
+	tween.finished.connect(func() -> void:
+		move_tweens.erase(tween)
+	)
+	_track_coin_flight_tween(coin_node, tween)
 	tween.set_trans(Tween.TRANS_BACK)
 	tween.set_ease(Tween.EASE_OUT)
 	tween.tween_property(coin_node, "scale", get_coin_local_scale(), 0.16)
 
+func _kill_coin_flight_tween(coin_node: Node) -> void:
+	if coin_node == null or not is_instance_valid(coin_node):
+		return
+	if coin_node.has_meta("flight_tween"):
+		var existing = coin_node.get_meta("flight_tween")
+		coin_node.remove_meta("flight_tween")
+		if existing is Tween and existing.is_valid():
+			existing.kill()
+		move_tweens.erase(existing)
+
+func _clear_coin_flight_tween_meta(coin_node: Node) -> void:
+	## Quita la meta sin matar el tween (seguro desde el callback del propio tween).
+	if coin_node == null or not is_instance_valid(coin_node):
+		return
+	if coin_node.has_meta("flight_tween"):
+		coin_node.remove_meta("flight_tween")
+
+func _track_coin_flight_tween(coin_node: Node, tween: Tween) -> void:
+	if coin_node == null or tween == null or not is_instance_valid(coin_node):
+		return
+	_kill_coin_flight_tween(coin_node)
+	coin_node.set_meta("flight_tween", tween)
+	tween.finished.connect(func() -> void:
+		_clear_coin_flight_tween_meta(coin_node)
+	)
+
 func refresh_visible_numbers() -> void:
 	for i in range(coin_nodes.size()):
 		var coin_node = coin_nodes[i]
+		if not is_instance_valid(coin_node):
+			continue
 		if coin_node.has_method("set_number_visible"):
 			# Mostrar numero solo en la ficha del tope para evitar solapados visuales.
 			coin_node.set_number_visible(i == coin_nodes.size() - 1)
@@ -222,7 +293,14 @@ func take_top_coin_for_move() -> Dictionary:
 
 	var value = coins.pop_back()
 	var coin_node: Node2D = coin_nodes.pop_back()
-	coin_node.reparent(get_parent())
+	if not is_instance_valid(coin_node):
+		return {}
+	_kill_coin_flight_tween(coin_node)
+	var board := get_parent()
+	if board == null or not is_instance_valid(board):
+		coin_node.queue_free()
+		return {}
+	coin_node.reparent(board)
 	coin_node.scale = get_coin_flight_scale()
 	coin_node.z_index = 30
 	refresh_visible_numbers()
@@ -234,9 +312,11 @@ func take_top_coin_for_move() -> Dictionary:
 	}
 
 func receive_moved_coin(value: int, moving_coin: Node2D, delay: float = 0.0) -> void:
-	if is_full():
-		if is_instance_valid(moving_coin):
-			moving_coin.queue_free()
+	if not is_instance_valid(moving_coin) or not moving_coin.is_inside_tree():
+		return
+	if not is_inside_tree() or is_full():
+		_kill_coin_flight_tween(moving_coin)
+		moving_coin.queue_free()
 		return
 
 	pending_incoming_values.append(value)
@@ -246,16 +326,41 @@ func receive_moved_coin(value: int, moving_coin: Node2D, delay: float = 0.0) -> 
 	if moving_coin.has_method("set_number_visible"):
 		moving_coin.set_number_visible(false)
 
-	var tween = create_tween()
+	# Tween del tablero (padre), no de la pila: sobrevive si la pila se limpia,
+	# y evitamos kill() del propio tween desde su callback.
+	var board := get_parent()
+	var tween: Tween
+	if board != null and is_instance_valid(board):
+		tween = board.create_tween()
+	else:
+		tween = create_tween()
+	move_tweens.append(tween)
+	tween.finished.connect(func() -> void:
+		move_tweens.erase(tween)
+	)
+	_track_coin_flight_tween(moving_coin, tween)
 	tween.set_trans(Tween.TRANS_CUBIC)
 	tween.set_ease(Tween.EASE_OUT)
 	if delay > 0.0:
 		tween.tween_interval(delay)
 	tween.tween_property(moving_coin, "global_position", target_global, 0.18)
 	tween.parallel().tween_property(moving_coin, "scale", flight_scale, 0.18)
-	tween.tween_callback(Callable(self, "_attach_moved_coin").bind(moving_coin, target_local, value))
+	# Adjuntar en el frame siguiente al terminar el vuelo: evita mutar nodos
+	# dentro del callback interno del Tween (inestable en móvil).
+	tween.tween_callback(func() -> void:
+		_clear_coin_flight_tween_meta(moving_coin)
+		if is_instance_valid(self):
+			call_deferred("_attach_moved_coin", moving_coin, target_local, value)
+		elif is_instance_valid(moving_coin):
+			moving_coin.queue_free()
+	)
 
 func _attach_moved_coin(moving_coin: Node2D, target_local: Vector2, value: int) -> void:
+	if not is_instance_valid(self) or not is_inside_tree():
+		if is_instance_valid(moving_coin):
+			moving_coin.queue_free()
+		return
+	_clear_coin_flight_tween_meta(moving_coin)
 	if not _consume_pending_incoming_value(value):
 		if is_instance_valid(moving_coin):
 			moving_coin.queue_free()
@@ -294,16 +399,30 @@ func _clear_pending_incoming() -> void:
 func _try_resolve_after_pending_settled() -> void:
 	if not pending_incoming_values.is_empty():
 		return
+	# Solo mirar pendientes de otras pilas; no bloquear por el tween actual
+	# (acabamos de aterrizar y ese tween todavía "está activo").
 	var board = get_parent()
-	if board == null:
+	if board == null or not is_instance_valid(board):
 		return
-	# Tras asentarse las monedas: resolver fusiones, checkpoint y bloqueo sobre el estado final.
-	if board.has_method("resolve_board_after_action"):
-		board.call_deferred("resolve_board_after_action")
+	if board.has_method("has_pending_incoming_coins") and board.has_pending_incoming_coins():
+		return
+	if board.has_method("request_resolve_board_after_action"):
+		var rev: int = int(board.get("board_revision")) if board.get("board_revision") != null else -1
+		board.call_deferred("request_resolve_board_after_action", rev)
 
 func animate_selected_block_lift() -> void:
 	if selection_tween != null and selection_tween.is_valid():
 		selection_tween.kill()
+	selection_tween = null
+	if coin_nodes.is_empty():
+		return
+	var has_valid_coin := false
+	for coin_node in coin_nodes:
+		if is_instance_valid(coin_node):
+			has_valid_coin = true
+			break
+	if not has_valid_coin:
+		return
 	selection_tween = create_tween()
 	selection_tween.set_trans(Tween.TRANS_SINE)
 	selection_tween.set_ease(Tween.EASE_OUT)
@@ -314,6 +433,7 @@ func update_coin_positions(animated: bool) -> void:
 		return
 	var movable_block_size := top_block_size() if is_selected else 0
 	var movable_start := coin_nodes.size() - movable_block_size
+	var tweened_any := false
 	for i in range(coin_nodes.size()):
 		var coin_node: Node2D = coin_nodes[i]
 		if not is_instance_valid(coin_node):
@@ -323,5 +443,9 @@ func update_coin_positions(animated: bool) -> void:
 			target.y += SELECTED_BLOCK_LIFT_Y
 		if animated and selection_tween != null and selection_tween.is_valid():
 			selection_tween.parallel().tween_property(coin_node, "position", target, 0.12)
+			tweened_any = true
 		else:
 			coin_node.position = target
+	if animated and selection_tween != null and selection_tween.is_valid() and not tweened_any:
+		selection_tween.kill()
+		selection_tween = null

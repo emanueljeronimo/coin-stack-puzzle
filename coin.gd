@@ -9,24 +9,25 @@ var number_visible: bool = true
 @onready var label = $Label
 @onready var collision_shape = $CollisionShape2D
 
-## Paleta pastel con color visible (suavizada ~15% hacia blanco).
+## Paleta pastel con matices redistribuidos para mejor distinción.
 const VALUE_COLORS := [
-	Color(0.96, 0.70, 0.72), # 1  blush
-	Color(0.62, 0.76, 0.96), # 7  azul
-	Color(0.99, 0.94, 0.70), # 3  amarillo pastel (mantequilla)
-	Color(0.78, 0.66, 0.94), # 8  violeta
-	Color(0.62, 0.88, 0.70), # 5  verde
-	Color(0.96, 0.74, 0.58), # 9  naranja
-	Color(0.58, 0.88, 0.84), # 6  aqua
-	Color(0.92, 0.66, 0.90), # 10 rosa violeta
-	Color(0.78, 0.90, 0.62), # 4  lima
-	Color(0.94, 0.66, 0.78), # 11 rosa
-	Color(0.92, 0.78, 0.66), # 13 trigo
-	Color(0.72, 0.68, 0.94), # 14 lavanda
-	Color(0.96, 0.74, 0.66), # 2  durazno
-	Color(0.68, 0.86, 0.68), # 12 salvia
-	Color(0.88, 0.86, 0.88), # 15 gris lavanda
+	Color(0.95, 0.45, 0.55), # 1  blush
+	Color(0.25, 0.75, 0.40), # 2  verde
+	Color(0.55, 0.35, 0.85), # 3  violeta
+	Color(0.90, 0.65, 0.50), # 4  durazno (bajado)
+	Color(0.25, 0.85, 0.80), # 5  aqua
+	Color(0.75, 0.30, 0.75), # 6  rosa violeta
+	Color(0.65, 0.85, 0.25), # 7  lima
+	Color(0.30, 0.55, 0.90), # 8  azul
+	Color(0.85, 0.70, 0.40), # 9  trigo
+	Color(0.55, 0.70, 0.55), # 10 salvia
+	Color(0.90, 0.50, 0.15), # 11 naranja
+	Color(0.75, 0.70, 0.95), # 12 lavanda
+	Color(0.95, 0.85, 0.25), # 13 amarillo
+	Color(0.95, 0.75, 0.85), # 14 rosa claro
+	Color(0.92, 0.92, 0.95), # 15 gris claro
 ]
+
 const PASTEL_SOFTEN := 0.14
 ## Aclarado mínimo al aplicar color (la textura gris ya oscurece un poco).
 const COIN_TINT_LIGHTEN := 0.04
@@ -37,6 +38,8 @@ var coin_color: Color = VALUE_COLORS[0]
 
 func _ready() -> void:
 	input_pickable = false
+	monitoring = false
+	monitorable = false
 	configure_sprite_scale()
 	if label:
 		label.z_index = 5

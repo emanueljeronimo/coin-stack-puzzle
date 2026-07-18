@@ -18,11 +18,16 @@ func configure(
 	verde: Color,
 	pixel_size: Vector2 = Vector2.ZERO
 ) -> void:
+	var corner_changed := not is_equal_approx(_corner_radius_px, float(corner_px))
+	var colors_changed := (
+		_color_celeste != celeste or _color_rosa != rosa or _color_verde != verde
+	)
 	_corner_radius_px = float(corner_px)
 	_color_celeste = celeste
 	_color_rosa = rosa
 	_color_verde = verde
-	_last_size = Vector2.ZERO
+	if corner_changed or colors_changed:
+		_last_size = Vector2.ZERO
 	if pixel_size.x > 1.0 and pixel_size.y > 1.0:
 		_refresh_gradient_for_size(pixel_size)
 	else:

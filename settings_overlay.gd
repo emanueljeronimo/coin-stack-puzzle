@@ -48,8 +48,8 @@ func layout_for_viewport(viewport_size: Vector2) -> void:
 	if card == null:
 		return
 	var scale := viewport_size.x / REF_WIDTH
-	var card_w := viewport_size.x * 0.47
-	var card_h := viewport_size.y * 0.45
+	var card_w := viewport_size.x * 0.70
+	var card_h := viewport_size.y * 0.60
 	card.position = Vector2((viewport_size.x - card_w) * 0.5, (viewport_size.y - card_h) * 0.5)
 	card.size = Vector2(card_w, card_h)
 	_position_close_button()
@@ -58,8 +58,8 @@ func layout_for_viewport(viewport_size: Vector2) -> void:
 func _apply_scaled_content(scale: float, card_w: float) -> void:
 	var panel_scale := clampf(card_w / (REF_WIDTH * 0.47), 0.55, 1.0)
 	var title_size := int(38.0 * scale * panel_scale)
-	var row_label_size := int(26.0 * scale * panel_scale)
-	var section_size := int(24.0 * scale * panel_scale)
+	var row_label_size := int(34.0 * scale * panel_scale)
+	var section_size := int(40.0 * scale * panel_scale)
 	var toggle_btn_size := Vector2(96.0 * scale * panel_scale, 48.0 * scale * panel_scale)
 
 	if _main_title != null:
@@ -115,7 +115,7 @@ func _build_ui() -> void:
 
 	var vbox := VBoxContainer.new()
 	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	vbox.add_theme_constant_override("separation", 18)
+	vbox.add_theme_constant_override("separation", 40)
 	content_scroll.add_child(vbox)
 
 	_main_title = _create_label("Configuración", 38, TITLE_COLOR)
