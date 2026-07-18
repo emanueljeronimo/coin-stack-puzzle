@@ -45,6 +45,10 @@ func _test_checkpoint_eval() -> void:
 	if lv2 != 2:
 		_fail("create_5_is_level_2", str(lv2))
 		return
+	var lv3 := GameEngineScript.evaluate_checkpoint_level(5, 5, 1, 5, 5, 15)
+	if lv3 != 3:
+		_fail("half_stack_5_is_level_3", str(lv3))
+		return
 	var lv15 := GameEngineScript.evaluate_checkpoint_level(11, 6, 1, 5, 5, 15)
 	if lv15 != 15:
 		_fail("half_11_is_level_15", str(lv15))

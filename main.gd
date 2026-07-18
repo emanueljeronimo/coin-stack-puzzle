@@ -154,7 +154,7 @@ const AD_LIVES_AMOUNT := 1
 ## Sistema de niveles (checkpoints). Patrón por valor V (>=5): crear pila V, pila V >50%, completar pila V (=crear V+1).
 ## N1=inicio (solo valores 1..4). N2=crear pila 5. N3=pila 5 >50%. N4=completar pila 5 → crear pila 6. Y así sucesivamente.
 const CHECKPOINT_BASE_VALUE := 5
-## "Más del 50 %": la pila tiene más de la mitad de su capacidad en fichas de ese valor.
+## "Mitad o más": la pila alcanza al menos la mitad de su capacidad en fichas de ese valor.
 const CHECKPOINT_HALF_THRESHOLD := STACK_CAPACITY / 2
 ## Tras crear la primera ficha de max_value, fusionar 10×(max_value-1) → max_value-1 otorga fichas max_value.
 const FUSION_BONUS_NEAR_CAP_COUNT := 9

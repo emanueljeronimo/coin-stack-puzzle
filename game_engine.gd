@@ -46,7 +46,7 @@ static func evaluate_checkpoint_level(
 	var cycle_base := cycle_base_level(roll_value_floor, checkpoint_base_value, board_cycle_levels)
 	if local_highest < checkpoint_base_value:
 		return 1 if cycle_base == 0 else cycle_base
-	var has_half := highest_value_max_count > checkpoint_half_threshold
+	var has_half := highest_value_max_count >= checkpoint_half_threshold
 	var local_level := 2 * (local_highest - checkpoint_base_value) + 2 + (1 if has_half else 0)
 	if cycle_base == 0:
 		return local_level
@@ -82,7 +82,7 @@ static func progress_toward_checkpoint_level(
 			float(int(max_count_for_value.call(prev_v))) / float(stack_capacity), 0.0, 1.0
 		) * 0.65
 		return clampf(hv_part + pile_part, 0.0, 0.99)
-	var need := checkpoint_half_threshold + 1
+	var need := checkpoint_half_threshold
 	return clampf(float(int(max_count_for_value.call(v))) / float(need), 0.0, 1.0)
 
 static func checkpoint_level_description(
@@ -105,4 +105,4 @@ static func checkpoint_level_description(
 		if steps == 0:
 			return "Creaste la pila %d" % v
 		return "Completaste la pila %d" % (v - 1)
-	return "Pila %d: más de la mitad" % v
+	return "Pila %d: mitad o más" % v
