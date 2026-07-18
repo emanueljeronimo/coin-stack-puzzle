@@ -1871,6 +1871,7 @@ func _unlock_adjacent_slots_for_level_range(previous_level: int, new_level: int)
 	if unlocked:
 		_clear_undo_snapshot()
 		refresh_all_stack_layout()
+		_sync_slot_overlay_controls()
 		queue_redraw()
 		capture_checkpoint_snapshot()
 		GameState.player_level = checkpoint_level

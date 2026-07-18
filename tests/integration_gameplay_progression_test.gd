@@ -21,6 +21,7 @@ func _initialize() -> void:
 func _run() -> void:
 	print("=== integration_gameplay_progression test ===")
 	_test_progression_purchase_and_cycle_reset()
+	_test_free_unlock_applies_immediately_on_level_threshold()
 	print("=== RESULT: %d passed, %d failed ===" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -142,3 +143,37 @@ func _test_progression_purchase_and_cycle_reset() -> void:
 		return
 
 	_ok("progression_purchase_and_cycle_reset")
+
+func _test_free_unlock_applies_immediately_on_level_threshold() -> void:
+	var state := {
+		"checkpoint_level": 1,
+		"current_level": 1,
+		"max_value": 5,
+		"roll_value_floor": 1,
+		"active_stacks": 5,
+		"adjacent_slot_next_price": ADJACENT_BASE_PRICE,
+		"next_free_slot_unlock_level": GameRulesScript.initial_free_slot_unlock_level(0),
+	}
+
+	# Nivel 2 al crear ficha 5 (sin desbloqueo gratis aún).
+	state = _advance_checkpoint(state, 5, 1)
+	if int(state.get("checkpoint_level", 0)) != 2:
+		_fail("immediate_unlock_level_2", str(state))
+		return
+	if int(state.get("active_stacks", 0)) != 5:
+		_fail("immediate_unlock_no_early_slot", str(state))
+		return
+
+	# Nivel 4 al crear ficha 6: debe otorgar ranura gratis en el mismo avance.
+	state = _advance_checkpoint(state, 6, 1)
+	if int(state.get("checkpoint_level", 0)) != 4:
+		_fail("immediate_unlock_level_4", str(state))
+		return
+	if int(state.get("active_stacks", 0)) != 6:
+		_fail("immediate_unlock_slot_granted", str(state))
+		return
+	if int(state.get("next_free_slot_unlock_level", 0)) != 6:
+		_fail("immediate_unlock_cursor_advanced", str(state))
+		return
+
+	_ok("free_unlock_applies_immediately_on_level_threshold")
