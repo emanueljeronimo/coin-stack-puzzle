@@ -3,6 +3,7 @@ class_name GameRules
 
 # Reglas de motor centralizadas (data-driven) para no mezclar criterio de juego con UI.
 const TEMP_SLOT_ACTIONS_TO_CLOSE := 3
+const TEMP_SLOT_CLOSE_BY_ACTIONS := false
 const ENABLE_FUSION_CREATE_BONUS := false
 
 const ADJACENT_SLOT_FREE_FIRST_LEVEL := 4

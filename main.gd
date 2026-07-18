@@ -250,7 +250,7 @@ var adjacent_offer_board_index: int = -1
 var temp_slot_time_remaining: float = 0.0
 ## Solo true tras comprar la ranura temporal (hay una pila extra); no confundir con "última pila" del tablero normal.
 var temp_slot_bonus_active: bool = false
-## Cierre data-driven de ranura temporal por cantidad de acciones de juego.
+## Contador opcional para cierre por acciones (desactivado por regla; se conserva por compatibilidad de save).
 var temp_slot_actions_remaining: int = 0
 ## Snapshot de partida en curso para restaurar estado exacto al volver desde Home.
 var runtime_snapshot: Dictionary = {}
@@ -898,6 +898,8 @@ func perform_roll() -> bool:
 	return true
 
 func _consume_temp_slot_action() -> void:
+	if not GameRulesScript.TEMP_SLOT_CLOSE_BY_ACTIONS:
+		return
 	var step := GameSlotServiceScript.consume_temp_action(
 		temp_slot_bonus_active,
 		temp_slot_actions_remaining
@@ -1149,7 +1151,9 @@ func try_purchase_temp_slot() -> void:
 		{
 			"temp_slot_cost_stars": TEMP_SLOT_COST_STARS,
 			"temp_slot_duration_sec": TEMP_SLOT_DURATION_SEC,
-			"temp_slot_actions_to_close": GameRulesScript.TEMP_SLOT_ACTIONS_TO_CLOSE,
+			"temp_slot_actions_to_close": (
+				GameRulesScript.TEMP_SLOT_ACTIONS_TO_CLOSE if GameRulesScript.TEMP_SLOT_CLOSE_BY_ACTIONS else 0
+			),
 		}
 	)
 	if not bool(economy.get("ok", false)):
@@ -1178,7 +1182,10 @@ func try_purchase_temp_slot() -> void:
 	board_locked = false
 	temp_slot_time_remaining = float(economy.get("temp_slot_time_remaining", TEMP_SLOT_DURATION_SEC))
 	temp_slot_actions_remaining = int(
-		economy.get("temp_slot_actions_remaining", GameRulesScript.TEMP_SLOT_ACTIONS_TO_CLOSE)
+		economy.get(
+			"temp_slot_actions_remaining",
+			GameRulesScript.TEMP_SLOT_ACTIONS_TO_CLOSE if GameRulesScript.TEMP_SLOT_CLOSE_BY_ACTIONS else 0
+		)
 	)
 	_temp_slot_timer_shown_sec = -1
 	update_stars_display()

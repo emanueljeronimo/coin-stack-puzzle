@@ -71,8 +71,8 @@ flowchart TD
 - Reset de ciclo: cuando aparece una ficha hito (15, 30, 45...), se reinicia el tablero del ciclo con nuevo piso de valores.
 - Slot temporal:
 - se compra con estrellas,
-- tambien tiene timer,
-- y ademas consume acciones de juego hasta cerrarse (`TEMP_SLOT_ACTIONS_TO_CLOSE`).
+- dura por timer (60 segundos),
+- no se cierra por cantidad de acciones de juego.
 - Si el slot temporal tiene fichas al vencer, no se cierra para evitar perder monedas.
 - Slot adyacente permanente: se compra con estrellas y duplica precio, salvo desbloqueos gratis por nivel.
 - Bonus de fusion por crear objetivo: esta encapsulado en `game_fusion_engine.gd` y controlado por `game_rules.gd`.
