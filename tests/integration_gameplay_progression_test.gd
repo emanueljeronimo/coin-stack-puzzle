@@ -22,6 +22,8 @@ func _run() -> void:
 	print("=== integration_gameplay_progression test ===")
 	_test_progression_purchase_and_cycle_reset()
 	_test_free_unlock_applies_immediately_on_level_threshold()
+	_test_reconcile_missing_free_unlock_state()
+	_test_no_early_unlock_before_target_level()
 	print("=== RESULT: %d passed, %d failed ===" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -177,3 +179,47 @@ func _test_free_unlock_applies_immediately_on_level_threshold() -> void:
 		return
 
 	_ok("free_unlock_applies_immediately_on_level_threshold")
+
+func _test_reconcile_missing_free_unlock_state() -> void:
+	# Estado inconsistente típico de bug visual/restore:
+	# nivel ya alcanzado, pero la ranura gratis aún no fue aplicada.
+	var state := {
+		"checkpoint_level": 4,
+		"current_level": 2,
+		"max_value": 6,
+		"roll_value_floor": 1,
+		"active_stacks": 5,
+		"adjacent_slot_next_price": ADJACENT_BASE_PRICE,
+		"next_free_slot_unlock_level": 4,
+	}
+
+	_apply_free_unlocks(state, 3, 4)
+	if int(state.get("active_stacks", 0)) != 6:
+		_fail("reconcile_missing_unlock_slot", str(state))
+		return
+	if int(state.get("next_free_slot_unlock_level", 0)) != 6:
+		_fail("reconcile_missing_unlock_cursor", str(state))
+		return
+
+	_ok("reconcile_missing_free_unlock_state")
+
+func _test_no_early_unlock_before_target_level() -> void:
+	var state := {
+		"checkpoint_level": 3,
+		"current_level": 2,
+		"max_value": 6,
+		"roll_value_floor": 1,
+		"active_stacks": 5,
+		"adjacent_slot_next_price": ADJACENT_BASE_PRICE,
+		"next_free_slot_unlock_level": 4,
+	}
+
+	_apply_free_unlocks(state, 2, 3)
+	if int(state.get("active_stacks", 0)) != 5:
+		_fail("no_early_unlock_slot", str(state))
+		return
+	if int(state.get("next_free_slot_unlock_level", 0)) != 4:
+		_fail("no_early_unlock_cursor", str(state))
+		return
+
+	_ok("no_early_unlock_before_target_level")
