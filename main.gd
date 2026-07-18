@@ -882,6 +882,9 @@ func perform_roll() -> bool:
 
 	values_to_roll.shuffle()
 	var roll_count := GameTurnEngineScript.compute_roll_count(values_to_roll.size(), total_free_slots, true)
+	var roll_assigned_by_stack: Dictionary = {}
+	for stack in target_stacks:
+		roll_assigned_by_stack[stack.get_instance_id()] = 0
 	for i in range(roll_count):
 		var available_stacks: Array = []
 		for stack in target_stacks:
@@ -889,8 +892,20 @@ func perform_roll() -> bool:
 				available_stacks.append(stack)
 		if available_stacks.is_empty():
 			break
-		var idx = randi() % available_stacks.size()
-		available_stacks[idx].push(values_to_roll[i])
+		var idx := GameTurnEngineScript.pick_balanced_index(
+			available_stacks.size(),
+			func(candidate_index: int) -> int:
+				var candidate_stack = available_stacks[candidate_index]
+				return int(roll_assigned_by_stack.get(candidate_stack.get_instance_id(), 0)),
+			func(max_exclusive: int) -> int:
+				return randi() % maxi(1, max_exclusive)
+		)
+		if idx < 0:
+			break
+		var selected_stack = available_stacks[idx]
+		selected_stack.push(values_to_roll[i])
+		var sid = selected_stack.get_instance_id()
+		roll_assigned_by_stack[sid] = int(roll_assigned_by_stack.get(sid, 0)) + 1
 
 	board_locked = false
 	_consume_temp_slot_action()
@@ -1474,13 +1489,15 @@ func update_checkpoint_level() -> bool:
 	checkpoint_level = int(decision.get("checkpoint_level", checkpoint_level))
 	if bool(decision.get("did_cycle_reset", false)):
 		reset_board_for_cycle_milestone(cycle_milestone)
-	capture_checkpoint_snapshot()
-	GameState.player_level = checkpoint_level
-	GameState.checkpoint_snapshot = checkpoint_snapshot.duplicate(true)
 	sync_wildcard_unlocks()
 	# Tras un reset de ciclo no hay desbloqueo retroactivo de ranuras.
 	if not bool(decision.get("did_cycle_reset", false)):
 		_unlock_adjacent_slots_for_level_range(previous, checkpoint_level)
+	# Guardar checkpoint DESPUES de aplicar desbloqueos de ranura gratis.
+	# Si se guarda antes, al restaurar se pierde la ranura otorgada por nivel.
+	capture_checkpoint_snapshot()
+	GameState.player_level = checkpoint_level
+	GameState.checkpoint_snapshot = checkpoint_snapshot.duplicate(true)
 	print("Checkpoint alcanzado: nivel ", checkpoint_level, " (tablero guardado)")
 	# Encolar cada nivel saltado para no perder carteles (ej. 1→3 muestra 2 y 3).
 	for alert_lvl in range(previous + 1, checkpoint_level + 1):
@@ -1855,6 +1872,9 @@ func _unlock_adjacent_slots_for_level_range(previous_level: int, new_level: int)
 		_clear_undo_snapshot()
 		refresh_all_stack_layout()
 		queue_redraw()
+		capture_checkpoint_snapshot()
+		GameState.player_level = checkpoint_level
+		GameState.checkpoint_snapshot = checkpoint_snapshot.duplicate(true)
 		save_game()
 		print(
 			"Ranura extra gratis (nivel %d, próxima gratis: %d)"

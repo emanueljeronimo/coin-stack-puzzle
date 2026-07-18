@@ -12,6 +12,7 @@ func _run() -> void:
 	print("=== game_turn_engine test ===")
 	_test_roll_value_pool()
 	_test_roll_count_policy()
+	_test_balanced_pick_policy()
 	print("=== RESULT: %d passed, %d failed ===" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -47,3 +48,22 @@ func _test_roll_count_policy() -> void:
 		_fail("roll_count_fill_all_when_disabled")
 		return
 	_ok("roll_count_policy")
+
+func _test_balanced_pick_policy() -> void:
+	var assigned := [0, 0, 0]
+	for _i in range(6):
+		var idx := GameTurnEngineScript.pick_balanced_index(
+			assigned.size(),
+			func(candidate_index: int) -> int:
+				return assigned[candidate_index],
+			func(_max_exclusive: int) -> int:
+				return 0
+		)
+		if idx < 0 or idx >= assigned.size():
+			_fail("balanced_pick_index", str(idx))
+			return
+		assigned[idx] += 1
+	if assigned != [2, 2, 2]:
+		_fail("balanced_pick_distribution", str(assigned))
+		return
+	_ok("balanced_pick_policy")
