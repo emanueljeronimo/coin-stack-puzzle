@@ -136,11 +136,13 @@ func push(value: int, play_spawn: bool = true) -> bool:
 	
 	return true
 
-func move_top_block_to(target: Node) -> int:
+func move_top_block_to(target: Node, ignore_top_match: bool = false) -> int:
 	if is_empty() or target == self:
 		return 0
 	var value = top_value()
-	if not target.can_receive_value(value):
+	if not ignore_top_match and not target.can_receive_value(value):
+		return 0
+	if ignore_top_match and target.free_slots() <= 0:
 		return 0
 	var amount = mini(top_block_size(), target.free_slots())
 	var moved_amount := 0
@@ -182,6 +184,18 @@ func pop() -> int:
 	
 	queue_redraw()
 	return value
+
+## Vacía la pila por completo (datos + nodos + pendientes). Para Mezclar.
+func clear_all_coins() -> void:
+	kill_all_tweens()
+	_clear_pending_incoming()
+	for coin_node in coin_nodes:
+		if is_instance_valid(coin_node):
+			_kill_coin_flight_tween(coin_node)
+			coin_node.queue_free()
+	coin_nodes.clear()
+	coins.clear()
+	queue_redraw()
 
 func _draw() -> void:
 	# Sin fondo de pila: solo feedback visual.

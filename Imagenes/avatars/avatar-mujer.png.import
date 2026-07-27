@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://vu5io2a6tui7"
-path="res://.godot/imported/variante-rosa-completa.png-8fbb071f2d75af34a2fb1183aeb5d834.ctex"
+uid="uid://c1lp5x8rbdbqf"
+path="res://.godot/imported/avatar-mujer.png-eb5edcc8b29ab92dbc295bbb27bdd44a.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Imagenes/variante-rosa-completa.png"
-dest_files=["res://.godot/imported/variante-rosa-completa.png-8fbb071f2d75af34a2fb1183aeb5d834.ctex"]
+source_file="res://Imagenes/avatars/avatar-mujer.png"
+dest_files=["res://.godot/imported/avatar-mujer.png-eb5edcc8b29ab92dbc295bbb27bdd44a.ctex"]
 
 [params]
 

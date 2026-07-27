@@ -123,16 +123,52 @@ static func create_gradient_pill() -> Control:
 	root.set_meta(PILL_BG_META, bg)
 	return root
 
+
+## Botón de perfil: la textura del avatar llena el control (sin pastilla de fondo).
+static func create_avatar_chip(texture: Texture2D) -> Dictionary:
+	var shadow := Panel.new()
+	shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var shadow_style := StyleBoxFlat.new()
+	shadow_style.bg_color = Color(0.19, 0.28, 0.18, 0.18)
+	shadow.add_theme_stylebox_override("panel", shadow_style)
+
+	var panel := Control.new()
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	panel.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	panel.clip_contents = true
+
+	var avatar := TextureRect.new()
+	avatar.set_anchors_preset(Control.PRESET_FULL_RECT)
+	avatar.offset_left = 0
+	avatar.offset_top = 0
+	avatar.offset_right = 0
+	avatar.offset_bottom = 0
+	avatar.texture = texture
+	avatar.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	avatar.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	avatar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(avatar)
+	return {"shadow": shadow, "panel": panel, "avatar": avatar}
+
+
+static func apply_avatar_chip_style(shadow: Panel, size: Vector2) -> void:
+	if shadow == null:
+		return
+	var radius := int(mini(size.x, size.y) * 0.22)
+	apply_shadow_corner_radius(shadow, radius)
+
+
 static func apply_gradient_pill_style(pill: Control, radius: int, pill_size: Vector2) -> void:
 	if pill == null or not pill.has_meta(PILL_BG_META):
 		return
 	var bg: TextureRect = pill.get_meta(PILL_BG_META)
 	if bg != null and bg.has_method("configure"):
+		var palette: Dictionary = GameState.get_ui_palette()
 		bg.configure(
 			radius,
-			PILL_GRAD_CELESTE,
-			PILL_GRAD_ROSA,
-			PILL_GRAD_VERDE,
+			palette.get("grad_a", PILL_GRAD_CELESTE),
+			palette.get("grad_b", PILL_GRAD_ROSA),
+			palette.get("grad_c", PILL_GRAD_VERDE),
 			pill_size
 		)
 

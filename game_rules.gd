@@ -5,6 +5,8 @@ class_name GameRules
 const TEMP_SLOT_ACTIONS_TO_CLOSE := 3
 const TEMP_SLOT_CLOSE_BY_ACTIONS := false
 const ENABLE_FUSION_CREATE_BONUS := false
+## Al completar 10 iguales, se crean esta cantidad de fichas del valor siguiente.
+const FUSION_OUTPUT_COUNT := 2
 
 const ADJACENT_SLOT_FREE_FIRST_LEVEL := 4
 const ADJACENT_SLOT_FREE_LEVEL_INTERVAL := 2
@@ -41,3 +43,142 @@ static func normalize_temp_state(
 		"temp_slot_bonus_active": true,
 		"temp_slot_time_remaining": temp_time_remaining,
 	}
+
+## Mezclar: desarma todo, cuenta fichas/espacios, colapsa fusiones de 10 y
+## recoloca 1 color por pila siempre que quepa. Si no alcanzan ranuras, maximiza
+## pilas homogéneas y concentra el resto en la menor cantidad de pilas mixtas.
+static func build_mix_stack_plan(all_values: Array, stack_count: int, capacity: int = 10) -> Array:
+	var plan: Array = []
+	for _i in range(maxi(0, stack_count)):
+		plan.append([])
+	if stack_count <= 0 or all_values.is_empty() or capacity <= 0:
+		return plan
+
+	var counts := _mix_count_values(all_values)
+	# Omnipotente: 10 iguales → FUSION_OUTPUT_COUNT del siguiente valor.
+	counts = _mix_collapse_fusions(counts, capacity)
+
+	var total_coins := 0
+	for v in counts.keys():
+		total_coins += int(counts[v])
+	var total_spaces := stack_count * capacity
+	if total_coins > total_spaces:
+		push_error(
+			"Mix: %d fichas no caben en %d espacios (%d pilas x %d)"
+			% [total_coins, total_spaces, stack_count, capacity]
+		)
+
+	var chunks: Array = _mix_build_chunks(counts, capacity)
+	if chunks.is_empty():
+		return plan
+
+	# Camino perfecto: un chunk = una pila homogénea.
+	if chunks.size() <= stack_count:
+		for i in range(chunks.size()):
+			plan[i] = chunks[i]
+		return plan
+
+	# Ordenar chunks grandes primero.
+	chunks.sort_custom(func(a, b):
+		var sa := (a as Array).size()
+		var sb := (b as Array).size()
+		if sa != sb:
+			return sa > sb
+		return int((a as Array)[0]) < int((b as Array)[0])
+	)
+
+	# Guardar chunks puros mientras el resto siga cabiendo en las ranuras restantes.
+	var si := 0
+	var coins_left := total_coins
+	var stacks_left := stack_count
+	var overflow: Array = []
+	for chunk in chunks:
+		var chunk_arr: Array = chunk
+		var chunk_size := chunk_arr.size()
+		var rest := coins_left - chunk_size
+		var stacks_after := stacks_left - 1
+		if (
+			si < stack_count
+			and stacks_after >= 0
+			and rest <= stacks_after * capacity
+		):
+			plan[si] = chunk_arr.duplicate()
+			si += 1
+			stacks_left -= 1
+			coins_left -= chunk_size
+		else:
+			for raw in chunk_arr:
+				overflow.append(int(raw))
+
+	overflow.sort()
+	var oi := 0
+	while oi < overflow.size() and si < stack_count:
+		var room := capacity - (plan[si] as Array).size()
+		if room <= 0:
+			si += 1
+			continue
+		var put := mini(room, overflow.size() - oi)
+		for _j in range(put):
+			(plan[si] as Array).append(int(overflow[oi]))
+			oi += 1
+		if (plan[si] as Array).size() >= capacity:
+			si += 1
+
+	if oi < overflow.size():
+		push_error("Mix: sobraron %d fichas sin colocar" % (overflow.size() - oi))
+
+	return plan
+
+static func _mix_count_values(all_values: Array) -> Dictionary:
+	var counts: Dictionary = {}
+	for raw in all_values:
+		var v := int(raw)
+		counts[v] = int(counts.get(v, 0)) + 1
+	return counts
+
+## 10 del valor V → FUSION_OUTPUT_COUNT del valor V+1, en cascada hasta estabilizar.
+static func _mix_collapse_fusions(counts: Dictionary, capacity: int = 10) -> Dictionary:
+	var out: Dictionary = counts.duplicate()
+	var guard := 0
+	var changed := true
+	while changed and guard < 1000:
+		changed = false
+		guard += 1
+		var keys: Array = out.keys()
+		keys.sort()
+		for v in keys:
+			var c := int(out.get(v, 0))
+			if c < capacity:
+				continue
+			var fused := int(c / capacity)
+			var rem := c % capacity
+			if rem > 0:
+				out[v] = rem
+			else:
+				out.erase(v)
+			var nxt := int(v) + 1
+			out[nxt] = int(out.get(nxt, 0)) + fused * FUSION_OUTPUT_COUNT
+			changed = true
+	return out
+
+static func _mix_build_chunks(counts: Dictionary, capacity: int) -> Array:
+	var values: Array = counts.keys()
+	values.sort_custom(func(a, b):
+		var ca := int(counts[a])
+		var cb := int(counts[b])
+		if ca != cb:
+			return ca > cb
+		return int(a) < int(b)
+	)
+	var chunks: Array = []
+	for v in values:
+		var left := int(counts[v])
+		while left > 0:
+			var put := mini(left, capacity)
+			var chunk: Array = []
+			for _j in range(put):
+				chunk.append(int(v))
+			chunks.append(chunk)
+			left -= put
+	return chunks
+ 

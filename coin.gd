@@ -19,7 +19,7 @@ const VALUE_COLORS := [
 	Color(0.75, 0.30, 0.75), # 6  rosa violeta
 	Color(0.65, 0.85, 0.25), # 7  lima
 	Color(0.30, 0.55, 0.90), # 8  azul
-	Color(0.85, 0.70, 0.40), # 9  trigo
+	Color(0.95, 0.85, 0.35), # 9 Amarillo trigo
 	Color(0.55, 0.70, 0.55), # 10 salvia
 	Color(0.90, 0.50, 0.15), # 11 naranja
 	Color(0.75, 0.70, 0.95), # 12 lavanda
@@ -33,7 +33,7 @@ const PASTEL_SOFTEN := 0.14
 const COIN_TINT_LIGHTEN := 0.04
 const SHADOW_ALPHA := 0.09
 const HIGHLIGHT_ALPHA := 0.14
-const COIN_RADIUS := 26.0
+const COIN_RADIUS := 24.0
 var coin_color: Color = VALUE_COLORS[0]
 
 func _ready() -> void:

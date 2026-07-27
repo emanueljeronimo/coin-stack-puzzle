@@ -18,6 +18,7 @@ const DiamondIconTexture = preload("res://Imagenes/icono-estrella.png")
 const LifeIconTexture = preload("res://Imagenes/icono-vidas.png")
 const StarIconTexture = preload("res://Imagenes/icono-estrella.png")
 const HomeIconTexture = preload("res://Imagenes/icono-home.png")
+const CartIconTexture = preload("res://Imagenes/icono-cart.png")
 const SettingsIconTexture = preload("res://Imagenes/icono-settings.png")
 const MenuButtonTexture = preload("res://Imagenes/boton-menu.png")
 const UiFont = preload("res://Fonts/Chewy-Regular.ttf")
@@ -40,6 +41,8 @@ const SLOT_WIDTH_RATIO = 0.97
 const SLOT_ROW_GAP_RATIO = 0.06
 ## Separación horizontal entre columnas de slots (fracción del ancho de una pila).
 const SLOT_COLUMN_GAP_RATIO = 0.05
+## Cuánto subir la pila respecto al borde inferior del slot (px a escala 1).
+const STACK_SLOT_BOTTOM_INSET := 12.0
 ## Cuánto de la pantalla puede ocupar la grilla (ancho / alto útil).
 const GRID_FILL_WIDTH_RATIO = 0.98
 const GRID_FILL_WIDTH_RATIO_COMPACT = 0.90
@@ -193,6 +196,7 @@ var _draw_gloss_style: StyleBoxFlat = null
 var _draw_row_style: StyleBoxFlat = null
 var _draw_slot_styles: Dictionary = {}
 var hammer_mode_active: bool = false
+var glove_mode_active: bool = false
 var background_sprite: Sprite2D = null
 var hud_layer: CanvasLayer = null
 var settings_layer: CanvasLayer = null
@@ -200,6 +204,9 @@ var hud_root: Control = null
 var home_chip_shadow: Panel = null
 var home_chip: Control = null
 var home_chip_icon: TextureRect = null
+var shop_chip_shadow: Panel = null
+var shop_chip: Control = null
+var shop_chip_icon: TextureRect = null
 var life_chip_shadow: Panel = null
 var life_chip: Control = null
 var life_chip_icon: TextureRect = null
@@ -216,6 +223,21 @@ var progress_right_label: Label = null
 var progress_bar_max_width: float = 0.0
 var progress_bar_height: float = 0.0
 var progress_fill_tween: Tween = null
+## Colores de UI según el fondo actual (slots + barra).
+var theme_slot_fill: Color = BOARD_SLOT_ACTIVE_COLOR
+var theme_slot_border: Color = BOARD_SLOT_BORDER_ACTIVE
+var theme_slot_fill_dim: Color = BOARD_SLOT_INACTIVE_COLOR
+var theme_slot_border_dim: Color = BOARD_SLOT_BORDER_INACTIVE
+var theme_slot_fill_temp: Color = BOARD_SLOT_TEMP_COLOR
+var theme_slot_border_temp: Color = BOARD_SLOT_BORDER_TEMP
+var theme_progress_track_bg: Color = PROGRESS_TRACK_BG
+var theme_progress_track_border: Color = PROGRESS_TRACK_BORDER
+var theme_progress_knob_bg: Color = PROGRESS_KNOB_BG
+var theme_progress_knob_border: Color = PROGRESS_KNOB_BORDER
+var theme_progress_text: Color = PROGRESS_TEXT
+var theme_grad_a: Color = SLOT_OVERLAY_GRAD_CELESTE
+var theme_grad_b: Color = SLOT_OVERLAY_GRAD_ROSA
+var theme_grad_c: Color = SLOT_OVERLAY_GRAD_VERDE
 var cta_shadow: Panel = null
 var cta_button: Control = null
 var cta_label: Label = null
@@ -349,6 +371,7 @@ func _ready() -> void:
 		restore_checkpoint()
 	update_stars_display()
 	update_life_display()
+	_apply_theme_ui_colors()
 	save_game()
 	configure_process_for_temp_slot()
 	queue_redraw()
@@ -406,6 +429,7 @@ func _update_temp_slot_timer_only() -> void:
 
 func clear_board_stacks() -> void:
 	hammer_mode_active = false
+	glove_mode_active = false
 	clear_selection()
 	_clear_undo_snapshot()
 	_cleanup_orphan_coin_nodes()
@@ -585,6 +609,7 @@ func _expected_stack_count_for_snapshot(snap: Dictionary) -> int:
 
 func _restore_board_from_snapshot(snap: Dictionary) -> void:
 	hammer_mode_active = false
+	glove_mode_active = false
 	clear_selection()
 	_cleanup_orphan_coin_nodes()
 	current_level = maxi(1, int(snap.get("current_level", current_level)))
@@ -745,6 +770,9 @@ func _input(event: InputEvent) -> void:
 		if is_control_clicked(home_chip, event.position):
 			go_to_home()
 			return
+		if is_control_clicked(shop_chip, event.position):
+			_on_shop_pressed()
+			return
 	if board_locked:
 		return
 	if event.is_action_pressed("ui_accept"):
@@ -770,6 +798,9 @@ func _input(event: InputEvent) -> void:
 			else:
 				print("Martillo: toca una pila para vaciarla.")
 			return
+		if glove_mode_active:
+			handle_glove_click(event.position)
+			return
 		if action_pills.size() > 0 and is_control_clicked(action_pills[0], event.position):
 			try_use_wildcard("mix")
 			return
@@ -780,6 +811,40 @@ func _input(event: InputEvent) -> void:
 			try_use_wildcard("glove")
 			return
 		handle_click(event.position)
+
+func handle_glove_click(mouse_pos: Vector2) -> void:
+	if has_pending_coin_animations():
+		return
+	var clicked_stack = get_stack_at_point(mouse_pos)
+	if clicked_stack == null:
+		if selected_stack != null:
+			clear_selection()
+		print("Guante: elegí origen y después un destino con espacio.")
+		return
+	if selected_stack == null:
+		if clicked_stack.is_empty():
+			print("Guante: elegí una pila con fichas.")
+			return
+		selected_stack = clicked_stack
+		selected_stack.set_selected(true)
+		queue_redraw()
+		print("Guante: ahora tocá el destino (cualquier ranura con hueco).")
+		return
+	if selected_stack == clicked_stack:
+		clear_selection()
+		return
+	var pre_move_snapshot := capture_board_snapshot()
+	var moved = selected_stack.move_top_block_to(clicked_stack, true)
+	if moved > 0:
+		undo_snapshot = pre_move_snapshot
+		_update_undo_button_state()
+		glove_mode_active = false
+		board_locked = true
+		_consume_temp_slot_action()
+		clear_selection(false)
+		print("Guante: moviste %d ficha(s)." % moved)
+	else:
+		print("Guante: destino sin espacio.")
 
 func handle_click(mouse_pos: Vector2) -> void:
 	if has_pending_coin_animations():
@@ -1022,10 +1087,14 @@ func resolve_fusions() -> void:
 			var new_value = stack.remove_all_and_fuse()
 			if new_value < 0:
 				continue
-			stack.push(new_value, false)
+			var fusion_output := GameRulesScript.FUSION_OUTPUT_COUNT
+			for _i in range(fusion_output):
+				if not stack.push(new_value, false):
+					push_error("Fusion: no cupo ficha %d tras fusionar %dx10" % [new_value, base_value])
+					break
 			if try_grant_fusion_create_bonus(new_value, stack, bonus_eligible) > 0:
 				changed = true
-			print("Fusion: ", base_value, "x10 -> ", new_value)
+			print("Fusion: ", base_value, "x10 -> ", fusion_output, "x", new_value)
 			changed = true
 	refresh_fusion_target_bonus_unlock()
 
@@ -1122,7 +1191,10 @@ func level_up() -> void:
 	_sync_slot_overlay_controls()
 
 func add_new_stack_for_level_unlock() -> void:
-	if has_active_temp_stack() and stacks.size() > 0:
+	# La temporal (si está activa) debe seguir siendo la última pila, con sus fichas.
+	# No usar has_active_temp_stack() acá: ese check depende de active_stacks y falla
+	# si se incrementó active_stacks antes de insertar (las fichas “desaparecen” del slot temp).
+	if temp_slot_bonus_active and stacks.size() > 0:
 		insert_stack_before_index(stacks.size() - 1)
 	else:
 		append_new_stack_node()
@@ -1305,6 +1377,7 @@ func reset_board_for_cycle_milestone(milestone_level: int) -> void:
 	if not bool(cycle_state.get("valid", false)):
 		return
 	hammer_mode_active = false
+	glove_mode_active = false
 	clear_selection(false)
 	_clear_undo_snapshot()
 	_resolve_board_scheduled = false
@@ -1465,9 +1538,9 @@ func _apply_progress_fill_gradient() -> void:
 	var radius := int(maxi(fill_size.y * 0.45, 6.0))
 	progress_fill.configure(
 		radius,
-		HudTextureButtons.PILL_GRAD_CELESTE,
-		HudTextureButtons.PILL_GRAD_ROSA,
-		HudTextureButtons.PILL_GRAD_VERDE,
+		theme_grad_a,
+		theme_grad_b,
+		theme_grad_c,
 		fill_size
 	)
 
@@ -1475,7 +1548,7 @@ func _style_progress_label(lbl: Label, font_size: int) -> void:
 	if UiFont != null:
 		lbl.add_theme_font_override("font", UiFont)
 	lbl.add_theme_font_size_override("font_size", font_size)
-	lbl.add_theme_color_override("font_color", PROGRESS_TEXT)
+	lbl.add_theme_color_override("font_color", theme_progress_text)
 
 ## Actualiza el checkpoint de forma monótona (solo avanza). Devuelve true si subió.
 ## El reset de ciclo NO usa el número de checkpoint: se dispara al tener la ficha 15/30/45…
@@ -1489,7 +1562,7 @@ func update_checkpoint_level() -> bool:
 	checkpoint_level = int(decision.get("checkpoint_level", checkpoint_level))
 	if bool(decision.get("did_cycle_reset", false)):
 		reset_board_for_cycle_milestone(cycle_milestone)
-	sync_wildcard_unlocks()
+	sync_wildcard_unlocks(previous)
 	# Tras un reset de ciclo no hay desbloqueo retroactivo de ranuras.
 	if not bool(decision.get("did_cycle_reset", false)):
 		_unlock_adjacent_slots_for_level_range(previous, checkpoint_level)
@@ -1539,6 +1612,7 @@ func restore_checkpoint() -> void:
 		setup_board()
 		return
 	hammer_mode_active = false
+	glove_mode_active = false
 	clear_selection()
 	board_locked = false
 	_pending_level_up_alerts.clear()
@@ -1687,20 +1761,20 @@ func _draw() -> void:
 		var slot_rect = get_slot_rect(i).grow(-inset)
 		var is_selected_slot := selected_slot_idx >= 0 and i == selected_slot_idx
 		var style_key := "inactive"
-		var fill := BOARD_SLOT_INACTIVE_COLOR
-		var border := BOARD_SLOT_BORDER_INACTIVE
+		var fill := theme_slot_fill_dim
+		var border := theme_slot_border_dim
 		if i == TEMP_SLOT_BOARD_INDEX and not temp_slot_bonus_active:
 			style_key = "temp"
-			fill = BOARD_SLOT_TEMP_COLOR
-			border = BOARD_SLOT_BORDER_TEMP
+			fill = theme_slot_fill_temp
+			border = theme_slot_border_temp
 		elif is_selected_slot:
 			style_key = "selected"
 			fill = BOARD_SLOT_SELECTED_FILL
 			border = BOARD_SLOT_BORDER_SELECTED
 		elif is_slot_active(i):
 			style_key = "active"
-			fill = BOARD_SLOT_ACTIVE_COLOR
-			border = BOARD_SLOT_BORDER_ACTIVE
+			fill = theme_slot_fill
+			border = theme_slot_border
 		var slot_style := _get_cached_slot_style(style_key)
 		slot_style.bg_color = fill
 		slot_style.border_color = border
@@ -1734,10 +1808,51 @@ func update_background_scale() -> void:
 		)
 
 func _on_background_theme_changed(_theme_id: String) -> void:
-	if background_sprite == null:
+	if background_sprite != null:
+		background_sprite.texture = GameState.get_background_theme_texture()
+		update_background_scale()
+	_apply_theme_ui_colors()
+
+## Aplica colores de slots, barra y botones según el fondo elegido en configuración.
+func _apply_theme_ui_colors() -> void:
+	var palette: Dictionary = GameState.get_ui_palette()
+	theme_slot_fill = palette.get("slot_fill", BOARD_SLOT_ACTIVE_COLOR)
+	theme_slot_border = palette.get("slot_border", BOARD_SLOT_BORDER_ACTIVE)
+	theme_slot_fill_dim = palette.get("slot_fill_dim", BOARD_SLOT_INACTIVE_COLOR)
+	theme_slot_border_dim = palette.get("slot_border_dim", BOARD_SLOT_BORDER_INACTIVE)
+	theme_slot_fill_temp = palette.get("slot_fill_temp", BOARD_SLOT_TEMP_COLOR)
+	theme_slot_border_temp = palette.get("slot_border_temp", BOARD_SLOT_BORDER_TEMP)
+	theme_progress_track_bg = palette.get("progress_track_bg", PROGRESS_TRACK_BG)
+	theme_progress_track_border = palette.get("progress_track_border", PROGRESS_TRACK_BORDER)
+	theme_progress_knob_bg = palette.get("progress_knob_bg", PROGRESS_KNOB_BG)
+	theme_progress_knob_border = palette.get("progress_knob_border", PROGRESS_KNOB_BORDER)
+	theme_progress_text = palette.get("progress_text", PROGRESS_TEXT)
+	theme_grad_a = palette.get("grad_a", SLOT_OVERLAY_GRAD_CELESTE)
+	theme_grad_b = palette.get("grad_b", SLOT_OVERLAY_GRAD_ROSA)
+	theme_grad_c = palette.get("grad_c", SLOT_OVERLAY_GRAD_VERDE)
+
+	_set_panel_colors(progress_container, theme_progress_track_bg, theme_progress_track_border)
+	_set_panel_colors(progress_knob, theme_progress_knob_bg, theme_progress_knob_border)
+	if progress_left_label != null:
+		progress_left_label.add_theme_color_override("font_color", theme_progress_text)
+	if progress_right_label != null:
+		progress_right_label.add_theme_color_override("font_color", theme_progress_text)
+	_apply_progress_fill_gradient()
+	_sync_slot_overlay_controls()
+	# Reaplica degradados de chips, Repartir, deshacer, comodines y botones de carteles.
+	layout_mock_ui()
+	queue_redraw()
+
+func _set_panel_colors(panel: Panel, bg: Color, border: Color) -> void:
+	if panel == null:
 		return
-	background_sprite.texture = GameState.get_background_theme_texture()
-	update_background_scale()
+	var style: StyleBox = panel.get_theme_stylebox("panel")
+	if style == null or not (style is StyleBoxFlat):
+		return
+	var flat := (style as StyleBoxFlat).duplicate() as StyleBoxFlat
+	flat.bg_color = bg
+	flat.border_color = border
+	panel.add_theme_stylebox_override("panel", flat)
 
 func get_unscaled_stack_footprint() -> Vector2:
 	return Vector2(float(StackScript.STACK_WIDTH), float(StackScript.get_visual_height()))
@@ -1815,8 +1930,11 @@ func get_stack_position_for_index(index: int) -> Vector2:
 	var x = get_board_origin().x + float(col) * get_slot_column_pitch() + slot_w * 0.5
 	var sc: float = get_layout_scale()
 	var slot_bottom := get_slot_base_y(row)
-	# Anclar la pila al borde inferior del slot (coincide con el tope visual de las fichas).
-	return Vector2(x, slot_bottom - StackScript.get_bottom_local_y() * sc)
+	# Anclar la pila cerca del borde inferior del slot, un poco más arriba.
+	return Vector2(
+		x,
+		slot_bottom - StackScript.get_bottom_local_y() * sc - STACK_SLOT_BOTTOM_INSET * sc
+	)
 
 func get_temp_slot_global_rect() -> Rect2:
 	var r = get_slot_rect(TEMP_SLOT_BOARD_INDEX)
@@ -1864,8 +1982,9 @@ func _unlock_adjacent_slots_for_level_range(previous_level: int, new_level: int)
 			continue
 		if not GameSlotServiceScript.can_grant_free_unlock(previous_level, new_level, unlock_level):
 			break
-		active_stacks += 1
+		# Insertar la pila nueva ANTES de subir active_stacks, para no desalojar la temporal.
 		add_new_stack_for_level_unlock()
+		active_stacks += 1
 		next_free_slot_unlock_level = GameRulesScript.next_free_slot_unlock_level(unlock_level)
 		unlocked = true
 	if unlocked:
@@ -2043,9 +2162,9 @@ func try_purchase_adjacent_extra_slot() -> void:
 		int(economy.get("next_free_slot_unlock_level", get_adjacent_slot_free_unlock_level()))
 	)
 	_clear_undo_snapshot()
-	active_stacks += 1
-	# Mantener la pila temporal como última cuando está activa.
+	# Insertar antes de incrementar active_stacks para no desalojar la temporal.
 	add_new_stack_for_level_unlock()
+	active_stacks += 1
 	refresh_all_stack_layout()
 	board_locked = false
 	update_stars_display()
@@ -2103,9 +2222,9 @@ func _apply_slot_overlay_panel_style(panel_bg: TextureRect, corner_px: int, pane
 	if panel_bg.has_method("configure"):
 		panel_bg.configure(
 			corner_px,
-			SLOT_OVERLAY_GRAD_CELESTE,
-			SLOT_OVERLAY_GRAD_ROSA,
-			SLOT_OVERLAY_GRAD_VERDE,
+			theme_grad_a,
+			theme_grad_b,
+			theme_grad_c,
 			panel_size
 		)
 
@@ -2337,6 +2456,21 @@ func _open_settings() -> void:
 	if settings_ui != null:
 		settings_ui.open()
 
+func _on_shop_pressed() -> void:
+	print("Tienda — próximamente")
+
+func _on_settings_restart_confirmed() -> void:
+	if lives <= 0:
+		print("Sin vidas: no se puede reiniciar el nivel.")
+		return
+	lives -= 1
+	update_life_display()
+	if settings_ui != null:
+		settings_ui.close()
+	# Volver al último checkpoint guardado y salir al home.
+	restore_checkpoint()
+	go_to_home()
+
 func _build_hud_icon_chip(icon_texture: Texture2D) -> Dictionary:
 	var radius := HUD_PILL_RADIUS
 	var shadow := create_shadow_panel(radius)
@@ -2408,6 +2542,10 @@ func build_mock_ui() -> void:
 	home_chip_shadow = home_parts.shadow
 	home_chip = home_parts.panel
 	home_chip_icon = home_parts.icon
+	var shop_parts := _build_hud_icon_chip(CartIconTexture)
+	shop_chip_shadow = shop_parts.shadow
+	shop_chip = shop_parts.panel
+	shop_chip_icon = shop_parts.icon
 	var life_parts := _build_hud_stat_chip(
 		LifeIconTexture, HudTextureButtons.format_lives_text(lives)
 	)
@@ -2429,6 +2567,8 @@ func build_mock_ui() -> void:
 	_bind_hud_chip_click(settings_chip, _open_settings)
 	hud_root.add_child(home_chip_shadow)
 	hud_root.add_child(home_chip)
+	hud_root.add_child(shop_chip_shadow)
+	hud_root.add_child(shop_chip)
 	hud_root.add_child(life_chip_shadow)
 	hud_root.add_child(life_chip)
 	hud_root.add_child(stars_chip_shadow)
@@ -2514,6 +2654,8 @@ func build_mock_ui() -> void:
 	add_child(settings_layer)
 	settings_ui = SettingsOverlay.new()
 	settings_layer.add_child(settings_ui)
+	settings_ui.set_restart_available(true)
+	settings_ui.restart_level_confirmed.connect(_on_settings_restart_confirmed)
 
 	adjacent_slot_star_error_label = Label.new()
 	adjacent_slot_star_error_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -2550,9 +2692,21 @@ func layout_mock_ui() -> void:
 	var icon_stat := chip_h * HUD_BOARD_LONG_ICON_RATIO
 	var stat_font := int(HUD_BOARD_STAT_FONT_SIZE * scale)
 
+	# Home + tienda arriba a la izquierda.
 	layout_hud_pill_pair(home_chip_shadow, home_chip, Vector2(edge_margin, chip_y), corner_size, scale)
 	_apply_hud_chip_styles(home_chip_shadow, home_chip, pill_radius, corner_size)
-	home_chip_icon.custom_minimum_size = Vector2(icon_corner, icon_corner)
+	if home_chip_icon != null:
+		home_chip_icon.custom_minimum_size = Vector2(icon_corner, icon_corner)
+	layout_hud_pill_pair(
+		shop_chip_shadow,
+		shop_chip,
+		Vector2(edge_margin + corner_size.x + gap, chip_y),
+		corner_size,
+		scale
+	)
+	_apply_hud_chip_styles(shop_chip_shadow, shop_chip, pill_radius, corner_size)
+	if shop_chip_icon != null:
+		shop_chip_icon.custom_minimum_size = Vector2(icon_corner, icon_corner)
 
 	layout_hud_pill_pair(life_chip_shadow, life_chip, Vector2(start_x, chip_y), stat_size, scale)
 	_apply_hud_chip_styles(life_chip_shadow, life_chip, pill_radius, stat_size)
@@ -2616,16 +2770,17 @@ func layout_mock_ui() -> void:
 		cta_label.add_theme_font_size_override("font_size", int(CTA_FONT_SIZE * scale))
 
 	var icon_btn_size = FOOTER_ICON_BUTTON_SIZE * scale
+	var undo_size = cta_h
 	var undo_x = cta_button.position.x + cta_w + btn_gap
-	undo_x = minf(undo_x, viewport_size.x - icon_btn_size - 10.0 * scale)
+	undo_x = minf(undo_x, viewport_size.x - undo_size - 10.0 * scale)
 	undo_button.position = Vector2(undo_x, footer_y)
-	undo_button.size = Vector2(icon_btn_size, icon_btn_size)
+	undo_button.size = Vector2(undo_size, undo_size)
 	undo_shadow.position = undo_button.position + Vector2(0, 4.0 * scale)
 	undo_shadow.size = undo_button.size
 	var icon_btn_radius := int(38.0 * scale)
-	_apply_hud_chip_styles(undo_shadow, undo_button, icon_btn_radius, undo_button.size)
+	_apply_hud_chip_styles(undo_shadow, undo_button, int(undo_size * 0.45), undo_button.size)
 	if undo_icon != null:
-		undo_icon.add_theme_font_size_override("font_size", int(UNDO_ICON_FONT_SIZE * scale))
+		undo_icon.add_theme_font_size_override("font_size", int(UNDO_ICON_FONT_SIZE * scale * (undo_size / icon_btn_size)))
 
 	var action_y = cta_button.position.y + cta_h + 20.0 * scale
 	var action_size = icon_btn_size
@@ -2732,91 +2887,91 @@ func perform_mix_action() -> void:
 		return
 	_clear_undo_snapshot()
 	board_locked = true
+	clear_selection(false)
+	hammer_mode_active = false
+	glove_mode_active = false
+	board_revision += 1
 
-	for stack in stacks:
-		if is_instance_valid(stack):
-			_kill_stack_tweens(stack)
-			if stack.has_method("_clear_pending_incoming"):
-				stack.call("_clear_pending_incoming")
-
+	# 1) Recolectar TODAS las fichas (pila + pendientes en vuelo).
 	var all_values: Array = []
 	for stack in stacks:
-		while not stack.is_empty():
-			all_values.append(stack.pop())
+		if not is_instance_valid(stack):
+			continue
+		_kill_stack_tweens(stack)
+		for raw in stack.pending_incoming_values:
+			all_values.append(int(raw))
+		for raw in stack.coins:
+			all_values.append(int(raw))
+
+	# 2) Desarmar por completo: vaciar pilas y borrar fichas huérfanas del tablero.
+	for stack in stacks:
+		if is_instance_valid(stack) and stack.has_method("clear_all_coins"):
+			stack.clear_all_coins()
+	for child in get_children():
+		if not is_instance_valid(child):
+			continue
+		if child.has_method("set_value") and child.has_method("set_number_visible"):
+			_kill_coin_flight_tween_on_node(child)
+			child.queue_free()
 
 	if all_values.is_empty():
 		board_locked = false
 		return
 
-	# Orden estable por número/color.
-	all_values.sort()
+	var spaces := stacks.size() * STACK_CAPACITY
+	print(
+		"Mezclar: %d fichas, %d espacios (%d ranuras x %d)."
+		% [all_values.size(), spaces, stacks.size(), STACK_CAPACITY]
+	)
 
-	# Reparto conservativo:
-	# - intenta mantener pilas homogéneas por valor (ordenadas de menor a mayor),
-	# - nunca descarta fichas: si no entra en el esquema ideal, hace fallback en cualquier pila con hueco.
-	var stack_idx := 0
+	# 3) Plan homogéneo (con fusiones virtuales de 10) y recolocar.
+	var plan: Array = GameRulesScript.build_mix_stack_plan(
+		all_values, stacks.size(), STACK_CAPACITY
+	)
 	var placed_count := 0
-	var i := 0
-	while i < all_values.size():
-		var value := int(all_values[i])
-		var remaining_of_value := 0
-		while i < all_values.size() and int(all_values[i]) == value:
-			remaining_of_value += 1
-			i += 1
-
-		while remaining_of_value > 0:
-			while stack_idx < stacks.size() and stacks[stack_idx].is_full():
-				stack_idx += 1
-
-			if stack_idx >= stacks.size():
+	for si in range(stacks.size()):
+		var st: Node = stacks[si]
+		if not is_instance_valid(st):
+			continue
+		var segment: Array = plan[si] if si < plan.size() else []
+		for raw in segment:
+			if not st.push(int(raw), false):
+				push_error("Mix: no se pudo colocar valor %d en pila %d" % [int(raw), si])
 				break
+			placed_count += 1
+		if st.has_method("update_coin_positions"):
+			st.update_coin_positions(false)
+		if st.has_method("refresh_visible_numbers"):
+			st.refresh_visible_numbers()
 
-			var st: Node = stacks[stack_idx]
-			var room: int = 0
-			if st.has_method("free_slots"):
-				room = int(st.free_slots())
-			else:
-				room = int(STACK_CAPACITY - st.coins.size())
-			var to_place: int = mini(room, remaining_of_value)
-			for _k in range(to_place):
-				st.push(value, false)
-				placed_count += 1
-			remaining_of_value -= to_place
+	var planned_total := 0
+	for segment in plan:
+		planned_total += (segment as Array).size()
+	if placed_count != planned_total:
+		push_error("Mix inconsistente: plan=%d colocadas=%d" % [planned_total, placed_count])
 
-			# Siguiente valor en la siguiente pila para mantener orden visual por bloques.
-			stack_idx += 1
-
-		# Fallback extremo para garantizar que no se pierdan fichas nunca.
-		while remaining_of_value > 0:
-			var fallback_done := false
-			for st_fallback in stacks:
-				if st_fallback.is_full():
-					continue
-				st_fallback.push(value, false)
-				placed_count += 1
-				remaining_of_value -= 1
-				fallback_done = true
-				break
-			if not fallback_done:
-				push_error("Mix: sin espacio para reubicar fichas (esto no debería pasar).")
-				break
-
-	if placed_count != all_values.size():
-		push_error("Mix inconsistente: esperadas %d, colocadas %d" % [all_values.size(), placed_count])
-
-	# Mostrar primero el ordenado; fusionar en el siguiente frame.
+	refresh_fusion_target_bonus_unlock()
+	refresh_all_stack_layout()
 	queue_redraw()
-	call_deferred("resolve_board_after_action")
+	print("Mezclar: reordenado → %d fichas en %d ranuras." % [placed_count, stacks.size()])
+	resolve_fusions()
+	resolve_board_after_action()
 
 func perform_hammer_action() -> void:
 	if board_locked:
 		return
 	hammer_mode_active = true
+	glove_mode_active = false
 	clear_selection()
 	print("Martillo activo: selecciona una pila para vaciarla.")
 
 func perform_glove_action() -> void:
-	print("Guante: todavia no esta implementado.")
+	if board_locked:
+		return
+	glove_mode_active = true
+	hammer_mode_active = false
+	clear_selection()
+	print("Guante activo: elegí un bloque y movelo a cualquier ranura con espacio.")
 
 func apply_hammer_on_stack(target_stack: Node) -> void:
 	if target_stack == null:
@@ -2825,6 +2980,7 @@ func apply_hammer_on_stack(target_stack: Node) -> void:
 	while not target_stack.is_empty():
 		target_stack.pop()
 	hammer_mode_active = false
+	glove_mode_active = false
 	resolve_board_after_action()
 
 func try_use_wildcard(wildcard_type: String) -> void:
@@ -2873,7 +3029,8 @@ func reset_wildcard_state() -> void:
 	for wildcard_type in WILDCARD_TYPES:
 		wildcard_counts[wildcard_type] = 0
 		wildcard_unlock_granted[wildcard_type] = false
-	sync_wildcard_unlocks()
+	# Sin previous_level: no mostrar carteles (setup / reset de tablero).
+	sync_wildcard_unlocks(-1)
 
 func _restore_wildcard_state_from_snapshot() -> void:
 	var counts = checkpoint_snapshot.get("wildcard_counts", null)
@@ -2884,17 +3041,24 @@ func _restore_wildcard_state_from_snapshot() -> void:
 	if granted is Dictionary:
 		for wildcard_type in WILDCARD_TYPES:
 			wildcard_unlock_granted[wildcard_type] = bool(granted.get(wildcard_type, false))
-	sync_wildcard_unlocks()
+	# Restore no debe re-mostrar carteles de desbloqueo.
+	sync_wildcard_unlocks(-1)
 
-## Concede 3 usos gratis la primera vez que el nivel desbloquea cada comodín.
-func sync_wildcard_unlocks() -> void:
+## Concede usos gratis la primera vez que el nivel desbloquea cada comodín.
+## previous_level: checkpoint antes del salto (para mostrar cartel solo al cruzar el umbral).
+## Pasar -1 en restore/setup para migrar en silencio sin cartel.
+func sync_wildcard_unlocks(previous_level: int = -1) -> void:
 	for wildcard_type in WILDCARD_TYPES:
+		var unlock_lvl := get_wildcard_unlock_level(wildcard_type)
 		if is_wildcard_unlocked(wildcard_type):
-			if not wildcard_unlock_granted.get(wildcard_type, false):
-				var show_panel := int(wildcard_counts.get(wildcard_type, 0)) == 0
-				wildcard_counts[wildcard_type] = WILDCARD_INITIAL_USES
+			if not bool(wildcard_unlock_granted.get(wildcard_type, false)):
+				var prev_counts := int(wildcard_counts.get(wildcard_type, 0))
+				if prev_counts <= 0:
+					wildcard_counts[wildcard_type] = WILDCARD_INITIAL_USES
 				wildcard_unlock_granted[wildcard_type] = true
-				if show_panel:
+				# Cartel solo si acabamos de cruzar el nivel de unlock en esta subida.
+				var crossed := previous_level >= 0 and previous_level < unlock_lvl and checkpoint_level >= unlock_lvl
+				if crossed:
 					queue_wildcard_unlock_panel(wildcard_type)
 				print(
 					"Comodín desbloqueado: %s (%d usos gratis)"
@@ -2902,7 +3066,7 @@ func sync_wildcard_unlocks() -> void:
 				)
 		else:
 			wildcard_counts[wildcard_type] = 0
-			wildcard_unlock_granted[wildcard_type] = false
+			# No resetear granted: evita re-mostrar el cartel si el flag se pierde en un save viejo.
 	update_wildcard_badges()
 
 func update_wildcard_badges() -> void:
@@ -3106,7 +3270,7 @@ func get_wildcard_display_name(wildcard_type: String) -> String:
 		"hammer":
 			return "Martillo"
 		"glove":
-			return "Mano"
+			return "Guante"
 		_:
 			return "Comodín"
 
@@ -3117,7 +3281,7 @@ func get_wildcard_unlock_description(wildcard_type: String) -> String:
 		"hammer":
 			return "Elimina una pila entera de fichas a elección."
 		"glove":
-			return "Aún no está disponible."
+			return "Mueve un bloque de fichas a cualquier ranura con espacio, aunque el tope sea otro número."
 		_:
 			return ""
 
@@ -3290,6 +3454,7 @@ func show_no_moves_panel() -> void:
 	board_locked = true
 	clear_selection()
 	hammer_mode_active = false
+	glove_mode_active = false
 	update_no_moves_buttons()
 	no_moves_overlay.visible = true
 	no_moves_overlay.move_to_front()
@@ -3421,6 +3586,7 @@ func show_level_up_panel(level: int) -> void:
 	board_locked = true
 	clear_selection()
 	hammer_mode_active = false
+	glove_mode_active = false
 	if level_up_title_label != null:
 		level_up_title_label.text = "¡Subiste de nivel!"
 	if level_up_subtitle_label != null:
@@ -3526,6 +3692,8 @@ func layout_wildcard_unlock_dialog_controls() -> void:
 func queue_wildcard_unlock_panel(wildcard_type: String) -> void:
 	if wildcard_type.is_empty():
 		return
+	if _pending_wildcard_unlock_queue.has(wildcard_type):
+		return
 	_pending_wildcard_unlock_queue.append(wildcard_type)
 	call_deferred("try_show_wildcard_unlock_panel")
 
@@ -3551,6 +3719,7 @@ func show_wildcard_unlock_panel(wildcard_type: String) -> void:
 	board_locked = true
 	clear_selection()
 	hammer_mode_active = false
+	glove_mode_active = false
 	var wildcard_name := get_wildcard_display_name(wildcard_type)
 	if wildcard_unlock_title_label != null:
 		wildcard_unlock_title_label.text = "Desbloqueado: comodín %s" % wildcard_name

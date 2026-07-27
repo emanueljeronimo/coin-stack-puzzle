@@ -62,6 +62,83 @@ func get_username() -> String:
 	return str(player_data.get("username", ""))
 
 
+func set_username(new_name: String) -> void:
+	var cleaned := new_name.strip_edges()
+	if cleaned.is_empty():
+		return
+	if cleaned.length() > 20:
+		cleaned = cleaned.substr(0, 20)
+	player_data["username"] = cleaned
+	if GameState != null:
+		GameState.username = cleaned
+	player_data_changed.emit()
+	save_game()
+
+
+const AVATAR_OPTIONS: Array = [
+	{"id": "mariposa", "path": "res://Imagenes/avatars/avatar-mariposa.png", "label": "Mariposa"},
+	{"id": "conejo", "path": "res://Imagenes/avatars/avatar-conejo.png", "label": "Conejo"},
+	{"id": "buho", "path": "res://Imagenes/avatars/avatar-buho.png", "label": "Búho"},
+	{"id": "rana", "path": "res://Imagenes/avatars/avatar-rana.png", "label": "Rana"},
+	{"id": "hombre", "path": "res://Imagenes/avatars/avatar-hombre.png", "label": "Hombre"},
+	{"id": "gato", "path": "res://Imagenes/avatars/avatar-gato.png", "label": "Gato"},
+	{"id": "mujer", "path": "res://Imagenes/avatars/avatar-mujer.png", "label": "Mujer"},
+	{"id": "zorro", "path": "res://Imagenes/avatars/avatar-zorro.png", "label": "Zorro"},
+	{"id": "panda", "path": "res://Imagenes/avatars/avatar-panda.png", "label": "Panda"},
+]
+
+
+func get_avatar_options() -> Array:
+	return AVATAR_OPTIONS.duplicate(true)
+
+
+func get_default_avatar_id() -> String:
+	return str(AVATAR_OPTIONS[0].get("id", "mariposa"))
+
+
+func get_avatar_id() -> String:
+	var id := str(player_data.get("avatar_id", get_default_avatar_id()))
+	if _avatar_path_for_id(id).is_empty():
+		return get_default_avatar_id()
+	return id
+
+
+func set_avatar_id(avatar_id: String) -> void:
+	if _avatar_path_for_id(avatar_id).is_empty():
+		return
+	player_data["avatar_id"] = avatar_id
+	player_data_changed.emit()
+	save_game()
+
+
+func get_avatar_texture() -> Texture2D:
+	var path := _avatar_path_for_id(get_avatar_id())
+	if path.is_empty():
+		path = str(AVATAR_OPTIONS[0].get("path", ""))
+	return load(path) as Texture2D
+
+
+## Mayor valor de ficha del progreso guardado (objetivo actual del nivel).
+func get_max_unlocked_coin_value() -> int:
+	var best := 0
+	var snap: Variant = player_data.get("checkpoint_snapshot", {})
+	if snap is Dictionary:
+		best = maxi(best, int(snap.get("max_value", 0)))
+	best = maxi(best, int(player_data.get("max_value", 0)))
+	if best <= 0 and GameState != null:
+		var gs: Variant = GameState.checkpoint_snapshot
+		if gs is Dictionary:
+			best = maxi(best, int(gs.get("max_value", 0)))
+	return maxi(5, best)
+
+
+func _avatar_path_for_id(avatar_id: String) -> String:
+	for opt in AVATAR_OPTIONS:
+		if str(opt.get("id", "")) == avatar_id:
+			return str(opt.get("path", ""))
+	return ""
+
+
 func get_position() -> Vector2:
 	var pos: Variant = player_data.get("position", {"x": 0.0, "y": 0.0})
 	if pos is Dictionary:
@@ -147,6 +224,7 @@ func _create_default_player_data() -> Dictionary:
 	return {
 		"save_version": SAVE_VERSION,
 		"username": _generate_random_username(),
+		"avatar_id": "mariposa",
 		"level": 1,
 		"coins": GameState.INITIAL_STARS,
 		"position": {"x": 0.0, "y": 0.0},
@@ -170,6 +248,9 @@ func _merge_with_defaults(loaded: Dictionary) -> Dictionary:
 	var pos: Variant = merged.get("position")
 	if not pos is Dictionary:
 		merged["position"] = {"x": 0.0, "y": 0.0}
+	var avatar_id := str(merged.get("avatar_id", ""))
+	if _avatar_path_for_id(avatar_id).is_empty():
+		merged["avatar_id"] = get_default_avatar_id()
 	return merged
 
 

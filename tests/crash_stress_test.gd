@@ -103,6 +103,7 @@ func _test_stack_move_and_fuse_spam() -> void:
 		board.queue_free()
 		return
 	a.push(fused, false)
+	a.push(fused, false)
 	for value in range(1, 8):
 		for _j in range(6):
 			if not a.is_full():

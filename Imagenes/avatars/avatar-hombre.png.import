@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bv1ajai1gdvw0"
-path="res://.godot/imported/variante-azul-completa.png-fd34db031b2e19713378006f4b57dfb0.ctex"
+uid="uid://5ej2ejv20587"
+path="res://.godot/imported/avatar-hombre.png-e5f702a0eb2c2f0a14a21553c08e6818.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Imagenes/variante-azul-completa.png"
-dest_files=["res://.godot/imported/variante-azul-completa.png-fd34db031b2e19713378006f4b57dfb0.ctex"]
+source_file="res://Imagenes/avatars/avatar-hombre.png"
+dest_files=["res://.godot/imported/avatar-hombre.png-e5f702a0eb2c2f0a14a21553c08e6818.ctex"]
 
 [params]
 

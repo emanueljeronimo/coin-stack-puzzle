@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://b8kxkp70xkpew"
-path="res://.godot/imported/variante-verde-completa.png-4634eb33366e3353fb5f5d313a8eba67.ctex"
+uid="uid://cdewfqilp1h4f"
+path="res://.godot/imported/avatar-buho.png-322882ffe0930d44bf89b633c42073db.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Imagenes/variante-verde-completa.png"
-dest_files=["res://.godot/imported/variante-verde-completa.png-4634eb33366e3353fb5f5d313a8eba67.ctex"]
+source_file="res://Imagenes/avatars/avatar-buho.png"
+dest_files=["res://.godot/imported/avatar-buho.png-322882ffe0930d44bf89b633c42073db.ctex"]
 
 [params]
 

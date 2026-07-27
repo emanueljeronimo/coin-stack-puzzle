@@ -59,7 +59,8 @@ func _test_move_block_and_fuse_result() -> void:
 		_free_stacks([src, dst])
 		return
 	dst.push(fused, false)
-	if int(dst.top_value()) != 3 or int(dst.coins.size()) != 1:
+	dst.push(fused, false)
+	if int(dst.top_value()) != 3 or int(dst.coins.size()) != 2:
 		_fail("post_fuse_state", str(dst.coins))
 		_free_stacks([src, dst])
 		return

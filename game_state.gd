@@ -19,6 +19,95 @@ const BACKGROUND_THEMES: Array = [
 	{"id": "fondo2-azul", "path": "res://Imagenes/fondo2-azul.png", "label": "Azul 2"},
 ]
 
+## Paletas UI (slots + barra) por familia de fondo.
+const UI_PALETTE_ROSA := {
+	"slot_fill": Color(0.98, 0.76, 0.86, 0.38),
+	"slot_border": Color(0.90, 0.52, 0.70, 0.82),
+	"slot_fill_dim": Color(0.98, 0.82, 0.92, 0.20),
+	"slot_border_dim": Color(0.84, 0.70, 0.82, 0.50),
+	"slot_fill_temp": Color(0.96, 0.78, 0.88, 0.26),
+	"slot_border_temp": Color(0.88, 0.58, 0.74, 0.62),
+	"progress_track_bg": Color(0.96, 0.82, 0.90, 0.92),
+	"progress_track_border": Color(0.88, 0.62, 0.76, 0.88),
+	"progress_knob_bg": Color(0.98, 0.88, 0.93, 0.97),
+	"progress_knob_border": Color(0.88, 0.64, 0.78, 0.9),
+	"progress_text": Color(0.58, 0.32, 0.46),
+	"grad_a": Color(0.98, 0.78, 0.88, 0.96),
+	"grad_b": Color(0.94, 0.62, 0.78, 0.96),
+	"grad_c": Color(0.88, 0.48, 0.68, 0.96),
+	"settings_card_bg": Color(0.78, 0.52, 0.64, 0.98),
+	"settings_card_border": Color(0.92, 0.72, 0.82, 0.95),
+	"settings_title": Color(0.99, 0.96, 0.98),
+	"settings_label": Color(0.98, 0.92, 0.96),
+	"settings_section": Color(0.96, 0.88, 0.92),
+	"settings_btn_on": Color(0.92, 0.58, 0.74, 0.98),
+	"settings_btn_off": Color(0.62, 0.42, 0.52, 0.95),
+	"settings_btn_border": Color(0.96, 0.78, 0.88, 1.0),
+	"settings_option_selected": Color(0.94, 0.70, 0.82, 0.88),
+	"settings_option_idle": Color(0.86, 0.62, 0.74, 0.40),
+}
+const UI_PALETTE_AZUL := {
+	"slot_fill": Color(0.72, 0.86, 0.98, 0.38),
+	"slot_border": Color(0.42, 0.68, 0.92, 0.82),
+	"slot_fill_dim": Color(0.80, 0.90, 0.98, 0.20),
+	"slot_border_dim": Color(0.62, 0.78, 0.92, 0.50),
+	"slot_fill_temp": Color(0.74, 0.86, 0.96, 0.26),
+	"slot_border_temp": Color(0.48, 0.70, 0.90, 0.62),
+	"progress_track_bg": Color(0.78, 0.88, 0.98, 0.92),
+	"progress_track_border": Color(0.58, 0.74, 0.92, 0.88),
+	"progress_knob_bg": Color(0.86, 0.92, 0.99, 0.97),
+	"progress_knob_border": Color(0.58, 0.74, 0.90, 0.9),
+	"progress_text": Color(0.28, 0.42, 0.62),
+	"grad_a": Color(0.72, 0.88, 0.98, 0.96),
+	"grad_b": Color(0.52, 0.74, 0.96, 0.96),
+	"grad_c": Color(0.38, 0.62, 0.90, 0.96),
+	"settings_card_bg": Color(0.42, 0.58, 0.78, 0.98),
+	"settings_card_border": Color(0.68, 0.82, 0.96, 0.95),
+	"settings_title": Color(0.96, 0.98, 1.0),
+	"settings_label": Color(0.90, 0.94, 0.99),
+	"settings_section": Color(0.86, 0.92, 0.98),
+	"settings_btn_on": Color(0.48, 0.72, 0.94, 0.98),
+	"settings_btn_off": Color(0.34, 0.46, 0.62, 0.95),
+	"settings_btn_border": Color(0.72, 0.86, 0.98, 1.0),
+	"settings_option_selected": Color(0.58, 0.78, 0.96, 0.88),
+	"settings_option_idle": Color(0.48, 0.64, 0.82, 0.40),
+}
+const UI_PALETTE_VERDE := {
+	"slot_fill": Color(0.76, 0.92, 0.78, 0.38),
+	"slot_border": Color(0.48, 0.78, 0.52, 0.82),
+	"slot_fill_dim": Color(0.84, 0.94, 0.86, 0.20),
+	"slot_border_dim": Color(0.64, 0.82, 0.68, 0.50),
+	"slot_fill_temp": Color(0.78, 0.90, 0.80, 0.26),
+	"slot_border_temp": Color(0.52, 0.76, 0.56, 0.62),
+	"progress_track_bg": Color(0.80, 0.92, 0.82, 0.92),
+	"progress_track_border": Color(0.58, 0.78, 0.62, 0.88),
+	"progress_knob_bg": Color(0.88, 0.96, 0.90, 0.97),
+	"progress_knob_border": Color(0.58, 0.78, 0.62, 0.9),
+	"progress_text": Color(0.28, 0.48, 0.32),
+	"grad_a": Color(0.74, 0.92, 0.76, 0.96),
+	"grad_b": Color(0.56, 0.84, 0.60, 0.96),
+	"grad_c": Color(0.42, 0.72, 0.48, 0.96),
+	"settings_card_bg": Color(0.48, 0.62, 0.48, 0.98),
+	"settings_card_border": Color(0.68, 0.82, 0.66, 0.95),
+	"settings_title": Color(0.96, 0.98, 0.94),
+	"settings_label": Color(0.92, 0.96, 0.90),
+	"settings_section": Color(0.90, 0.95, 0.88),
+	"settings_btn_on": Color(0.58, 0.80, 0.48, 0.98),
+	"settings_btn_off": Color(0.40, 0.50, 0.40, 0.95),
+	"settings_btn_border": Color(0.75, 0.88, 0.58, 1.0),
+	"settings_option_selected": Color(0.68, 0.84, 0.62, 0.88),
+	"settings_option_idle": Color(0.54, 0.66, 0.52, 0.40),
+}
+
+const UI_PALETTES_BY_THEME := {
+	"fonde2-rosa": UI_PALETTE_ROSA,
+	"fondo-rosa": UI_PALETTE_ROSA,
+	"fondo-azul": UI_PALETTE_AZUL,
+	"fondo2-azul": UI_PALETTE_AZUL,
+	"fondo-verde": UI_PALETTE_VERDE,
+	"fondo2-verde": UI_PALETTE_VERDE,
+}
+
 var lives: int = INITIAL_LIVES
 var player_stars: int = INITIAL_STARS
 var gems: int = INITIAL_GEMS
@@ -73,6 +162,15 @@ func get_background_theme_label(theme_id: String) -> String:
 		if str(theme.get("id", "")) == theme_id:
 			return str(theme.get("label", theme_id))
 	return theme_id
+
+## Colores de slots y barra de progreso según el fondo actual (o el id indicado).
+func get_ui_palette(theme_id: String = "") -> Dictionary:
+	var id := theme_id if not theme_id.is_empty() else background_theme_id
+	if UI_PALETTES_BY_THEME.has(id):
+		return (UI_PALETTES_BY_THEME[id] as Dictionary).duplicate()
+	if UI_PALETTES_BY_THEME.has(DEFAULT_BACKGROUND_THEME_ID):
+		return (UI_PALETTES_BY_THEME[DEFAULT_BACKGROUND_THEME_ID] as Dictionary).duplicate()
+	return UI_PALETTE_VERDE.duplicate()
 
 func get_background_theme_texture(theme_id: String = "") -> Texture2D:
 	var id := theme_id if not theme_id.is_empty() else background_theme_id
