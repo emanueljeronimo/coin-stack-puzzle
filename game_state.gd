@@ -11,12 +11,12 @@ const SETTINGS_PATH := "user://settings.cfg"
 const DEFAULT_BACKGROUND_THEME_ID := "fondo2-verde"
 
 const BACKGROUND_THEMES: Array = [
-	{"id": "fonde2-rosa", "path": "res://Imagenes/fonde2-rosa.png", "label": "Rosa 2"},
-	{"id": "fondo-azul", "path": "res://Imagenes/fondo-azul.png", "label": "Azul"},
-	{"id": "fondo-rosa", "path": "res://Imagenes/fondo-rosa.png", "label": "Rosa"},
-	{"id": "fondo-verde", "path": "res://Imagenes/fondo-verde.png", "label": "Verde"},
-	{"id": "fondo2-verde", "path": "res://Imagenes/fondo2-verde.png", "label": "Verde 2"},
-	{"id": "fondo2-azul", "path": "res://Imagenes/fondo2-azul.png", "label": "Azul 2"},
+	{"id": "fonde2-rosa", "path": "res://Imagenes/fonde2-rosa.png"},
+	{"id": "fondo-azul", "path": "res://Imagenes/fondo-azul.png"},
+	{"id": "fondo-rosa", "path": "res://Imagenes/fondo-rosa.png"},
+	{"id": "fondo-verde", "path": "res://Imagenes/fondo-verde.png"},
+	{"id": "fondo2-verde", "path": "res://Imagenes/fondo2-verde.png"},
+	{"id": "fondo2-azul", "path": "res://Imagenes/fondo2-azul.png"},
 ]
 
 ## Paletas UI (slots + barra) por familia de fondo.
@@ -156,12 +156,6 @@ func get_background_theme_path(theme_id: String) -> String:
 		if str(theme.get("id", "")) == theme_id:
 			return str(theme.get("path", ""))
 	return ""
-
-func get_background_theme_label(theme_id: String) -> String:
-	for theme in BACKGROUND_THEMES:
-		if str(theme.get("id", "")) == theme_id:
-			return str(theme.get("label", theme_id))
-	return theme_id
 
 ## Colores de slots y barra de progreso según el fondo actual (o el id indicado).
 func get_ui_palette(theme_id: String = "") -> Dictionary:

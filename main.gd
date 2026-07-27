@@ -20,7 +20,6 @@ const StarIconTexture = preload("res://Imagenes/icono-estrella.png")
 const HomeIconTexture = preload("res://Imagenes/icono-home.png")
 const CartIconTexture = preload("res://Imagenes/icono-cart.png")
 const SettingsIconTexture = preload("res://Imagenes/icono-settings.png")
-const MenuButtonTexture = preload("res://Imagenes/boton-menu.png")
 const UiFont = preload("res://Fonts/Chewy-Regular.ttf")
 const LobbyScenePath := "res://Lobby.tscn"
 
@@ -319,7 +318,7 @@ var pending_purchase_type: String = ""
 var lives: int = INITIAL_LIVES
 ## Cartel "No hay movimientos" (bloqueo del tablero).
 var no_moves_overlay: ColorRect = null
-var no_moves_card: Control = null
+var no_moves_card: Panel = null
 var no_moves_margin: MarginContainer = null
 var no_moves_vbox: VBoxContainer = null
 var no_moves_title_label: Label = null
@@ -328,7 +327,7 @@ var no_moves_buy_button: Control = null
 var no_moves_ad_button: Control = null
 ## Cartel al subir de nivel (checkpoint).
 var level_up_overlay: ColorRect = null
-var level_up_card: Control = null
+var level_up_card: Panel = null
 var level_up_margin: MarginContainer = null
 var level_up_vbox: VBoxContainer = null
 var level_up_title_label: Label = null
@@ -336,7 +335,7 @@ var level_up_subtitle_label: Label = null
 var level_up_continue_button: Control = null
 ## Cartel al desbloquear un comodín.
 var wildcard_unlock_overlay: ColorRect = null
-var wildcard_unlock_card: Control = null
+var wildcard_unlock_card: Panel = null
 var wildcard_unlock_margin: MarginContainer = null
 var wildcard_unlock_vbox: VBoxContainer = null
 var wildcard_unlock_title_label: Label = null
@@ -1839,9 +1838,85 @@ func _apply_theme_ui_colors() -> void:
 		progress_right_label.add_theme_color_override("font_color", theme_progress_text)
 	_apply_progress_fill_gradient()
 	_sync_slot_overlay_controls()
+	_apply_dialog_cards_theme_colors()
+	_apply_purchase_dialog_theme_colors()
 	# Reaplica degradados de chips, Repartir, deshacer, comodines y botones de carteles.
 	layout_mock_ui()
 	queue_redraw()
+
+## Misma receta visual que SettingsOverlay: card_bg aclarado + borde oscurecido.
+func _settings_card_colors() -> Dictionary:
+	var p: Dictionary = GameState.get_ui_palette()
+	var card_bg: Color = p.get("settings_card_bg", Color(0.62, 0.52, 0.82, 0.98))
+	card_bg = card_bg.lightened(0.18)
+	var card_border: Color = p.get("settings_card_border", Color(0.42, 0.28, 0.58, 0.95))
+	card_border = card_border.darkened(0.35)
+	return {"bg": card_bg, "border": card_border}
+
+func _apply_settings_style_card(card: Panel, radius: int = 30, border_w: int = 4) -> void:
+	if card == null:
+		return
+	var colors: Dictionary = _settings_card_colors()
+	card.add_theme_stylebox_override(
+		"panel",
+		make_flat_style(colors.bg, colors.border, radius, border_w)
+	)
+
+func _apply_dialog_cards_theme_colors() -> void:
+	_apply_settings_style_card(no_moves_card)
+	_apply_settings_style_card(level_up_card)
+	_apply_settings_style_card(wildcard_unlock_card)
+	_apply_settings_style_card(purchase_card, 30, 4)
+
+func _apply_purchase_dialog_theme_colors() -> void:
+	var p: Dictionary = GameState.get_ui_palette()
+	var btn_on: Color = p.get("settings_btn_on", Color(0.58, 0.80, 0.48, 0.98))
+	var btn_border: Color = p.get("settings_btn_border", Color(0.75, 0.88, 0.58, 1.0))
+	var btn_off: Color = p.get("settings_btn_off", Color(0.40, 0.50, 0.40, 0.95))
+	var font_on := Color(0.98, 0.99, 0.96)
+	_apply_settings_style_card(purchase_card, 30, 4)
+	if purchase_title_label != null:
+		purchase_title_label.add_theme_color_override(
+			"font_color", p.get("settings_title", font_on)
+		)
+		purchase_title_label.add_theme_color_override("font_outline_color", Color(0.08, 0.06, 0.14, 0.95))
+		purchase_title_label.add_theme_constant_override("outline_size", 6)
+	if purchase_icon_circle != null:
+		var inset: Color = btn_off
+		inset.a = 0.98
+		_set_panel_colors(purchase_icon_circle, inset.darkened(0.08), btn_border.darkened(0.15))
+	if purchase_buy_button != null:
+		var buy_hover := btn_on.lightened(0.08)
+		var buy_pressed := btn_on.darkened(0.08)
+		purchase_buy_button.add_theme_stylebox_override(
+			"normal", make_flat_style(btn_on, btn_border, 36, 2)
+		)
+		purchase_buy_button.add_theme_stylebox_override(
+			"hover", make_flat_style(buy_hover, btn_border.lightened(0.05), 36, 2)
+		)
+		purchase_buy_button.add_theme_stylebox_override(
+			"pressed", make_flat_style(buy_pressed, btn_border.darkened(0.05), 36, 2)
+		)
+	if purchase_buy_cost_label != null:
+		purchase_buy_cost_label.add_theme_color_override("font_color", font_on)
+	if purchase_close_button != null:
+		var close_hover := btn_off.lightened(0.10)
+		var close_pressed := btn_off.darkened(0.08)
+		var close_border: Color = p.get("settings_card_border", btn_border).darkened(0.15)
+		purchase_close_button.add_theme_color_override("font_color", font_on)
+		purchase_close_button.add_theme_color_override("font_hover_color", font_on)
+		purchase_close_button.add_theme_color_override("font_pressed_color", font_on)
+		purchase_close_button.add_theme_stylebox_override(
+			"normal", make_flat_style(btn_off, close_border, 44, 2)
+		)
+		purchase_close_button.add_theme_stylebox_override(
+			"hover", make_flat_style(close_hover, close_border.lightened(0.05), 44, 2)
+		)
+		purchase_close_button.add_theme_stylebox_override(
+			"pressed", make_flat_style(close_pressed, close_border.darkened(0.05), 44, 2)
+		)
+	if purchase_count_badge != null:
+		_set_panel_colors(purchase_count_badge, btn_on, btn_border)
 
 func _set_panel_colors(panel: Panel, bg: Color, border: Color) -> void:
 	if panel == null:
@@ -2618,8 +2693,10 @@ func build_mock_ui() -> void:
 		hud_root.add_child(action)
 		hud_root.add_child(icon)
 		hud_root.add_child(lbl)
-		var count_badge = create_panel(Color(0.99, 0.99, 0.95, 0.98), Color(0.80, 0.86, 0.72, 0.92), 14)
-		var count_label = create_label("", 18, Color(0.27, 0.43, 0.24))
+		var count_badge = create_panel(Color(0.99, 0.99, 0.95, 0.98), Color(0.80, 0.86, 0.72, 0.92), 18)
+		var count_label = create_label("", 24, Color(0.27, 0.43, 0.24))
+		count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		count_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		count_badge.add_child(count_label)
 		hud_root.add_child(count_badge)
 		action_shadows.append(action_shadow)
@@ -2678,64 +2755,65 @@ func layout_mock_ui() -> void:
 	var board_rect = get_board_rect()
 	var scale = get_layout_scale()
 	var chip_y: float = maxf(12.0 * scale, board_rect.position.y - 132.0 * scale)
-	var gap = HUD_CHIP_GAP * scale
-	var edge_margin = HUD_EDGE_MARGIN * scale
-	var corner_w = HUD_CORNER_SIZE * scale
-	var stat_w = HUD_CHIP_STAT_W * scale
+	var edge_margin: float = HUD_EDGE_MARGIN * scale
+	var corner_w: float = HUD_CORNER_SIZE * scale
+	var stat_w: float = HUD_CHIP_STAT_W * scale
 	var chip_h: float = HUD_CHIP_HEIGHT * scale
+	var layout_w: float = viewport_size.x - edge_margin * 2.0
+	# Home, shop, vidas, estrellas, settings — justificados en una fila.
+	var chips_w: float = corner_w * 3.0 + stat_w * 2.0
+	var gaps_count: float = 4.0
+	var gap: float = (layout_w - chips_w) / gaps_count
+	if gap < 6.0 * scale:
+		# Si no entra, achicar chips y recalcular separación.
+		var min_gap: float = 6.0 * scale
+		var shrink: float = clampf((layout_w - min_gap * gaps_count) / chips_w, 0.72, 1.0)
+		corner_w *= shrink
+		stat_w *= shrink
+		chip_h *= shrink
+		chips_w = corner_w * 3.0 + stat_w * 2.0
+		gap = (layout_w - chips_w) / gaps_count
 	var corner_size := Vector2(corner_w, chip_h)
 	var stat_size := Vector2(stat_w, chip_h)
 	var pill_radius := _hud_pill_radius(scale)
-	var total_w = stat_size.x + gap + stat_size.x
-	var start_x = (viewport_size.x - total_w) * 0.5
-	var icon_corner := chip_h * HUD_BOARD_ROUND_ICON_RATIO
-	var icon_stat := chip_h * HUD_BOARD_LONG_ICON_RATIO
-	var stat_font := int(HUD_BOARD_STAT_FONT_SIZE * scale)
+	var icon_corner: float = chip_h * HUD_BOARD_ROUND_ICON_RATIO
+	var icon_stat: float = chip_h * HUD_BOARD_LONG_ICON_RATIO
+	var stat_font: int = int(clampf(HUD_BOARD_STAT_FONT_SIZE * scale * (chip_h / maxf(HUD_CHIP_HEIGHT * scale, 1.0)), 20.0, chip_h * 0.52))
 
-	# Home + tienda arriba a la izquierda.
-	layout_hud_pill_pair(home_chip_shadow, home_chip, Vector2(edge_margin, chip_y), corner_size, scale)
+	var chip_x: float = edge_margin
+	layout_hud_pill_pair(home_chip_shadow, home_chip, Vector2(chip_x, chip_y), corner_size, scale)
 	_apply_hud_chip_styles(home_chip_shadow, home_chip, pill_radius, corner_size)
 	if home_chip_icon != null:
 		home_chip_icon.custom_minimum_size = Vector2(icon_corner, icon_corner)
-	layout_hud_pill_pair(
-		shop_chip_shadow,
-		shop_chip,
-		Vector2(edge_margin + corner_size.x + gap, chip_y),
-		corner_size,
-		scale
-	)
+	chip_x += corner_size.x + gap
+
+	layout_hud_pill_pair(shop_chip_shadow, shop_chip, Vector2(chip_x, chip_y), corner_size, scale)
 	_apply_hud_chip_styles(shop_chip_shadow, shop_chip, pill_radius, corner_size)
 	if shop_chip_icon != null:
 		shop_chip_icon.custom_minimum_size = Vector2(icon_corner, icon_corner)
+	chip_x += corner_size.x + gap
 
-	layout_hud_pill_pair(life_chip_shadow, life_chip, Vector2(start_x, chip_y), stat_size, scale)
+	layout_hud_pill_pair(life_chip_shadow, life_chip, Vector2(chip_x, chip_y), stat_size, scale)
 	_apply_hud_chip_styles(life_chip_shadow, life_chip, pill_radius, stat_size)
-	life_chip_icon.custom_minimum_size = Vector2(icon_stat, icon_stat)
+	if life_chip_icon != null:
+		life_chip_icon.custom_minimum_size = Vector2(icon_stat, icon_stat)
 	if life_chip_label != null:
 		life_chip_label.add_theme_font_size_override("font_size", stat_font)
+	chip_x += stat_size.x + gap
 
 	if stars_chip != null:
-		layout_hud_pill_pair(
-			stars_chip_shadow,
-			stars_chip,
-			Vector2(start_x + stat_size.x + gap, chip_y),
-			stat_size,
-			scale
-		)
+		layout_hud_pill_pair(stars_chip_shadow, stars_chip, Vector2(chip_x, chip_y), stat_size, scale)
 		_apply_hud_chip_styles(stars_chip_shadow, stars_chip, pill_radius, stat_size)
-		stars_chip_icon.custom_minimum_size = Vector2(icon_stat, icon_stat)
+		if stars_chip_icon != null:
+			stars_chip_icon.custom_minimum_size = Vector2(icon_stat, icon_stat)
 		if stars_chip_label != null:
 			stars_chip_label.add_theme_font_size_override("font_size", stat_font)
+	chip_x += stat_size.x + gap
 
-	layout_hud_pill_pair(
-		settings_chip_shadow,
-		settings_chip,
-		Vector2(viewport_size.x - edge_margin - corner_size.x, chip_y),
-		corner_size,
-		scale
-	)
+	layout_hud_pill_pair(settings_chip_shadow, settings_chip, Vector2(chip_x, chip_y), corner_size, scale)
 	_apply_hud_chip_styles(settings_chip_shadow, settings_chip, pill_radius, corner_size)
-	settings_chip_icon.custom_minimum_size = Vector2(icon_corner, icon_corner)
+	if settings_chip_icon != null:
+		settings_chip_icon.custom_minimum_size = Vector2(icon_corner, icon_corner)
 
 	var progress_w = viewport_size.x * 0.78
 	var progress_h = 54 * scale
@@ -2787,9 +2865,9 @@ func layout_mock_ui() -> void:
 	var action_gap = WILDCARD_BUTTON_GAP * scale
 	var actions_total_w = action_size * 3 + action_gap * 2
 	var actions_start_x = (viewport_size.x - actions_total_w) * 0.5
-	var badge_w = 22.0 * scale
-	var badge_h = 18.0 * scale
-	var badge_font = int(15.0 * scale)
+	var badge_w = 36.0 * scale
+	var badge_h = 30.0 * scale
+	var badge_font = int(22.0 * scale)
 	for i in range(action_pills.size()):
 		var x = actions_start_x + i * (action_size + action_gap)
 		action_shadows[i].position = Vector2(x, action_y + 4.0 * scale)
@@ -2806,7 +2884,7 @@ func layout_mock_ui() -> void:
 		)
 		action_icons[i].size = Vector2(icon_size, icon_size)
 		action_labels[i].visible = false
-		action_count_badges[i].position = Vector2(x + action_size - badge_w * 0.85, action_y - 5.0 * scale)
+		action_count_badges[i].position = Vector2(x + action_size - badge_w * 0.72, action_y - 8.0 * scale)
 		action_count_badges[i].size = Vector2(badge_w, badge_h)
 		action_count_labels[i].position = Vector2.ZERO
 		action_count_labels[i].size = action_count_badges[i].size
@@ -3132,9 +3210,6 @@ func build_purchase_dialog() -> void:
 	purchase_buy_button = Button.new()
 	purchase_buy_button.focus_mode = Control.FOCUS_NONE
 	purchase_buy_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	purchase_buy_button.add_theme_stylebox_override("normal", make_flat_style(Color(0.61, 0.82, 0.41, 0.98), Color(0.74, 0.88, 0.56, 1.0), 36, 1))
-	purchase_buy_button.add_theme_stylebox_override("hover", make_flat_style(Color(0.67, 0.86, 0.47, 1.0), Color(0.79, 0.90, 0.63, 1.0), 36, 1))
-	purchase_buy_button.add_theme_stylebox_override("pressed", make_flat_style(Color(0.56, 0.76, 0.37, 1.0), Color(0.69, 0.82, 0.50, 1.0), 36, 1))
 	purchase_buy_button.pressed.connect(_on_purchase_confirmed)
 	purchase_card.add_child(purchase_buy_button)
 
@@ -3163,15 +3238,10 @@ func build_purchase_dialog() -> void:
 	purchase_close_button.focus_mode = Control.FOCUS_NONE
 	purchase_close_button.custom_minimum_size = Vector2(88, 88)
 	purchase_close_button.add_theme_font_size_override("font_size", 54)
-	purchase_close_button.add_theme_color_override("font_color", Color(0.95, 0.98, 0.93))
-	purchase_close_button.add_theme_color_override("font_hover_color", Color(0.95, 0.98, 0.93))
-	purchase_close_button.add_theme_color_override("font_pressed_color", Color(0.95, 0.98, 0.93))
-	purchase_close_button.add_theme_stylebox_override("normal", make_flat_style(Color(0.92, 0.52, 0.52, 0.98), Color(0.86, 0.45, 0.45, 1.0), 44, 2))
-	purchase_close_button.add_theme_stylebox_override("hover", make_flat_style(Color(0.95, 0.58, 0.58, 1.0), Color(0.90, 0.50, 0.50, 1.0), 44, 2))
-	purchase_close_button.add_theme_stylebox_override("pressed", make_flat_style(Color(0.86, 0.46, 0.46, 1.0), Color(0.80, 0.40, 0.40, 1.0), 44, 2))
 	purchase_close_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	purchase_close_button.pressed.connect(_on_purchase_close_pressed)
 	purchase_card.add_child(purchase_close_button)
+	_apply_purchase_dialog_theme_colors()
 	layout_purchase_dialog_controls()
 
 func open_purchase_dialog(wildcard_type: String) -> void:
@@ -3181,6 +3251,7 @@ func open_purchase_dialog(wildcard_type: String) -> void:
 		return
 	pending_purchase_type = wildcard_type
 	update_purchase_dialog_content(wildcard_type)
+	_apply_purchase_dialog_theme_colors()
 	purchase_overlay.visible = true
 	purchase_overlay.move_to_front()
 	layout_purchase_dialog_controls()
@@ -3318,30 +3389,21 @@ func make_flat_style(bg: Color, border: Color, radius: int, border_width: int) -
 	style.corner_radius_bottom_right = radius
 	return style
 
-func _create_dialog_card(clip_contents: bool = true) -> Control:
-	var card := Control.new()
+func _create_dialog_card(clip_contents: bool = true) -> Panel:
+	var card := Panel.new()
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
 	card.clip_contents = clip_contents
-	var bg := TextureRect.new()
-	bg.texture = MenuButtonTexture
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	bg.offset_left = 0
-	bg.offset_top = 0
-	bg.offset_right = 0
-	bg.offset_bottom = 0
-	bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	bg.stretch_mode = TextureRect.STRETCH_SCALE
-	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	card.add_child(bg)
+	_apply_settings_style_card(card)
 	return card
 
 func _style_dialog_title_label(lbl: Label, font_size: int) -> void:
 	if UiFont != null:
 		lbl.add_theme_font_override("font", UiFont)
 	lbl.add_theme_font_size_override("font_size", font_size)
-	lbl.add_theme_color_override("font_color", HudTextureButtons.BTN_TEXT_COLOR)
-	lbl.add_theme_color_override("font_outline_color", HudTextureButtons.BTN_TEXT_OUTLINE)
-	lbl.add_theme_constant_override("outline_size", 4)
+	var p: Dictionary = GameState.get_ui_palette()
+	lbl.add_theme_color_override("font_color", p.get("settings_title", HudTextureButtons.BTN_TEXT_COLOR))
+	lbl.add_theme_color_override("font_outline_color", Color(0.08, 0.06, 0.14, 0.95))
+	lbl.add_theme_constant_override("outline_size", 6)
 
 func make_dialog_gradient_button(text: String, font_size: int = DIALOG_BTN_FONT_SIZE, compact: bool = false) -> Control:
 	var btn := HudTextureButtons.create_gradient_pill()

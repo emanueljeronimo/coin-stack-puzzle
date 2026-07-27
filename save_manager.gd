@@ -87,6 +87,20 @@ const AVATAR_OPTIONS: Array = [
 	{"id": "panda", "path": "res://Imagenes/avatars/avatar-panda.png", "label": "Panda"},
 ]
 
+const BORDER_COLOR_OPTIONS: Array = [
+	{"id": "verde", "color": Color(0.25, 0.75, 0.40), "label": "Verde"},
+	{"id": "violeta", "color": Color(0.55, 0.35, 0.85), "label": "Violeta"},
+	{"id": "amarillo", "color": Color(0.95, 0.85, 0.25), "label": "Amarillo"},
+	{"id": "azul", "color": Color(0.30, 0.55, 0.90), "label": "Azul"},
+	{"id": "naranja", "color": Color(0.90, 0.50, 0.15), "label": "Naranja"},
+	{"id": "lima", "color": Color(0.65, 0.85, 0.25), "label": "Lima"},
+	{"id": "rosa_claro", "color": Color(0.95, 0.75, 0.85), "label": "Rosa claro"},
+	{"id": "rosa_violeta", "color": Color(0.75, 0.30, 0.75), "label": "Rosa violeta"},
+]
+
+const CUSTOM_BORDER_ID := "custom"
+const DEFAULT_CUSTOM_BORDER_COLOR := Color(0.25, 0.75, 0.40)
+
 
 func get_avatar_options() -> Array:
 	return AVATAR_OPTIONS.duplicate(true)
@@ -111,11 +125,80 @@ func set_avatar_id(avatar_id: String) -> void:
 	save_game()
 
 
-func get_avatar_texture() -> Texture2D:
+func get_avatar_path() -> String:
 	var path := _avatar_path_for_id(get_avatar_id())
 	if path.is_empty():
 		path = str(AVATAR_OPTIONS[0].get("path", ""))
-	return load(path) as Texture2D
+	return path
+
+
+func get_avatar_texture() -> Texture2D:
+	return load(get_avatar_path()) as Texture2D
+
+
+func get_border_color_options() -> Array:
+	return BORDER_COLOR_OPTIONS.duplicate(true)
+
+
+func get_default_border_color_id() -> String:
+	return str(BORDER_COLOR_OPTIONS[0].get("id", "verde"))
+
+
+func get_avatar_border_color_id() -> String:
+	var id := str(player_data.get("avatar_border_id", get_default_border_color_id()))
+	if id == CUSTOM_BORDER_ID:
+		return id
+	if _border_color_for_id(id) == null:
+		return get_default_border_color_id()
+	return id
+
+
+func set_avatar_border_color_id(border_id: String) -> void:
+	if border_id != CUSTOM_BORDER_ID and _border_color_for_id(border_id) == null:
+		return
+	player_data["avatar_border_id"] = border_id
+	player_data_changed.emit()
+	save_game()
+
+
+func get_avatar_border_custom_color() -> Color:
+	var raw: Variant = player_data.get("avatar_border_custom", null)
+	if raw is Dictionary:
+		var d := raw as Dictionary
+		return Color(
+			float(d.get("r", DEFAULT_CUSTOM_BORDER_COLOR.r)),
+			float(d.get("g", DEFAULT_CUSTOM_BORDER_COLOR.g)),
+			float(d.get("b", DEFAULT_CUSTOM_BORDER_COLOR.b)),
+			1.0
+		)
+	return DEFAULT_CUSTOM_BORDER_COLOR
+
+
+func set_avatar_border_custom_color(color: Color) -> void:
+	player_data["avatar_border_custom"] = {
+		"r": color.r,
+		"g": color.g,
+		"b": color.b,
+	}
+	player_data["avatar_border_id"] = CUSTOM_BORDER_ID
+	player_data_changed.emit()
+	save_game()
+
+
+func get_avatar_border_color() -> Color:
+	if get_avatar_border_color_id() == CUSTOM_BORDER_ID:
+		return get_avatar_border_custom_color()
+	var c: Variant = _border_color_for_id(get_avatar_border_color_id())
+	if c is Color:
+		return c
+	return Color(BORDER_COLOR_OPTIONS[0].get("color", DEFAULT_CUSTOM_BORDER_COLOR))
+
+
+func _border_color_for_id(border_id: String) -> Variant:
+	for opt in BORDER_COLOR_OPTIONS:
+		if str(opt.get("id", "")) == border_id:
+			return opt.get("color", null)
+	return null
 
 
 ## Mayor valor de ficha del progreso guardado (objetivo actual del nivel).
@@ -225,6 +308,12 @@ func _create_default_player_data() -> Dictionary:
 		"save_version": SAVE_VERSION,
 		"username": _generate_random_username(),
 		"avatar_id": "mariposa",
+		"avatar_border_id": "verde",
+		"avatar_border_custom": {
+			"r": DEFAULT_CUSTOM_BORDER_COLOR.r,
+			"g": DEFAULT_CUSTOM_BORDER_COLOR.g,
+			"b": DEFAULT_CUSTOM_BORDER_COLOR.b,
+		},
 		"level": 1,
 		"coins": GameState.INITIAL_STARS,
 		"position": {"x": 0.0, "y": 0.0},
@@ -251,6 +340,18 @@ func _merge_with_defaults(loaded: Dictionary) -> Dictionary:
 	var avatar_id := str(merged.get("avatar_id", ""))
 	if _avatar_path_for_id(avatar_id).is_empty():
 		merged["avatar_id"] = get_default_avatar_id()
+	var border_id := str(merged.get("avatar_border_id", ""))
+	if border_id == "gris_claro":
+		border_id = get_default_border_color_id()
+		merged["avatar_border_id"] = border_id
+	if border_id != CUSTOM_BORDER_ID and _border_color_for_id(border_id) == null:
+		merged["avatar_border_id"] = get_default_border_color_id()
+	if not (merged.get("avatar_border_custom") is Dictionary):
+		merged["avatar_border_custom"] = {
+			"r": DEFAULT_CUSTOM_BORDER_COLOR.r,
+			"g": DEFAULT_CUSTOM_BORDER_COLOR.g,
+			"b": DEFAULT_CUSTOM_BORDER_COLOR.b,
+		}
 	return merged
 
 

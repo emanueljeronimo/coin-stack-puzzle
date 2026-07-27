@@ -12,6 +12,7 @@ const PILL_GRAD_CELESTE := Color(0.62, 0.82, 0.97, 0.94)
 const PILL_GRAD_ROSA := Color(0.98, 0.68, 0.84, 0.94)
 const PILL_GRAD_VERDE := Color(0.66, 0.88, 0.68, 0.94)
 const PILL_BG_META := "pill_bg"
+const RoundedClipShader = preload("res://rounded_clip.gdshader")
 
 const BTN_TEXT_COLOR := Color(0.98, 0.99, 0.95)
 const BTN_TEXT_OUTLINE := Color(0.16, 0.38, 0.20)
@@ -124,25 +125,105 @@ static func create_gradient_pill() -> Control:
 	return root
 
 
-## Botón de perfil: la textura del avatar llena el control (sin pastilla de fondo).
-static func create_avatar_chip(texture: Texture2D) -> Dictionary:
+static func apply_rounded_clip(item: CanvasItem, size: Vector2, radius: float) -> void:
+	if item == null:
+		return
+	var size_px := Vector2(maxf(size.x, 1.0), maxf(size.y, 1.0))
+	var r := minf(radius, minf(size_px.x, size_px.y) * 0.5)
+	var mat: ShaderMaterial = null
+	if item.material is ShaderMaterial:
+		var existing := item.material as ShaderMaterial
+		if existing.shader == RoundedClipShader:
+			mat = existing
+	if mat == null:
+		mat = ShaderMaterial.new()
+		mat.shader = RoundedClipShader
+		item.material = mat
+	mat.set_shader_parameter("size_px", size_px)
+	mat.set_shader_parameter("corner_radius", r)
+
+
+## Primer color opaco en diagonal desde (0,0), oscurecido para el borde.
+## Sale siempre de la imagen (path PNG o textura); no hay color fijo por avatar.
+static func sample_texture_corner_color(texture: Texture2D, path: String = "") -> Color:
+	var img: Image = null
+	if not path.is_empty():
+		img = _image_from_path(path)
+	if img == null and texture != null:
+		img = _texture_to_image(texture)
+		if img == null and not str(texture.resource_path).is_empty():
+			img = _image_from_path(texture.resource_path)
+	var sampled := _first_opaque_diagonal(img)
+	if sampled.a <= 0.0:
+		return Color(0, 0, 0, 1)
+	sampled.a = 1.0
+	return sampled.darkened(0.28)
+
+
+static func _first_opaque_diagonal(img: Image) -> Color:
+	if img == null or img.get_width() < 1 or img.get_height() < 1:
+		return Color(0, 0, 0, 0)
+	var limit := mini(img.get_width(), img.get_height())
+	for i in range(limit):
+		var c := img.get_pixel(i, i)
+		if c.a > 0.15:
+			return c
+	return Color(0, 0, 0, 0)
+
+
+static func _image_from_path(path: String) -> Image:
+	if path.is_empty() or not FileAccess.file_exists(path):
+		return null
+	var bytes := FileAccess.get_file_as_bytes(path)
+	if bytes.is_empty():
+		return null
+	var img := Image.new()
+	if img.load_png_from_buffer(bytes) != OK:
+		return null
+	return img
+
+
+static func _texture_to_image(texture: Texture2D) -> Image:
+	if texture == null:
+		return null
+	var img := texture.get_image()
+	if img == null:
+		return null
+	if img.is_compressed():
+		img = img.duplicate()
+		if img.decompress() != OK:
+			return null
+	return img
+
+
+## Botón de perfil: avatar con borde grueso redondeado tomado del marco del avatar.
+static func create_avatar_chip(texture: Texture2D, path: String = "") -> Dictionary:
 	var shadow := Panel.new()
 	shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var shadow_style := StyleBoxFlat.new()
-	shadow_style.bg_color = Color(0.19, 0.28, 0.18, 0.18)
-	shadow.add_theme_stylebox_override("panel", shadow_style)
+	shadow.visible = false
+	shadow.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 
-	var panel := Control.new()
+	var panel := Panel.new()
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	panel.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	panel.clip_contents = true
+	if path.is_empty() and texture != null:
+		path = texture.resource_path
+	panel.set_meta("avatar_path", path)
+	var border_col := SaveManager.get_avatar_border_color()
+	var border_style := StyleBoxFlat.new()
+	border_style.bg_color = border_col
+	border_style.border_color = border_col
+	border_style.set_border_width_all(12)
+	border_style.set_corner_radius_all(22)
+	panel.add_theme_stylebox_override("panel", border_style)
 
 	var avatar := TextureRect.new()
 	avatar.set_anchors_preset(Control.PRESET_FULL_RECT)
-	avatar.offset_left = 0
-	avatar.offset_top = 0
-	avatar.offset_right = 0
-	avatar.offset_bottom = 0
+	avatar.offset_left = 12
+	avatar.offset_top = 12
+	avatar.offset_right = -12
+	avatar.offset_bottom = -12
 	avatar.texture = texture
 	avatar.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	avatar.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
@@ -151,11 +232,50 @@ static func create_avatar_chip(texture: Texture2D) -> Dictionary:
 	return {"shadow": shadow, "panel": panel, "avatar": avatar}
 
 
-static func apply_avatar_chip_style(shadow: Panel, size: Vector2) -> void:
+static func apply_avatar_chip_style(shadow: Panel, panel: Control, avatar: TextureRect, size: Vector2) -> void:
 	if shadow == null:
 		return
-	var radius := int(mini(size.x, size.y) * 0.22)
+	var side := mini(size.x, size.y)
+	var radius := int(side * 0.36)
+	var border_w := int(clampf(side * 0.14, 10.0, 24.0))
 	apply_shadow_corner_radius(shadow, radius)
+	if panel == null:
+		return
+	var style := panel.get_theme_stylebox("panel")
+	if style is StyleBoxFlat:
+		var flat := (style as StyleBoxFlat).duplicate() as StyleBoxFlat
+		flat.set_corner_radius_all(radius)
+		flat.set_border_width_all(border_w)
+		if avatar != null and avatar.texture != null:
+			var border_col := SaveManager.get_avatar_border_color()
+			flat.border_color = border_col
+			flat.bg_color = border_col
+		panel.add_theme_stylebox_override("panel", flat)
+	if avatar != null:
+		avatar.offset_left = float(border_w)
+		avatar.offset_top = float(border_w)
+		avatar.offset_right = float(-border_w)
+		avatar.offset_bottom = float(-border_w)
+		var inner := maxf(side - float(border_w) * 2.0, 1.0)
+		var inner_radius := maxf(float(radius) - float(border_w), inner * 0.34)
+		apply_rounded_clip(avatar, Vector2(inner, inner), inner_radius)
+
+
+static func set_avatar_chip_texture(panel: Control, avatar: TextureRect, texture: Texture2D, path: String = "") -> void:
+	if avatar != null:
+		avatar.texture = texture
+	if panel == null or texture == null:
+		return
+	if path.is_empty():
+		path = texture.resource_path
+	panel.set_meta("avatar_path", path)
+	var style := panel.get_theme_stylebox("panel")
+	if style is StyleBoxFlat:
+		var flat := (style as StyleBoxFlat).duplicate() as StyleBoxFlat
+		var border_col := SaveManager.get_avatar_border_color()
+		flat.border_color = border_col
+		flat.bg_color = border_col
+		panel.add_theme_stylebox_override("panel", flat)
 
 
 static func apply_gradient_pill_style(pill: Control, radius: int, pill_size: Vector2) -> void:

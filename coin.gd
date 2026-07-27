@@ -19,11 +19,11 @@ const VALUE_COLORS := [
 	Color(0.75, 0.30, 0.75), # 6  rosa violeta
 	Color(0.65, 0.85, 0.25), # 7  lima
 	Color(0.30, 0.55, 0.90), # 8  azul
-	Color(0.95, 0.85, 0.35), # 9 Amarillo trigo
+	Color(0.95, 0.85, 0.35), # 9  amarillo trigo
 	Color(0.55, 0.70, 0.55), # 10 salvia
 	Color(0.90, 0.50, 0.15), # 11 naranja
 	Color(0.75, 0.70, 0.95), # 12 lavanda
-	Color(0.95, 0.85, 0.25), # 13 amarillo
+	Color(0.22, 0.62, 0.70), # 13 teal
 	Color(0.95, 0.75, 0.85), # 14 rosa claro
 	Color(0.92, 0.92, 0.95), # 15 gris claro
 ]

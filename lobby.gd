@@ -170,7 +170,10 @@ func build_ui() -> void:
 	hud_root.add_child(play_button)
 
 func _build_profile_chip() -> Dictionary:
-	return HudTextureButtons.create_avatar_chip(SaveManager.get_avatar_texture())
+	return HudTextureButtons.create_avatar_chip(
+		SaveManager.get_avatar_texture(),
+		SaveManager.get_avatar_path()
+	)
 
 func build_settings_dialog() -> void:
 	settings_layer = CanvasLayer.new()
@@ -199,8 +202,13 @@ func update_displays() -> void:
 		level_label.text = "Nivel %d" % GameState.player_level
 	if showcase_coin != null and showcase_coin.has_method("set_value"):
 		showcase_coin.set_value(SaveManager.get_max_unlocked_coin_value())
-	if profile_avatar != null:
-		profile_avatar.texture = SaveManager.get_avatar_texture()
+	if profile_avatar != null and profile_button != null:
+		HudTextureButtons.set_avatar_chip_texture(
+			profile_button,
+			profile_avatar,
+			SaveManager.get_avatar_texture(),
+			SaveManager.get_avatar_path()
+		)
 
 func _hud_pill_radius(scale: float) -> int:
 	return int(HUD_PILL_RADIUS * scale)
@@ -334,7 +342,12 @@ func layout_ui() -> void:
 	var avatar_size := Vector2(avatar_side, avatar_side)
 	var avatar_y := row_y - (avatar_side - chip_h) * 0.5
 	layout_hud_pill_pair(profile_button_shadow, profile_button, Vector2(edge_margin, avatar_y), avatar_size, scale)
-	HudTextureButtons.apply_avatar_chip_style(profile_button_shadow, avatar_size)
+	HudTextureButtons.apply_avatar_chip_style(
+		profile_button_shadow,
+		profile_button,
+		profile_avatar,
+		avatar_size
+	)
 
 	layout_hud_pill_pair(life_button_shadow, life_button, Vector2(center_x, row_y), stat_size, scale)
 	_apply_hud_chip_styles(life_button_shadow, life_button, pill_radius, stat_size)
