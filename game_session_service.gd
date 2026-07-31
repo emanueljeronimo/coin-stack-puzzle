@@ -23,6 +23,9 @@ static func build_runtime_snapshot(state: Dictionary) -> Dictionary:
 		"temp_slot_bonus_active": bool(state.get("temp_slot_bonus_active", false)),
 		"temp_slot_time_remaining": float(state.get("temp_slot_time_remaining", 0.0)),
 		"temp_slot_actions_remaining": int(state.get("temp_slot_actions_remaining", 0)),
+		"pending_cycle_reset_milestone": int(state.get("pending_cycle_reset_milestone", 0)),
+		"wildcard_counts": (state.get("wildcard_counts", {}) as Dictionary).duplicate(true),
+		"wildcard_unlock_granted": (state.get("wildcard_unlock_granted", {}) as Dictionary).duplicate(true),
 		"stacks": rows,
 	}
 

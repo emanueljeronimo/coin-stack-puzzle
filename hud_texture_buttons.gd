@@ -14,8 +14,8 @@ const PILL_GRAD_VERDE := Color(0.66, 0.88, 0.68, 0.94)
 const PILL_BG_META := "pill_bg"
 const RoundedClipShader = preload("res://rounded_clip.gdshader")
 
-const BTN_TEXT_COLOR := Color(0.98, 0.99, 0.95)
-const BTN_TEXT_OUTLINE := Color(0.16, 0.38, 0.20)
+const BTN_TEXT_COLOR := Color(0.88, 0.86, 0.83)
+const BTN_TEXT_OUTLINE := Color(0.22, 0.20, 0.24, 0.78)
 ## Texto sobre chips crema (vidas, estrellas): verde oscuro legible sobre fondo claro.
 const CHIP_STAT_COLOR := Color(0.34, 0.48, 0.36)
 const CHIP_STAT_OUTLINE := Color(0.99, 0.98, 0.94, 0.75)

@@ -744,7 +744,7 @@ func _apply_custom_done_btn_theme() -> void:
 	var p: Dictionary = GameState.get_ui_palette()
 	var btn_on: Color = p.get("settings_btn_on", Color(0.58, 0.80, 0.48, 0.98))
 	var btn_border: Color = p.get("settings_btn_border", Color(0.75, 0.88, 0.58, 1.0))
-	_apply_button_style(custom_color_done_btn, btn_on, btn_border, 16, Color(1, 1, 1))
+	_apply_button_style(custom_color_done_btn, btn_on, btn_border, 16, Color(0.88, 0.86, 0.83))
 
 func _apply_custom_picker_size() -> void:
 	if custom_color_picker == null:
@@ -808,9 +808,9 @@ func _make_outlined_label(text: String, font_size: int) -> Label:
 	lbl.text = text
 	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	lbl.add_theme_font_size_override("font_size", font_size)
-	lbl.add_theme_color_override("font_color", Color(0.99, 0.99, 1.0))
-	lbl.add_theme_color_override("font_outline_color", Color(0.08, 0.06, 0.14, 0.95))
-	lbl.add_theme_constant_override("outline_size", 6)
+	lbl.add_theme_color_override("font_color", Color(0.88, 0.86, 0.83))
+	lbl.add_theme_color_override("font_outline_color", Color(0.22, 0.20, 0.24, 0.78))
+	lbl.add_theme_constant_override("outline_size", 5)
 	if LogoFont != null:
 		lbl.add_theme_font_override("font", LogoFont)
 	return lbl
@@ -868,17 +868,18 @@ func _apply_theme_colors() -> void:
 	if avatar_well != null:
 		avatar_well.add_theme_stylebox_override("panel", _flat_style(well, card_border.darkened(0.15), 36, 2))
 	if title_label != null:
-		title_label.add_theme_color_override("font_color", Color(0.99, 0.99, 1.0))
+		title_label.add_theme_color_override("font_color", p.get("settings_title", Color(0.88, 0.86, 0.83)))
 	if choose_label != null:
-		choose_label.add_theme_color_override("font_color", Color(0.99, 0.99, 1.0))
+		choose_label.add_theme_color_override("font_color", p.get("settings_title", Color(0.88, 0.86, 0.83)))
 	if name_label != null:
-		name_label.add_theme_color_override("font_color", Color(0.99, 0.99, 1.0))
+		name_label.add_theme_color_override("font_color", p.get("settings_title", Color(0.88, 0.86, 0.83)))
 
-	_apply_button_style(close_btn, CLOSE_RED, CLOSE_RED_BORDER, 14, Color(1, 1, 1))
+	var text_marble := Color(0.88, 0.86, 0.83)
+	_apply_button_style(close_btn, CLOSE_RED, CLOSE_RED_BORDER, 14, text_marble)
 	_apply_button_style(edit_name_btn, Color(0.96, 0.96, 0.98), Color(0.55, 0.55, 0.62), 12, Color(0.2, 0.2, 0.28))
 	var btn_on: Color = p.get("settings_btn_on", Color(0.58, 0.80, 0.48, 0.98))
 	var btn_border: Color = p.get("settings_btn_border", Color(0.75, 0.88, 0.58, 1.0))
-	_apply_button_style(save_btn, btn_on, btn_border, 22, Color(1, 1, 1))
+	_apply_button_style(save_btn, btn_on, btn_border, 22, text_marble)
 	_apply_custom_done_btn_theme()
 	_refresh_tab_styles()
 
@@ -886,8 +887,8 @@ func _apply_theme_colors() -> void:
 		var edit_style := _flat_style(Color(0.12, 0.10, 0.18, 0.55), Color(0.85, 0.85, 0.92, 0.4), 10, 1)
 		name_edit.add_theme_stylebox_override("normal", edit_style)
 		name_edit.add_theme_stylebox_override("focus", edit_style)
-		name_edit.add_theme_color_override("font_color", Color(0.98, 0.98, 1.0))
-		name_edit.add_theme_color_override("font_placeholder_color", Color(0.85, 0.85, 0.92, 0.55))
+		name_edit.add_theme_color_override("font_color", text_marble)
+		name_edit.add_theme_color_override("font_placeholder_color", Color(0.78, 0.76, 0.74, 0.55))
 
 func _sync_name_widgets() -> void:
 	if name_label != null:
@@ -1026,12 +1027,13 @@ func _refresh_tab_styles() -> void:
 	var on_border: Color = p.get("settings_btn_border", Color(0.75, 0.88, 0.58, 1.0))
 	var off_bg: Color = p.get("settings_btn_off", Color(0.34, 0.26, 0.48, 0.95))
 	var off_border: Color = p.get("settings_card_border", Color(0.42, 0.28, 0.58, 0.95))
+	var text_marble := Color(0.88, 0.86, 0.83)
 	if _active_tab == 0:
-		_apply_button_style(tab_avatar_btn, on_bg, on_border, 14, Color(1, 1, 1))
-		_apply_button_style(tab_border_btn, off_bg, off_border.darkened(0.2), 14, Color(0.95, 0.95, 1.0))
+		_apply_button_style(tab_avatar_btn, on_bg, on_border, 14, text_marble)
+		_apply_button_style(tab_border_btn, off_bg, off_border.darkened(0.2), 14, text_marble)
 	else:
-		_apply_button_style(tab_avatar_btn, off_bg, off_border.darkened(0.2), 14, Color(0.95, 0.95, 1.0))
-		_apply_button_style(tab_border_btn, on_bg, on_border, 14, Color(1, 1, 1))
+		_apply_button_style(tab_avatar_btn, off_bg, off_border.darkened(0.2), 14, text_marble)
+		_apply_button_style(tab_border_btn, on_bg, on_border, 14, text_marble)
 
 func _refresh_preview_avatar() -> void:
 	if preview_avatar == null:

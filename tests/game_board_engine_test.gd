@@ -53,7 +53,7 @@ func _test_cycle_reset_state() -> void:
 	var st := GameBoardEngineScript.build_cycle_reset_state(30, {
 		"board_cycle_levels": 15,
 		"checkpoint_base_value": 5,
-		"cycle_reset_stacks": 4,
+		"cycle_reset_stacks": 5,
 		"adjacent_slot_base_price": 600,
 	})
 	if not bool(st.get("valid", false)):

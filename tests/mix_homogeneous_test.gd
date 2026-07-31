@@ -19,6 +19,7 @@ func _run() -> void:
 	_test_overflow_keeps_largest_pure()
 	_test_plan_places_every_coin()
 	_test_no_mix_when_chunks_fit()
+	_test_opening_deal_skips_fusion()
 	print("=== RESULT: %d passed, %d failed ===" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -207,3 +208,21 @@ func _test_no_mix_when_chunks_fit() -> void:
 		_fail("no_mix_fused_7", "8s=%d 7s=%d" % [_count_value(plan, 8), _count_value(plan, 7)])
 		return
 	_ok("no_mix_when_chunks_fit")
+
+func _test_opening_deal_skips_fusion() -> void:
+	# Apertura: 10×3 no debe colapsar a 4s; se parten en chunks homogéneos.
+	var values: Array = []
+	for _i in range(10):
+		values.append(3)
+	for _i in range(4):
+		values.append(5)
+	var plan: Array = GameRules.build_mix_stack_plan(values, 3, STACK_CAPACITY, false)
+	if _count_value(plan, 3) != 10:
+		_fail("opening_keeps_tens", "3s=%d" % _count_value(plan, 3))
+		return
+	if _count_value(plan, 4) != 0:
+		_fail("opening_no_fuse", "4s=%d" % _count_value(plan, 4))
+		return
+	if not _assert_all_homogeneous(plan, "opening_homogeneous"):
+		return
+	_ok("opening_deal_skips_fusion")

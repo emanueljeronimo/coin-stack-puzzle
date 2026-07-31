@@ -8,7 +8,7 @@ const GameSlotServiceScript = preload("res://game_slot_service.gd")
 const CHECKPOINT_BASE_VALUE := 5
 const CHECKPOINT_HALF_THRESHOLD := 5
 const BOARD_CYCLE_LEVELS := 15
-const CYCLE_RESET_STACKS := 4
+const CYCLE_RESET_STACKS := 5
 const ADJACENT_BASE_PRICE := 600
 const MAX_PERMANENT_STACKS := 14
 

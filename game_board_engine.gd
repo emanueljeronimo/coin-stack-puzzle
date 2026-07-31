@@ -46,7 +46,7 @@ static func build_cycle_reset_state(milestone_level: int, config: Dictionary) ->
 	var checkpoint_base_value := int(config.get("checkpoint_base_value", 5))
 	return {
 		"valid": true,
-		"active_stacks": int(config.get("cycle_reset_stacks", 4)),
+		"active_stacks": int(config.get("cycle_reset_stacks", 5)),
 		"current_level": 1,
 		"max_value": milestone_level,
 		"roll_value_floor": milestone_level - checkpoint_base_value,

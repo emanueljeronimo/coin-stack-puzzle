@@ -1,8 +1,8 @@
 extends Control
 
-const CoverTexture = preload("res://Imagenes/prototipo 1 portada.png")
-const PlayButtonTexture = preload("res://Imagenes/boton-jugar_ahora.png")
 const LobbyScenePath := "res://Lobby.tscn"
+const COVER_PATH := "res://Imagenes/prototipo 1 portada.png"
+const PLAY_BUTTON_PATH := "res://Imagenes/boton-jugar_ahora.png"
 
 const REF_WIDTH := 1080.0
 
@@ -12,6 +12,8 @@ const PLAY_BOTTOM_MARGIN := 0.0
 const PLAY_Y_DROP := 58.0
 const PLAY_VISIBLE_HEIGHT := 0.86
 
+var cover_texture: Texture2D = null
+var play_button_texture: Texture2D = null
 var background_rect: TextureRect = null
 var play_button: TextureButton = null
 
@@ -19,10 +21,18 @@ func _ready() -> void:
 	_apply_portrait_orientation()
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cover_texture = _load_texture(COVER_PATH, "res://Imagenes/home-1.png")
+	play_button_texture = _load_texture(PLAY_BUTTON_PATH, "res://Imagenes/boton-jugar-ahora-pastel.png")
 	build_ui()
 	if not get_viewport().size_changed.is_connected(_on_viewport_resized):
 		get_viewport().size_changed.connect(_on_viewport_resized)
 	layout_ui()
+
+func _load_texture(primary_path: String, fallback_path: String) -> Texture2D:
+	var tex: Texture2D = load(primary_path) as Texture2D
+	if tex != null:
+		return tex
+	return load(fallback_path) as Texture2D
 
 func _apply_portrait_orientation() -> void:
 	var os_name := OS.get_name()
@@ -37,14 +47,14 @@ func build_ui() -> void:
 	background_rect.offset_top = 0
 	background_rect.offset_right = 0
 	background_rect.offset_bottom = 0
-	background_rect.texture = CoverTexture
+	background_rect.texture = cover_texture
 	background_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	background_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	background_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(background_rect)
 
 	play_button = TextureButton.new()
-	play_button.texture_normal = PlayButtonTexture
+	play_button.texture_normal = play_button_texture
 	play_button.ignore_texture_size = true
 	play_button.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
 	play_button.focus_mode = Control.FOCUS_NONE
@@ -56,34 +66,38 @@ func build_ui() -> void:
 	add_child(play_button)
 
 func _get_play_button_size(cover_width: float) -> Vector2:
-	var tex_size := PlayButtonTexture.get_size()
+	if play_button_texture == null:
+		return Vector2(cover_width * PLAY_WIDTH_RATIO, cover_width * PLAY_WIDTH_RATIO * 0.28)
+	var tex_size: Vector2 = play_button_texture.get_size()
 	if tex_size.x <= 0.0 or tex_size.y <= 0.0:
 		return Vector2(cover_width * PLAY_WIDTH_RATIO, cover_width * PLAY_WIDTH_RATIO * 0.28)
-	var btn_w := cover_width * PLAY_WIDTH_RATIO
-	var btn_h := btn_w * (tex_size.y / tex_size.x)
+	var btn_w: float = cover_width * PLAY_WIDTH_RATIO
+	var btn_h: float = btn_w * (tex_size.y / tex_size.x)
 	return Vector2(btn_w, btn_h)
 
 func _get_cover_draw_rect() -> Rect2:
-	var viewport_size := get_viewport_rect().size
-	var tex_size := CoverTexture.get_size()
+	var viewport_size: Vector2 = get_viewport_rect().size
+	if cover_texture == null:
+		return Rect2(Vector2.ZERO, viewport_size)
+	var tex_size: Vector2 = cover_texture.get_size()
 	if tex_size.x <= 0.0 or tex_size.y <= 0.0:
 		return Rect2(Vector2.ZERO, viewport_size)
-	var cover_scale := maxf(viewport_size.x / tex_size.x, viewport_size.y / tex_size.y)
-	var drawn_size := tex_size * cover_scale
-	var offset := (viewport_size - drawn_size) * 0.5
+	var cover_scale: float = maxf(viewport_size.x / tex_size.x, viewport_size.y / tex_size.y)
+	var drawn_size: Vector2 = tex_size * cover_scale
+	var offset: Vector2 = (viewport_size - drawn_size) * 0.5
 	return Rect2(offset, drawn_size)
 
 func layout_ui() -> void:
 	if play_button == null:
 		return
-	var viewport_size := get_viewport_rect().size
-	var scale := viewport_size.x / REF_WIDTH
+	var viewport_size: Vector2 = get_viewport_rect().size
+	var ui_scale: float = viewport_size.x / REF_WIDTH
 	var cover := _get_cover_draw_rect()
 	var btn_size := _get_play_button_size(cover.size.x)
-	var btn_x := cover.position.x + (cover.size.x - btn_size.x) * 0.5
-	var cover_bottom := minf(cover.position.y + cover.size.y, viewport_size.y)
-	var btn_y := cover_bottom - btn_size.y - (PLAY_BOTTOM_MARGIN * scale) + (PLAY_Y_DROP * scale)
-	var max_y := viewport_size.y - btn_size.y * PLAY_VISIBLE_HEIGHT
+	var btn_x: float = cover.position.x + (cover.size.x - btn_size.x) * 0.5
+	var cover_bottom: float = minf(cover.position.y + cover.size.y, viewport_size.y)
+	var btn_y: float = cover_bottom - btn_size.y - (PLAY_BOTTOM_MARGIN * ui_scale) + (PLAY_Y_DROP * ui_scale)
+	var max_y: float = viewport_size.y - btn_size.y * PLAY_VISIBLE_HEIGHT
 	btn_y = minf(btn_y, max_y)
 	play_button.position = Vector2(btn_x, btn_y)
 	play_button.size = btn_size

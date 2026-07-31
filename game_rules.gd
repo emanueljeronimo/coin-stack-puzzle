@@ -44,10 +44,16 @@ static func normalize_temp_state(
 		"temp_slot_time_remaining": temp_time_remaining,
 	}
 
-## Mezclar: desarma todo, cuenta fichas/espacios, colapsa fusiones de 10 y
+## Mezclar: desarma todo, cuenta fichas/espacios, opcionalmente colapsa fusiones de 10 y
 ## recoloca 1 color por pila siempre que quepa. Si no alcanzan ranuras, maximiza
 ## pilas homogéneas y concentra el resto en la menor cantidad de pilas mixtas.
-static func build_mix_stack_plan(all_values: Array, stack_count: int, capacity: int = 10) -> Array:
+## collapse_fusions=false: tirada/apertura inicial (mantiene los valores tal cual).
+static func build_mix_stack_plan(
+	all_values: Array,
+	stack_count: int,
+	capacity: int = 10,
+	collapse_fusions: bool = true
+) -> Array:
 	var plan: Array = []
 	for _i in range(maxi(0, stack_count)):
 		plan.append([])
@@ -56,7 +62,8 @@ static func build_mix_stack_plan(all_values: Array, stack_count: int, capacity: 
 
 	var counts := _mix_count_values(all_values)
 	# Omnipotente: 10 iguales → FUSION_OUTPUT_COUNT del siguiente valor.
-	counts = _mix_collapse_fusions(counts, capacity)
+	if collapse_fusions:
+		counts = _mix_collapse_fusions(counts, capacity)
 
 	var total_coins := 0
 	for v in counts.keys():

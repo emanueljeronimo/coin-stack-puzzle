@@ -35,8 +35,13 @@ func _test_runtime_snapshot_roundtrip() -> void:
 		"temp_slot_bonus_active": true,
 		"temp_slot_time_remaining": 44.0,
 		"temp_slot_actions_remaining": 2,
+		"wildcard_counts": {"mix": 2, "hammer": 1, "glove": 0},
+		"wildcard_unlock_granted": {"mix": true, "hammer": true, "glove": false},
 		"all_rows": [[10, 10], [11], [9], [8], [], [10], []],
 	})
+	if int((runtime.get("wildcard_counts", {}) as Dictionary).get("mix", 0)) != 2:
+		_fail("runtime_wildcard_counts", str(runtime.get("wildcard_counts", {})))
+		return
 	var payload := GameSessionServiceScript.build_save_payload({
 		"checkpoint_level": 12,
 		"checkpoint_snapshot": {"foo": 1},
@@ -76,6 +81,10 @@ func _test_runtime_snapshot_roundtrip() -> void:
 		return
 	if rows[0] != [10, 10] or rows[6] != []:
 		_fail("runtime_roundtrip_content", str(rows))
+		return
+	var wc: Dictionary = rs.get("wildcard_counts", {})
+	if int(wc.get("mix", 0)) != 2 or int(wc.get("hammer", 0)) != 1:
+		_fail("runtime_roundtrip_wildcards", str(wc))
 		return
 	_ok("runtime_snapshot_roundtrip")
 

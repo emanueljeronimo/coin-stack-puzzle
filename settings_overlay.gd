@@ -187,14 +187,14 @@ func layout_for_viewport(viewport_size: Vector2) -> void:
 	card.position = Vector2((viewport_size.x - card_w) * 0.5, (viewport_size.y - card_h) * 0.5)
 
 	if _confirm_title != null:
-		_confirm_title.add_theme_font_size_override("font_size", int(38 * scale))
-		_confirm_title.add_theme_constant_override("outline_size", int(7 * scale))
+		_confirm_title.add_theme_font_size_override("font_size", int(28 * scale))
+		_confirm_title.add_theme_constant_override("outline_size", int(5 * scale))
 	if _confirm_salir_btn != null:
-		_confirm_salir_btn.custom_minimum_size = Vector2(0, 72.0 * scale)
-		_confirm_salir_btn.add_theme_font_size_override("font_size", int(36 * scale))
+		_confirm_salir_btn.custom_minimum_size = Vector2(0, 52.0 * scale)
+		_confirm_salir_btn.add_theme_font_size_override("font_size", int(30 * scale))
 	if _confirm_atras_btn != null:
-		_confirm_atras_btn.custom_minimum_size = Vector2(0, 72.0 * scale)
-		_confirm_atras_btn.add_theme_font_size_override("font_size", int(36 * scale))
+		_confirm_atras_btn.custom_minimum_size = Vector2(0, 52.0 * scale)
+		_confirm_atras_btn.add_theme_font_size_override("font_size", int(30 * scale))
 	_layout_confirm_card(scale)
 
 func _build_ui() -> void:
@@ -339,20 +339,20 @@ func _build_restart_confirm() -> void:
 
 	var margin := MarginContainer.new()
 	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	margin.add_theme_constant_override("margin_left", 28)
-	margin.add_theme_constant_override("margin_top", 28)
-	margin.add_theme_constant_override("margin_right", 28)
-	margin.add_theme_constant_override("margin_bottom", 28)
+	margin.add_theme_constant_override("margin_left", 18)
+	margin.add_theme_constant_override("margin_top", 18)
+	margin.add_theme_constant_override("margin_right", 18)
+	margin.add_theme_constant_override("margin_bottom", 18)
 	_confirm_card.add_child(margin)
 
 	var vbox := VBoxContainer.new()
 	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	vbox.add_theme_constant_override("separation", 18)
+	vbox.add_theme_constant_override("separation", 10)
 	margin.add_child(vbox)
 
-	_confirm_title = _make_outlined_label("¿Desea reiniciar nivel?\nPerderá una vida", 34)
+	_confirm_title = _make_outlined_label("¿Desea reiniciar nivel?\nPerderá una vida", 28)
 	_confirm_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	vbox.add_child(_confirm_title)
 
@@ -384,10 +384,27 @@ func _layout_confirm_card(scale: float) -> void:
 	if _confirm_card == null:
 		return
 	var vp := get_viewport_rect().size
-	var card_w := vp.x * 0.82
-	var card_h := maxf(360.0 * scale, vp.y * 0.32)
+	# Escala acotada: no multiplicar tops sueltos (en pantallas anchas volvía enorme).
+	var s := clampf(min(vp.x / REF_WIDTH, vp.y / 1920.0), 0.7, 1.1)
+	var pad := 20.0 * s
+	var sep := 12.0 * s
+	var title_h := 64.0 * s
+	var btn_h := 52.0 * s
+	if _confirm_salir_btn != null:
+		btn_h = maxf(btn_h, _confirm_salir_btn.custom_minimum_size.y)
+	var card_w := mini(vp.x * 0.72, 360.0 * s)
+	var card_h := pad * 2.0 + title_h + btn_h * 2.0 + sep * 2.0
 	_confirm_card.size = Vector2(card_w, card_h)
 	_confirm_card.position = Vector2((vp.x - card_w) * 0.5, (vp.y - card_h) * 0.5)
+	if _confirm_title != null:
+		_confirm_title.add_theme_font_size_override("font_size", int(28 * s))
+		_confirm_title.add_theme_constant_override("outline_size", int(5 * s))
+	if _confirm_salir_btn != null:
+		_confirm_salir_btn.custom_minimum_size = Vector2(0, btn_h)
+		_confirm_salir_btn.add_theme_font_size_override("font_size", int(30 * s))
+	if _confirm_atras_btn != null:
+		_confirm_atras_btn.custom_minimum_size = Vector2(0, btn_h)
+		_confirm_atras_btn.add_theme_font_size_override("font_size", int(30 * s))
 
 func _on_restart_pressed() -> void:
 	_show_restart_confirm()
@@ -404,9 +421,10 @@ func _make_outlined_label(text: String, font_size: int) -> Label:
 	lbl.text = text
 	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	lbl.add_theme_font_size_override("font_size", font_size)
-	lbl.add_theme_color_override("font_color", Color(0.99, 0.99, 1.0))
-	lbl.add_theme_color_override("font_outline_color", Color(0.08, 0.06, 0.14, 0.95))
-	lbl.add_theme_constant_override("outline_size", 6)
+	# Mármol suave (no blanco puro).
+	lbl.add_theme_color_override("font_color", Color(0.88, 0.86, 0.83))
+	lbl.add_theme_color_override("font_outline_color", Color(0.22, 0.20, 0.24, 0.78))
+	lbl.add_theme_constant_override("outline_size", 5)
 	if LogoFont != null:
 		lbl.add_theme_font_override("font", LogoFont)
 	return lbl
@@ -466,16 +484,27 @@ func _apply_theme_colors() -> void:
 		toggles_well.add_theme_stylebox_override("panel", _flat_style(well, card_border.darkened(0.15), 20, 2))
 	if themes_well != null:
 		themes_well.add_theme_stylebox_override("panel", _flat_style(well, card_border.darkened(0.15), 20, 2))
-	if _confirm_card != null:
-		_confirm_card.add_theme_stylebox_override("panel", _flat_style(card_bg, card_border, 30, 4))
 
-	_apply_button_style(close_btn, CLOSE_RED, CLOSE_RED_BORDER, 14, Color(1, 1, 1))
+	_apply_button_style(close_btn, CLOSE_RED, CLOSE_RED_BORDER, 14, Color(0.90, 0.88, 0.85))
 	var btn_on: Color = p.get("settings_btn_on", Color(0.58, 0.80, 0.48, 0.98))
 	var btn_border: Color = p.get("settings_btn_border", Color(0.75, 0.88, 0.58, 1.0))
-	_apply_button_style(_close_menu_btn, btn_on, btn_border, 22, Color(1, 1, 1))
-	_apply_button_style(_restart_btn, p.get("settings_btn_off", Color(0.40, 0.50, 0.40, 0.95)), card_border, 22, Color(1, 1, 1))
-	_apply_button_style(_confirm_salir_btn, btn_on, btn_border, 22, Color(1, 1, 1))
-	_apply_button_style(_confirm_atras_btn, p.get("settings_btn_off", Color(0.40, 0.50, 0.40, 0.95)), card_border, 22, Color(1, 1, 1))
+	var text_marble := Color(0.88, 0.86, 0.83)
+	# Confirm reiniciar: borde del color del botón CTA (Salir / Continuar del tema).
+	if _confirm_card != null:
+		_confirm_card.add_theme_stylebox_override("panel", _flat_style(card_bg, btn_on, 30, 5))
+	if title_label != null:
+		title_label.add_theme_color_override("font_color", p.get("settings_title", text_marble))
+	if bg_section_label != null:
+		bg_section_label.add_theme_color_override("font_color", p.get("settings_section", text_marble))
+	if _confirm_title != null:
+		_confirm_title.add_theme_color_override("font_color", p.get("settings_title", text_marble))
+	for lbl in _toggle_labels:
+		if lbl != null:
+			lbl.add_theme_color_override("font_color", p.get("settings_label", text_marble))
+	_apply_button_style(_close_menu_btn, btn_on, btn_border, 22, text_marble)
+	_apply_button_style(_restart_btn, p.get("settings_btn_off", Color(0.40, 0.50, 0.40, 0.95)), card_border, 22, text_marble)
+	_apply_button_style(_confirm_salir_btn, btn_on, btn_border, 22, text_marble)
+	_apply_button_style(_confirm_atras_btn, p.get("settings_btn_off", Color(0.40, 0.50, 0.40, 0.95)), card_border, 22, text_marble)
 
 	for i in range(_toggle_btns.size()):
 		_apply_toggle_style(_toggle_btns[i], _toggle_btns[i].button_pressed)
@@ -555,13 +584,14 @@ func _sync_toggle_btn(index: int, on: bool) -> void:
 func _apply_toggle_style(btn: Button, is_on: bool) -> void:
 	btn.text = "ON" if is_on else "OFF"
 	var p: Dictionary = GameState.get_ui_palette()
+	var text_marble := Color(0.88, 0.86, 0.83)
 	if is_on:
 		_apply_button_style(
 			btn,
 			p.get("settings_btn_on", Color(0.58, 0.80, 0.48, 0.98)),
 			p.get("settings_btn_border", Color(0.75, 0.88, 0.58, 1.0)),
 			14,
-			Color(1, 1, 1)
+			text_marble
 		)
 	else:
 		_apply_button_style(
@@ -569,7 +599,7 @@ func _apply_toggle_style(btn: Button, is_on: bool) -> void:
 			p.get("settings_btn_off", Color(0.40, 0.50, 0.40, 0.95)),
 			p.get("settings_card_border", Color(0.52, 0.60, 0.48, 0.9)).darkened(0.2),
 			14,
-			Color(0.98, 0.98, 1.0)
+			text_marble
 		)
 
 func _build_theme_option(theme: Dictionary) -> Panel:

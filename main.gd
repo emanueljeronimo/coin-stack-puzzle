@@ -10,6 +10,7 @@ const GameEconomyServiceScript = preload("res://game_economy_service.gd")
 const GameRulesScript = preload("res://game_rules.gd")
 const GameSessionServiceScript = preload("res://game_session_service.gd")
 const GameSlotServiceScript = preload("res://game_slot_service.gd")
+const GameWildcardServiceScript = preload("res://game_wildcard_service.gd")
 const SlotOverlayBgScript = preload("res://slot_overlay_bg.gd")
 const MixIconTexture = preload("res://Imagenes/icono-mezclar.png")
 const HammerIconTexture = preload("res://Imagenes/icono-martillo.png")
@@ -101,8 +102,8 @@ const DIALOG_BTN_FONT_SIZE := 42
 const DIALOG_COMPACT_BTN_WIDTH_RATIO := 0.52
 const DIALOG_COMPACT_BTN_HEIGHT_RATIO := 0.70
 const DIALOG_COMPACT_BTN_FONT_SIZE := 50
-const WILDCARD_UNLOCK_CARD_HEIGHT := 760.0
-const WILDCARD_UNLOCK_TITLE_FONT_SIZE := 58
+const WILDCARD_UNLOCK_CARD_HEIGHT := 520.0
+const WILDCARD_UNLOCK_TITLE_FONT_SIZE := 54
 const MENU_CARD_INNER_BTN_WIDTH_RATIO := 0.68
 const MENU_CARD_WIDTH_MAX := 920.0
 ## Botón Repartir, deshacer y comodines.
@@ -139,8 +140,8 @@ const TEMP_SLOT_BOARD_INDEX := 4
 ## Compra opcional al lado de la última pila habilitada (estrellas mock); precio se duplica en cada compra.
 const ADJACENT_EXTRA_SLOT_BASE_PRICE := 600
 const INITIAL_PERMANENT_STACKS := 5
-## Al reiniciar ciclo (fichas 15, 30, 45…) el tablero vuelve a esta cantidad de ranuras.
-const CYCLE_RESET_STACKS := 4
+## Al reiniciar ciclo (fichas 15, 30, 45…) el tablero vuelve a esta cantidad de ranuras (GDD: 5).
+const CYCLE_RESET_STACKS := 5
 const ADJACENT_SLOT_FREE_FIRST_LEVEL := 4
 const ADJACENT_SLOT_FREE_LEVEL_INTERVAL := 2
 ## Máximo de pilas en las otras 14 celdas; la 15ª pila solo aparece con ranura temporal activa.
@@ -188,6 +189,9 @@ var _resolve_board_scheduled: bool = false
 var _temp_slot_timer_shown_sec: int = -1
 ## Cola de carteles de subida de nivel (si se saltan varios checkpoints de golpe).
 var _pending_level_up_alerts: Array = []
+## Hito de ficha (15/30/45…) esperando transición de tablero tras el cartel.
+var _pending_cycle_reset_milestone: int = 0
+var _cycle_reset_transition_playing: bool = false
 ## StyleBoxes cacheados para no alocar en cada _draw (crítico en móvil).
 var _draw_shadow_styles: Array = []
 var _draw_board_style: StyleBoxFlat = null
@@ -456,32 +460,41 @@ func fill_board_initial_random() -> void:
 		return
 	## Siempre dejamos exactamente una pila vacía (índice active_stacks - 1) para poder mover al hueco.
 	var keep_empty_index := clampi(active_stacks - 1, 0, maxi(0, stacks.size() - 1))
-	var initial_target_stacks: Array = []
 	for si in range(stacks.size()):
 		while not stacks[si].is_empty():
 			stacks[si].pop()
+	var fillable_count := active_stacks - 1
+	var total_coins := (
+		INITIAL_COINS_PER_STACK * fillable_count
+		+ INITIAL_EXTRA_COINS
+		+ maxi(0, active_stacks - 2)
+	)
+	var pool: Array = []
+	for _i in range(total_coins):
+		pool.append(get_roll_value())
+	# Empaqueta maximizando pilas homogéneas (sin colapsar fusiones) para un arranque jugable.
+	# El azar puro intercalaba 5 valores en pocas ranuras y dejaba el post-prestige casi trabado.
+	var plan: Array = GameRulesScript.build_mix_stack_plan(
+		pool, fillable_count, STACK_CAPACITY, false
+	)
+	var plan_i := 0
 	for i in range(active_stacks):
 		if i == keep_empty_index:
 			continue
-		initial_target_stacks.append(stacks[i])
-		for _j in range(INITIAL_COINS_PER_STACK):
-			stacks[i].push(get_roll_value())
-	# Arranque más funcional: sumar monedas extra al inicio sin afectar la tirada normal.
-	var extra_to_place := INITIAL_EXTRA_COINS + maxi(0, active_stacks - 2)
-	while extra_to_place > 0:
-		var candidates: Array = []
-		for st in initial_target_stacks:
-			if st.free_slots() > 0:
-				candidates.append(st)
-		if candidates.is_empty():
+		if plan_i >= plan.size():
 			break
-		var random_stack = candidates[randi() % candidates.size()]
-		random_stack.push(get_roll_value())
-		extra_to_place -= 1
+		var segment: Array = plan[plan_i]
+		plan_i += 1
+		for raw in segment:
+			if stacks[i].is_full():
+				break
+			stacks[i].push(int(raw))
 
 func setup_board() -> void:
 	board_locked = false
 	_pending_level_up_alerts.clear()
+	_pending_cycle_reset_milestone = 0
+	_cycle_reset_transition_playing = false
 	temp_slot_bonus_active = false
 	temp_slot_time_remaining = 0.0
 	temp_slot_actions_remaining = 0
@@ -526,9 +539,19 @@ func capture_board_snapshot() -> Dictionary:
 		"temp_slot_bonus_active": temp_slot_bonus_active and has_active_temp_stack(),
 		"temp_slot_time_remaining": temp_slot_time_remaining if has_active_temp_stack() else 0.0,
 		"temp_slot_actions_remaining": temp_slot_actions_remaining,
+		"pending_cycle_reset_milestone": _pending_cycle_reset_milestone,
+		"wildcard_counts": wildcard_counts,
+		"wildcard_unlock_granted": wildcard_unlock_granted,
 		"all_rows": _capture_stack_data(),
 		"has_active_temp_stack": has_active_temp_stack(),
 	})
+
+## Mantiene los comodines del checkpoint al día (usos/compras entre niveles).
+func _sync_wildcards_into_checkpoint_snapshot() -> void:
+	if checkpoint_snapshot.is_empty():
+		return
+	checkpoint_snapshot["wildcard_counts"] = wildcard_counts.duplicate(true)
+	checkpoint_snapshot["wildcard_unlock_granted"] = wildcard_unlock_granted.duplicate(true)
 
 func _clear_undo_snapshot() -> void:
 	undo_snapshot.clear()
@@ -597,6 +620,32 @@ func _cleanup_orphan_coin_nodes() -> void:
 			_kill_coin_flight_tween_on_node(child)
 			child.queue_free()
 
+func _min_stacks_for_current_cycle() -> int:
+	# Post-prestige el piso es CYCLE_RESET_STACKS; en ciclo 0, el arranque.
+	if roll_value_floor <= 1:
+		return INITIAL_PERMANENT_STACKS
+	return CYCLE_RESET_STACKS
+
+## Saves del reset viejo (4 ranuras post-ficha 15): agrega ranuras vacías hasta el piso.
+func _grant_missing_cycle_floor_stacks() -> int:
+	var floor_stacks := _min_stacks_for_current_cycle()
+	var added := 0
+	while active_stacks < floor_stacks and active_stacks < MAX_PERMANENT_STACKS:
+		add_new_stack_for_level_unlock()
+		active_stacks += 1
+		added += 1
+	if added > 0:
+		_clear_undo_snapshot()
+		refresh_all_stack_layout()
+		_sync_slot_overlay_controls()
+		capture_checkpoint_snapshot()
+		GameState.player_level = checkpoint_level
+		GameState.checkpoint_snapshot = checkpoint_snapshot.duplicate(true)
+		save_game()
+		queue_redraw()
+		print("Migración post-ciclo: +%d ranura(s) vacía(s) (piso %d)" % [added, active_stacks])
+	return added
+
 func _expected_stack_count_for_snapshot(snap: Dictionary) -> int:
 	var permanent := maxi(1, int(snap.get("active_stacks", 1)))
 	var temp_on := bool(snap.get("temp_slot_bonus_active", false))
@@ -620,6 +669,15 @@ func _restore_board_from_snapshot(snap: Dictionary) -> void:
 	if snap_checkpoint is Dictionary:
 		checkpoint_snapshot = snap_checkpoint.duplicate(true)
 	active_stacks = maxi(1, int(snap.get("active_stacks", active_stacks)))
+	_pending_cycle_reset_milestone = maxi(0, int(snap.get("pending_cycle_reset_milestone", 0)))
+	_cycle_reset_transition_playing = false
+	var wc_counts: Variant = snap.get("wildcard_counts", null) if snap.has("wildcard_counts") else null
+	var wc_granted: Variant = snap.get("wildcard_unlock_granted", null) if snap.has("wildcard_unlock_granted") else null
+	# Saves viejos: comodines solo vivían en el checkpoint.
+	if wc_counts == null and checkpoint_snapshot is Dictionary:
+		wc_counts = checkpoint_snapshot.get("wildcard_counts", null)
+		wc_granted = checkpoint_snapshot.get("wildcard_unlock_granted", null)
+	_apply_wildcard_state_from_dicts(wc_counts, wc_granted)
 	next_free_slot_unlock_level = maxi(
 		1,
 		int(
@@ -659,6 +717,12 @@ func _restore_board_from_snapshot(snap: Dictionary) -> void:
 	refresh_fusion_target_bonus_unlock()
 	update_progress_bar(false)
 	_sync_slot_overlay_controls()
+	_grant_missing_cycle_floor_stacks()
+	if _pending_cycle_reset_milestone > 0:
+		board_locked = true
+		_pending_level_up_alerts.clear()
+		_pending_level_up_alerts.append(checkpoint_level)
+		call_deferred("_show_next_level_up_alert")
 	queue_redraw()
 
 func try_undo_last_move() -> void:
@@ -679,6 +743,7 @@ func try_undo_last_move() -> void:
 	print("Movimiento deshecho.")
 
 func save_game() -> void:
+	_sync_wildcards_into_checkpoint_snapshot()
 	_push_player_resources_to_game_state()
 	runtime_snapshot = capture_board_snapshot()
 	var session := collect_save_dict()
@@ -701,6 +766,7 @@ func try_load_saved_game() -> bool:
 ## Estado persistible (save/load sigue desactivado; estos helpers quedan listos para reactivarlo).
 ## Incluye el nivel actual (checkpoint) como pide el sistema de checkpoints.
 func collect_save_dict() -> Dictionary:
+	_sync_wildcards_into_checkpoint_snapshot()
 	runtime_snapshot = capture_board_snapshot()
 	return GameSessionServiceScript.build_save_payload({
 		"checkpoint_level": checkpoint_level,
@@ -832,10 +898,9 @@ func handle_glove_click(mouse_pos: Vector2) -> void:
 	if selected_stack == clicked_stack:
 		clear_selection()
 		return
-	var pre_move_snapshot := capture_board_snapshot()
+	# No pisar undo_snapshot: se capturó al activar el guante (tablero + comodín previos).
 	var moved = selected_stack.move_top_block_to(clicked_stack, true)
 	if moved > 0:
-		undo_snapshot = pre_move_snapshot
 		_update_undo_button_state()
 		glove_mode_active = false
 		board_locked = true
@@ -1001,6 +1066,8 @@ func resolve_board_after_action(expected_revision: int = -1) -> void:
 	var level_alert_open := (
 		(level_up_overlay != null and level_up_overlay.visible)
 		or not _pending_level_up_alerts.is_empty()
+		or _pending_cycle_reset_milestone > 0
+		or _cycle_reset_transition_playing
 	)
 	var wildcard_alert_open := wildcard_unlock_overlay != null and wildcard_unlock_overlay.visible
 	if not level_alert_open and not wildcard_alert_open:
@@ -1364,8 +1431,16 @@ func get_roll_value() -> int:
 	var hi := get_roll_max_value()
 	return randi_range(lo, hi)
 
+## Meta de progreso del ciclo (piso de tirada / objetivo). No toca el tablero visible.
+func _apply_cycle_reset_meta(milestone_level: int, cycle_state: Dictionary) -> void:
+	adjacent_slot_next_price = int(cycle_state.get("adjacent_slot_next_price", ADJACENT_EXTRA_SLOT_BASE_PRICE))
+	next_free_slot_unlock_level = GameRulesScript.initial_free_slot_unlock_level(milestone_level)
+	current_level = int(cycle_state.get("current_level", 1))
+	max_value = int(cycle_state.get("max_value", milestone_level))
+	roll_value_floor = int(cycle_state.get("roll_value_floor", milestone_level - CHECKPOINT_BASE_VALUE))
+
 ## Reinicia el tablero al conseguir la ficha hito (15, 30, 45…).
-## 4 ranuras; objetivo = milestone; tiradas en (milestone-5)..(milestone-1).
+## 5 ranuras; objetivo = milestone; tiradas en (milestone-5)..(milestone-1).
 func reset_board_for_cycle_milestone(milestone_level: int) -> void:
 	var cycle_state := GameBoardEngineScript.build_cycle_reset_state(milestone_level, {
 		"board_cycle_levels": BOARD_CYCLE_LEVELS,
@@ -1385,14 +1460,10 @@ func reset_board_for_cycle_milestone(milestone_level: int) -> void:
 	temp_slot_actions_remaining = 0
 	_temp_slot_timer_shown_sec = -1
 	configure_process_for_temp_slot()
-	adjacent_slot_next_price = int(cycle_state.get("adjacent_slot_next_price", ADJACENT_EXTRA_SLOT_BASE_PRICE))
-	next_free_slot_unlock_level = GameRulesScript.initial_free_slot_unlock_level(milestone_level)
+	_apply_cycle_reset_meta(milestone_level, cycle_state)
 
 	active_stacks = int(cycle_state.get("active_stacks", CYCLE_RESET_STACKS))
-	current_level = int(cycle_state.get("current_level", 1))
-	max_value = int(cycle_state.get("max_value", milestone_level))
-	roll_value_floor = int(cycle_state.get("roll_value_floor", milestone_level - CHECKPOINT_BASE_VALUE))
-
+	board_revision += 1
 	clear_board_stacks()
 	create_stack_nodes(active_stacks)
 	fill_board_initial_random()
@@ -1405,6 +1476,65 @@ func reset_board_for_cycle_milestone(milestone_level: int) -> void:
 		"Ciclo de tablero reiniciado @ nivel %d → %d ranuras, fichas %d..%d (objetivo %d)"
 		% [milestone_level, active_stacks, roll_value_floor, max_value - 1, max_value]
 	)
+
+## El tablero viejo se desliza hacia arriba; el nuevo entra desde abajo.
+func _play_cycle_board_transition(milestone: int) -> void:
+	if _cycle_reset_transition_playing:
+		return
+	if milestone <= 0:
+		return
+	_cycle_reset_transition_playing = true
+	board_locked = true
+	clear_selection(false)
+	hammer_mode_active = false
+	glove_mode_active = false
+	var slide := maxf(420.0, get_viewport_rect().size.y * 0.55)
+	var old_stacks: Array = stacks.duplicate()
+	var tw := create_tween()
+	tw.set_parallel(true)
+	for st in old_stacks:
+		if not is_instance_valid(st):
+			continue
+		tw.tween_property(st, "position:y", st.position.y - slide, 0.42)\
+			.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+		tw.tween_property(st, "modulate:a", 0.0, 0.30).set_delay(0.06)
+	tw.chain().tween_callback(_swap_board_after_cycle_slide.bind(milestone, slide))
+
+func _swap_board_after_cycle_slide(milestone: int, slide: float) -> void:
+	reset_board_for_cycle_milestone(milestone)
+	_pending_cycle_reset_milestone = 0
+	for st in stacks:
+		if not is_instance_valid(st):
+			continue
+		st.position.y += slide
+		st.modulate.a = 0.0
+	var tw2 := create_tween()
+	tw2.set_parallel(true)
+	for st in stacks:
+		if not is_instance_valid(st):
+			continue
+		var target_y: float = st.position.y - slide
+		tw2.tween_property(st, "position:y", target_y, 0.52)\
+			.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		tw2.tween_property(st, "modulate:a", 1.0, 0.36)
+	tw2.chain().tween_callback(_on_cycle_board_transition_done)
+
+func _on_cycle_board_transition_done() -> void:
+	_cycle_reset_transition_playing = false
+	for st in stacks:
+		if is_instance_valid(st):
+			st.modulate.a = 1.0
+	refresh_all_stack_layout()
+	capture_checkpoint_snapshot()
+	GameState.player_level = checkpoint_level
+	GameState.checkpoint_snapshot = checkpoint_snapshot.duplicate(true)
+	save_game()
+	board_locked = false
+	try_show_wildcard_unlock_panel()
+	var wildcard_open := wildcard_unlock_overlay != null and wildcard_unlock_overlay.visible
+	if not wildcard_open:
+		check_blocked_state()
+	_update_undo_button_state()
 
 func has_any_valid_moves() -> bool:
 	return count_legal_moves() > 0 or can_repartir()
@@ -1551,6 +1681,7 @@ func _style_progress_label(lbl: Label, font_size: int) -> void:
 
 ## Actualiza el checkpoint de forma monótona (solo avanza). Devuelve true si subió.
 ## El reset de ciclo NO usa el número de checkpoint: se dispara al tener la ficha 15/30/45…
+## El tablero visible se renueva después del cartel (Continuar), no al instante.
 func update_checkpoint_level() -> bool:
 	var previous := checkpoint_level
 	var cycle_milestone := get_reached_cycle_coin_milestone()
@@ -1559,11 +1690,21 @@ func update_checkpoint_level() -> bool:
 	if not bool(decision.get("changed", false)):
 		return false
 	checkpoint_level = int(decision.get("checkpoint_level", checkpoint_level))
-	if bool(decision.get("did_cycle_reset", false)):
-		reset_board_for_cycle_milestone(cycle_milestone)
+	var did_cycle_reset := bool(decision.get("did_cycle_reset", false))
+	if did_cycle_reset:
+		var cycle_state := GameBoardEngineScript.build_cycle_reset_state(cycle_milestone, {
+			"board_cycle_levels": BOARD_CYCLE_LEVELS,
+			"checkpoint_base_value": CHECKPOINT_BASE_VALUE,
+			"cycle_reset_stacks": CYCLE_RESET_STACKS,
+			"adjacent_slot_base_price": ADJACENT_EXTRA_SLOT_BASE_PRICE,
+		})
+		if bool(cycle_state.get("valid", false)):
+			# Aplicar meta ya (evita re-disparar el hito), pero diferir el tablero nuevo.
+			_apply_cycle_reset_meta(cycle_milestone, cycle_state)
+			_pending_cycle_reset_milestone = cycle_milestone
 	sync_wildcard_unlocks(previous)
 	# Tras un reset de ciclo no hay desbloqueo retroactivo de ranuras.
-	if not bool(decision.get("did_cycle_reset", false)):
+	if not did_cycle_reset:
 		_unlock_adjacent_slots_for_level_range(previous, checkpoint_level)
 	# Guardar checkpoint DESPUES de aplicar desbloqueos de ranura gratis.
 	# Si se guarda antes, al restaurar se pierde la ranura otorgada por nivel.
@@ -1574,6 +1715,10 @@ func update_checkpoint_level() -> bool:
 	# Encolar cada nivel saltado para no perder carteles (ej. 1→3 muestra 2 y 3).
 	for alert_lvl in range(previous + 1, checkpoint_level + 1):
 		_pending_level_up_alerts.append(alert_lvl)
+	# Prestige: el checkpoint a veces ya era el hito (ej. mitad de 11 → niv. 15)
+	# sin ficha 15; igual hay que mostrar cartel antes de renovar el tablero.
+	if _pending_cycle_reset_milestone > 0 and _pending_level_up_alerts.is_empty():
+		_pending_level_up_alerts.append(checkpoint_level)
 	call_deferred("_show_next_level_up_alert")
 	save_game()
 	return true
@@ -1583,9 +1728,11 @@ func _show_next_level_up_alert() -> void:
 		# Tras el último cartel de nivel, mostrar comodines pendientes si hay.
 		try_show_wildcard_unlock_panel()
 		return
-	if level_up_overlay != null and level_up_overlay.visible:
-		return
 	if wildcard_unlock_overlay != null and wildcard_unlock_overlay.visible:
+		return
+	# Si ya hay un cartel visible, solo re-layout (no consumir otro de la cola).
+	if level_up_overlay != null and level_up_overlay.visible:
+		layout_level_up_dialog_controls()
 		return
 	var alert_level: int = int(_pending_level_up_alerts.pop_front())
 	show_level_up_panel(alert_level)
@@ -1615,6 +1762,8 @@ func restore_checkpoint() -> void:
 	clear_selection()
 	board_locked = false
 	_pending_level_up_alerts.clear()
+	_pending_cycle_reset_milestone = 0
+	_cycle_reset_transition_playing = false
 	temp_slot_bonus_active = false
 	temp_slot_time_remaining = 0.0
 	temp_slot_actions_remaining = 0
@@ -1649,6 +1798,7 @@ func restore_checkpoint() -> void:
 	refresh_fusion_target_bonus_unlock()
 	_sync_slot_overlay_controls()
 	update_progress_bar(false)
+	_grant_missing_cycle_floor_stacks()
 	queue_redraw()
 	print("Checkpoint restaurado: nivel ", checkpoint_level)
 
@@ -1853,6 +2003,19 @@ func _settings_card_colors() -> Dictionary:
 	card_border = card_border.darkened(0.35)
 	return {"bg": card_bg, "border": card_border}
 
+## Fondo de cartel + borde del color del CTA (Continuar / botón on del tema).
+func _apply_cta_border_dialog_card(card: Panel, radius: int = 30, border_w: int = 5) -> void:
+	if card == null:
+		return
+	var p: Dictionary = GameState.get_ui_palette()
+	var card_bg: Color = p.get("settings_card_bg", Color(0.62, 0.52, 0.82, 0.98))
+	card_bg = card_bg.lightened(0.18)
+	var border: Color = p.get("settings_btn_on", Color(0.58, 0.80, 0.48, 0.98))
+	card.add_theme_stylebox_override(
+		"panel",
+		make_flat_style(card_bg, border, radius, border_w)
+	)
+
 func _apply_settings_style_card(card: Panel, radius: int = 30, border_w: int = 4) -> void:
 	if card == null:
 		return
@@ -1863,9 +2026,9 @@ func _apply_settings_style_card(card: Panel, radius: int = 30, border_w: int = 4
 	)
 
 func _apply_dialog_cards_theme_colors() -> void:
-	_apply_settings_style_card(no_moves_card)
-	_apply_settings_style_card(level_up_card)
-	_apply_settings_style_card(wildcard_unlock_card)
+	_apply_cta_border_dialog_card(no_moves_card)
+	_apply_cta_border_dialog_card(level_up_card)
+	_apply_cta_border_dialog_card(wildcard_unlock_card)
 	_apply_settings_style_card(purchase_card, 30, 4)
 
 func _apply_purchase_dialog_theme_colors() -> void:
@@ -1873,14 +2036,14 @@ func _apply_purchase_dialog_theme_colors() -> void:
 	var btn_on: Color = p.get("settings_btn_on", Color(0.58, 0.80, 0.48, 0.98))
 	var btn_border: Color = p.get("settings_btn_border", Color(0.75, 0.88, 0.58, 1.0))
 	var btn_off: Color = p.get("settings_btn_off", Color(0.40, 0.50, 0.40, 0.95))
-	var font_on := Color(0.98, 0.99, 0.96)
+	var font_on := Color(0.88, 0.86, 0.83)
 	_apply_settings_style_card(purchase_card, 30, 4)
 	if purchase_title_label != null:
 		purchase_title_label.add_theme_color_override(
 			"font_color", p.get("settings_title", font_on)
 		)
-		purchase_title_label.add_theme_color_override("font_outline_color", Color(0.08, 0.06, 0.14, 0.95))
-		purchase_title_label.add_theme_constant_override("outline_size", 6)
+		purchase_title_label.add_theme_color_override("font_outline_color", Color(0.22, 0.20, 0.24, 0.78))
+		purchase_title_label.add_theme_constant_override("outline_size", 5)
 	if purchase_icon_circle != null:
 		var inset: Color = btn_off
 		inset.a = 0.98
@@ -3054,11 +3217,12 @@ func perform_glove_action() -> void:
 func apply_hammer_on_stack(target_stack: Node) -> void:
 	if target_stack == null:
 		return
-	_clear_undo_snapshot()
+	# Conservar undo_snapshot de la activación (incluye el comodín antes de gastarlo).
 	while not target_stack.is_empty():
 		target_stack.pop()
 	hammer_mode_active = false
 	glove_mode_active = false
+	_update_undo_button_state()
 	resolve_board_after_action()
 
 func try_use_wildcard(wildcard_type: String) -> void:
@@ -3076,75 +3240,79 @@ func try_use_wildcard(wildcard_type: String) -> void:
 
 	match wildcard_type:
 		"mix":
+			# Mezclar no tiene undo (reparte de nuevo el tablero).
 			consume_wildcard(wildcard_type)
 			perform_mix_action()
-		"hammer":
+		"hammer", "glove":
+			# Snapshot ANTES de gastar: deshacer devuelve tablero + comodín.
+			_clear_undo_snapshot()
+			undo_snapshot = capture_board_snapshot()
 			consume_wildcard(wildcard_type)
-			perform_hammer_action()
-		"glove":
-			consume_wildcard(wildcard_type)
-			perform_glove_action()
+			if wildcard_type == "hammer":
+				perform_hammer_action()
+			else:
+				perform_glove_action()
+			_update_undo_button_state()
 		_:
 			return
 
 func consume_wildcard(wildcard_type: String) -> void:
-	wildcard_counts[wildcard_type] = max(0, int(wildcard_counts.get(wildcard_type, 0)) - 1)
+	wildcard_counts = GameWildcardServiceScript.consume(wildcard_counts, wildcard_type)
+	_sync_wildcards_into_checkpoint_snapshot()
 	update_wildcard_badges()
 
 func add_wildcard_use(wildcard_type: String, amount: int = 1) -> void:
-	if not is_wildcard_unlocked(wildcard_type):
-		return
-	wildcard_counts[wildcard_type] = int(wildcard_counts.get(wildcard_type, 0)) + max(1, amount)
+	wildcard_counts = GameWildcardServiceScript.add_uses(
+		wildcard_counts, wildcard_type, amount, checkpoint_level, WILDCARD_UNLOCK_LEVEL
+	)
+	_sync_wildcards_into_checkpoint_snapshot()
 	update_wildcard_badges()
 
 func get_wildcard_unlock_level(wildcard_type: String) -> int:
 	return int(WILDCARD_UNLOCK_LEVEL.get(wildcard_type, 9999))
 
 func is_wildcard_unlocked(wildcard_type: String) -> bool:
-	return get_current_level() >= get_wildcard_unlock_level(wildcard_type)
+	return GameWildcardServiceScript.is_unlocked(wildcard_type, get_current_level(), WILDCARD_UNLOCK_LEVEL)
 
 func reset_wildcard_state() -> void:
-	for wildcard_type in WILDCARD_TYPES:
-		wildcard_counts[wildcard_type] = 0
-		wildcard_unlock_granted[wildcard_type] = false
+	wildcard_counts = GameWildcardServiceScript.normalize_counts({})
+	wildcard_unlock_granted = GameWildcardServiceScript.normalize_granted({})
 	# Sin previous_level: no mostrar carteles (setup / reset de tablero).
 	sync_wildcard_unlocks(-1)
 
-func _restore_wildcard_state_from_snapshot() -> void:
-	var counts = checkpoint_snapshot.get("wildcard_counts", null)
-	if counts is Dictionary:
-		for wildcard_type in WILDCARD_TYPES:
-			wildcard_counts[wildcard_type] = int(counts.get(wildcard_type, 0))
-	var granted = checkpoint_snapshot.get("wildcard_unlock_granted", null)
-	if granted is Dictionary:
-		for wildcard_type in WILDCARD_TYPES:
-			wildcard_unlock_granted[wildcard_type] = bool(granted.get(wildcard_type, false))
+func _apply_wildcard_state_from_dicts(counts_raw: Variant, granted_raw: Variant) -> void:
+	wildcard_counts = GameWildcardServiceScript.normalize_counts(counts_raw)
+	wildcard_unlock_granted = GameWildcardServiceScript.normalize_granted(granted_raw)
 	# Restore no debe re-mostrar carteles de desbloqueo.
 	sync_wildcard_unlocks(-1)
+
+func _restore_wildcard_state_from_snapshot() -> void:
+	_apply_wildcard_state_from_dicts(
+		checkpoint_snapshot.get("wildcard_counts", null),
+		checkpoint_snapshot.get("wildcard_unlock_granted", null)
+	)
 
 ## Concede usos gratis la primera vez que el nivel desbloquea cada comodín.
 ## previous_level: checkpoint antes del salto (para mostrar cartel solo al cruzar el umbral).
 ## Pasar -1 en restore/setup para migrar en silencio sin cartel.
 func sync_wildcard_unlocks(previous_level: int = -1) -> void:
-	for wildcard_type in WILDCARD_TYPES:
-		var unlock_lvl := get_wildcard_unlock_level(wildcard_type)
-		if is_wildcard_unlocked(wildcard_type):
-			if not bool(wildcard_unlock_granted.get(wildcard_type, false)):
-				var prev_counts := int(wildcard_counts.get(wildcard_type, 0))
-				if prev_counts <= 0:
-					wildcard_counts[wildcard_type] = WILDCARD_INITIAL_USES
-				wildcard_unlock_granted[wildcard_type] = true
-				# Cartel solo si acabamos de cruzar el nivel de unlock en esta subida.
-				var crossed := previous_level >= 0 and previous_level < unlock_lvl and checkpoint_level >= unlock_lvl
-				if crossed:
-					queue_wildcard_unlock_panel(wildcard_type)
-				print(
-					"Comodín desbloqueado: %s (%d usos gratis)"
-					% [get_wildcard_display_name(wildcard_type), WILDCARD_INITIAL_USES]
-				)
-		else:
-			wildcard_counts[wildcard_type] = 0
-			# No resetear granted: evita re-mostrar el cartel si el flag se pierde en un save viejo.
+	var synced := GameWildcardServiceScript.sync_unlocks(
+		checkpoint_level,
+		wildcard_counts,
+		wildcard_unlock_granted,
+		previous_level,
+		WILDCARD_INITIAL_USES,
+		WILDCARD_UNLOCK_LEVEL
+	)
+	wildcard_counts = synced.get("wildcard_counts", wildcard_counts)
+	wildcard_unlock_granted = synced.get("wildcard_unlock_granted", wildcard_unlock_granted)
+	var newly: Array = synced.get("newly_unlocked", [])
+	for wildcard_type in newly:
+		queue_wildcard_unlock_panel(str(wildcard_type))
+		print(
+			"Comodín desbloqueado: %s (%d usos gratis)"
+			% [get_wildcard_display_name(str(wildcard_type)), WILDCARD_INITIAL_USES]
+		)
 	update_wildcard_badges()
 
 func update_wildcard_badges() -> void:
@@ -3402,8 +3570,8 @@ func _style_dialog_title_label(lbl: Label, font_size: int) -> void:
 	lbl.add_theme_font_size_override("font_size", font_size)
 	var p: Dictionary = GameState.get_ui_palette()
 	lbl.add_theme_color_override("font_color", p.get("settings_title", HudTextureButtons.BTN_TEXT_COLOR))
-	lbl.add_theme_color_override("font_outline_color", Color(0.08, 0.06, 0.14, 0.95))
-	lbl.add_theme_constant_override("outline_size", 6)
+	lbl.add_theme_color_override("font_outline_color", Color(0.22, 0.20, 0.24, 0.78))
+	lbl.add_theme_constant_override("outline_size", 5)
 
 func make_dialog_gradient_button(text: String, font_size: int = DIALOG_BTN_FONT_SIZE, compact: bool = false) -> Control:
 	var btn := HudTextureButtons.create_gradient_pill()
@@ -3441,7 +3609,7 @@ func _layout_dialog_gradient_button(btn: Control, btn_w: float, scale: float, fo
 func build_no_moves_dialog() -> void:
 	no_moves_overlay = ColorRect.new()
 	no_moves_overlay.color = Color(0.0, 0.0, 0.0, 0.45)
-	no_moves_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	no_moves_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	no_moves_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
 	no_moves_overlay.visible = false
 	# Debe quedar por encima de cualquier otro overlay del HUD.
@@ -3449,25 +3617,29 @@ func build_no_moves_dialog() -> void:
 	no_moves_overlay.z_index = 320
 	hud_layer.add_child(no_moves_overlay)
 
-	no_moves_card = _create_dialog_card()
+	no_moves_card = _create_dialog_card(false)
+	no_moves_card.clip_contents = false
 	no_moves_card.z_as_relative = false
 	no_moves_card.z_index = 321
 	no_moves_overlay.add_child(no_moves_card)
 
 	no_moves_margin = MarginContainer.new()
-	no_moves_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	no_moves_margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	no_moves_margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	no_moves_card.add_child(no_moves_margin)
 
 	no_moves_vbox = VBoxContainer.new()
 	no_moves_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	no_moves_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	no_moves_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	no_moves_vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	no_moves_vbox.add_theme_constant_override("separation", 28)
+	no_moves_vbox.add_theme_constant_override("separation", 16)
 	no_moves_margin.add_child(no_moves_vbox)
 
 	no_moves_title_label = create_label("No hay movimientos", DIALOG_TITLE_FONT_SIZE, HudTextureButtons.BTN_TEXT_COLOR)
 	_style_dialog_title_label(no_moves_title_label, DIALOG_TITLE_FONT_SIZE)
 	no_moves_title_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	no_moves_title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	no_moves_vbox.add_child(no_moves_title_label)
 
 	no_moves_restart_button = make_dialog_gradient_button("Reiniciar", DIALOG_COMPACT_BTN_FONT_SIZE, true)
@@ -3484,31 +3656,49 @@ func build_no_moves_dialog() -> void:
 	_bind_hud_chip_click(no_moves_ad_button, _on_no_moves_watch_ad_pressed)
 	no_moves_vbox.add_child(no_moves_ad_button)
 
+	_apply_cta_border_dialog_card(no_moves_card)
 	layout_no_moves_dialog_controls()
 
 func layout_no_moves_dialog_controls() -> void:
 	if no_moves_overlay == null or no_moves_card == null:
 		return
-	var viewport_size = get_viewport_rect().size
-	var scale = clampf(min(viewport_size.x / 1080.0, viewport_size.y / 1920.0), 0.75, 1.2)
-	var card_size = Vector2(min(viewport_size.x * 0.88, 840.0 * scale), 660.0 * scale)
+	var viewport_size: Vector2 = get_viewport_rect().size
+	if viewport_size.x < 2.0 or viewport_size.y < 2.0:
+		return
+	var ui_scale: float = clampf(minf(viewport_size.x / 1080.0, viewport_size.y / 1920.0), 0.75, 1.2)
+	var visible_btns := 0
+	if no_moves_restart_button != null and no_moves_restart_button.visible:
+		visible_btns += 1
+	if no_moves_buy_button != null and no_moves_buy_button.visible:
+		visible_btns += 1
+	if no_moves_ad_button != null and no_moves_ad_button.visible:
+		visible_btns += 1
+	visible_btns = maxi(visible_btns, 1)
+
+	var card_w: float = minf(viewport_size.x * 0.86, 680.0 * ui_scale)
+	var pad: float = 36.0 * ui_scale
+	var sep: float = 16.0 * ui_scale
+	var title_h: float = 70.0 * ui_scale
+	var btn_h: float = DIALOG_BTN_HEIGHT * ui_scale * 0.78
+	var card_h: float = pad * 2.0 + title_h + float(visible_btns) * (btn_h + sep)
+	var card_size := Vector2(card_w, card_h)
 	no_moves_card.size = card_size
 	no_moves_card.position = (viewport_size - card_size) * 0.5
 
 	if no_moves_margin != null:
-		no_moves_margin.add_theme_constant_override("margin_left", int(54 * scale))
-		no_moves_margin.add_theme_constant_override("margin_right", int(54 * scale))
-		no_moves_margin.add_theme_constant_override("margin_top", int(64 * scale))
-		no_moves_margin.add_theme_constant_override("margin_bottom", int(58 * scale))
+		no_moves_margin.add_theme_constant_override("margin_left", int(36 * ui_scale))
+		no_moves_margin.add_theme_constant_override("margin_right", int(36 * ui_scale))
+		no_moves_margin.add_theme_constant_override("margin_top", int(32 * ui_scale))
+		no_moves_margin.add_theme_constant_override("margin_bottom", int(28 * ui_scale))
 	if no_moves_vbox != null:
-		no_moves_vbox.add_theme_constant_override("separation", int(28 * scale))
+		no_moves_vbox.add_theme_constant_override("separation", int(sep))
 	if no_moves_title_label != null:
-		_style_dialog_title_label(no_moves_title_label, int(DIALOG_TITLE_FONT_SIZE * scale))
+		_style_dialog_title_label(no_moves_title_label, int(DIALOG_TITLE_FONT_SIZE * ui_scale))
 
-	var btn_w: float = card_size.x - 108.0 * scale
-	_layout_dialog_gradient_button(no_moves_restart_button, btn_w, scale, DIALOG_COMPACT_BTN_FONT_SIZE)
-	_layout_dialog_gradient_button(no_moves_buy_button, btn_w, scale, DIALOG_BTN_FONT_SIZE)
-	_layout_dialog_gradient_button(no_moves_ad_button, btn_w, scale, DIALOG_BTN_FONT_SIZE)
+	var btn_w: float = card_size.x - 72.0 * ui_scale
+	_layout_dialog_gradient_button(no_moves_restart_button, btn_w, ui_scale, DIALOG_COMPACT_BTN_FONT_SIZE)
+	_layout_dialog_gradient_button(no_moves_buy_button, btn_w, ui_scale, DIALOG_BTN_FONT_SIZE)
+	_layout_dialog_gradient_button(no_moves_ad_button, btn_w, ui_scale, DIALOG_BTN_FONT_SIZE)
 
 func show_no_moves_panel() -> void:
 	if no_moves_overlay == null:
@@ -3519,7 +3709,10 @@ func show_no_moves_panel() -> void:
 	glove_mode_active = false
 	update_no_moves_buttons()
 	no_moves_overlay.visible = true
+	no_moves_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	no_moves_overlay.move_to_front()
+	if hud_layer != null:
+		hud_layer.move_child(no_moves_overlay, hud_layer.get_child_count() - 1)
 	layout_no_moves_dialog_controls()
 
 func hide_no_moves_panel() -> void:
@@ -3538,6 +3731,8 @@ func update_no_moves_buttons() -> void:
 			buy_lbl.text = "Comprar %d vidas por %d" % [BUY_LIVES_AMOUNT, BUY_LIVES_COST]
 	if no_moves_ad_button != null:
 		no_moves_ad_button.visible = not has_lives
+	if no_moves_overlay != null and no_moves_overlay.visible:
+		layout_no_moves_dialog_controls()
 
 func _restart_after_no_moves() -> void:
 	hide_no_moves_panel()
@@ -3578,25 +3773,28 @@ func _on_no_moves_watch_ad_pressed() -> void:
 func build_level_up_dialog() -> void:
 	level_up_overlay = ColorRect.new()
 	level_up_overlay.color = Color(0.0, 0.0, 0.0, 0.40)
-	level_up_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	level_up_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	level_up_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
 	level_up_overlay.visible = false
 	level_up_overlay.z_as_relative = false
 	level_up_overlay.z_index = 310
 	hud_layer.add_child(level_up_overlay)
 
-	level_up_card = _create_dialog_card()
+	level_up_card = _create_dialog_card(false)
+	level_up_card.clip_contents = false
 	level_up_card.z_as_relative = false
 	level_up_card.z_index = 311
 	level_up_overlay.add_child(level_up_card)
 
 	level_up_margin = MarginContainer.new()
-	level_up_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	level_up_margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	level_up_margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	level_up_card.add_child(level_up_margin)
 
 	level_up_vbox = VBoxContainer.new()
 	level_up_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	level_up_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	level_up_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	level_up_vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	level_up_vbox.add_theme_constant_override("separation", 20)
 	level_up_margin.add_child(level_up_vbox)
@@ -3604,11 +3802,13 @@ func build_level_up_dialog() -> void:
 	level_up_title_label = create_label("¡Subiste de nivel!", DIALOG_TITLE_FONT_SIZE, HudTextureButtons.BTN_TEXT_COLOR)
 	_style_dialog_title_label(level_up_title_label, DIALOG_TITLE_FONT_SIZE)
 	level_up_title_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	level_up_title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	level_up_vbox.add_child(level_up_title_label)
 
 	level_up_subtitle_label = create_label("Nivel 2", DIALOG_SUBTITLE_FONT_SIZE, HudTextureButtons.BTN_TEXT_COLOR)
 	_style_dialog_title_label(level_up_subtitle_label, DIALOG_SUBTITLE_FONT_SIZE)
 	level_up_subtitle_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	level_up_subtitle_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	level_up_vbox.add_child(level_up_subtitle_label)
 
 	level_up_continue_button = make_dialog_gradient_button("Continuar", DIALOG_COMPACT_BTN_FONT_SIZE, true)
@@ -3616,28 +3816,35 @@ func build_level_up_dialog() -> void:
 	level_up_vbox.add_child(level_up_continue_button)
 
 	layout_level_up_dialog_controls()
-	layout_wildcard_unlock_dialog_controls()
 
 func layout_level_up_dialog_controls() -> void:
 	if level_up_overlay == null or level_up_card == null:
 		return
 	var viewport_size = get_viewport_rect().size
+	if viewport_size.x < 2.0 or viewport_size.y < 2.0:
+		return
 	var scale = clampf(min(viewport_size.x / 1080.0, viewport_size.y / 1920.0), 0.75, 1.2)
-	var card_size = Vector2(min(viewport_size.x * 0.90, 780.0 * scale), 560.0 * scale)
+	# Título + "Nivel N" + Continuar (sin explicación larga).
+	var card_size = Vector2(min(viewport_size.x * 0.88, 720.0 * scale), 420.0 * scale)
 	level_up_card.size = card_size
 	level_up_card.position = (viewport_size - card_size) * 0.5
+	level_up_card.visible = true
 
 	if level_up_margin != null:
-		level_up_margin.add_theme_constant_override("margin_left", int(48 * scale))
-		level_up_margin.add_theme_constant_override("margin_right", int(48 * scale))
-		level_up_margin.add_theme_constant_override("margin_top", int(52 * scale))
-		level_up_margin.add_theme_constant_override("margin_bottom", int(48 * scale))
+		level_up_margin.add_theme_constant_override("margin_left", int(40 * scale))
+		level_up_margin.add_theme_constant_override("margin_right", int(40 * scale))
+		level_up_margin.add_theme_constant_override("margin_top", int(40 * scale))
+		level_up_margin.add_theme_constant_override("margin_bottom", int(36 * scale))
 	if level_up_vbox != null:
-		level_up_vbox.add_theme_constant_override("separation", int(20 * scale))
+		level_up_vbox.add_theme_constant_override("separation", int(18 * scale))
 	if level_up_title_label != null:
 		_style_dialog_title_label(level_up_title_label, int(DIALOG_TITLE_FONT_SIZE * scale))
+		level_up_title_label.visible = true
 	if level_up_subtitle_label != null:
 		_style_dialog_title_label(level_up_subtitle_label, int(DIALOG_SUBTITLE_FONT_SIZE * scale))
+		level_up_subtitle_label.visible = true
+	if level_up_continue_button != null:
+		level_up_continue_button.visible = true
 	var btn_w: float = _dialog_inner_button_width(card_size.x)
 	_layout_dialog_gradient_button(level_up_continue_button, btn_w, scale, DIALOG_COMPACT_BTN_FONT_SIZE)
 
@@ -3652,13 +3859,10 @@ func show_level_up_panel(level: int) -> void:
 	if level_up_title_label != null:
 		level_up_title_label.text = "¡Subiste de nivel!"
 	if level_up_subtitle_label != null:
-		var desc := get_checkpoint_level_description(level)
-		if desc.is_empty():
-			level_up_subtitle_label.text = "Nivel %d" % level
-		else:
-			level_up_subtitle_label.text = "Nivel %d\n%s" % [level, desc]
+		level_up_subtitle_label.text = "Nivel %d" % level
 	_force_progress_bar_display(1.0)
 	level_up_overlay.visible = true
+	level_up_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	level_up_overlay.move_to_front()
 	if hud_layer != null:
 		hud_layer.move_child(level_up_overlay, hud_layer.get_child_count() - 1)
@@ -3668,7 +3872,8 @@ func show_level_up_panel(level: int) -> void:
 func hide_level_up_panel() -> void:
 	if level_up_overlay != null:
 		level_up_overlay.visible = false
-	board_locked = false
+	if not _cycle_reset_transition_playing:
+		board_locked = false
 	update_progress_bar(false)
 
 func _on_level_up_continue_pressed() -> void:
@@ -3676,6 +3881,9 @@ func _on_level_up_continue_pressed() -> void:
 	# Si saltó varios niveles, mostrar el siguiente cartel antes de comodines/bloqueo.
 	if not _pending_level_up_alerts.is_empty():
 		_show_next_level_up_alert()
+		return
+	if _pending_cycle_reset_milestone > 0:
+		_play_cycle_board_transition(_pending_cycle_reset_milestone)
 		return
 	try_show_wildcard_unlock_panel()
 	check_blocked_state()
@@ -3726,30 +3934,35 @@ func build_wildcard_unlock_dialog() -> void:
 	_bind_hud_chip_click(wildcard_unlock_continue_button, _on_wildcard_unlock_continue_pressed)
 	wildcard_unlock_vbox.add_child(wildcard_unlock_continue_button)
 
+	_apply_cta_border_dialog_card(wildcard_unlock_card)
 	layout_wildcard_unlock_dialog_controls()
 
 func layout_wildcard_unlock_dialog_controls() -> void:
 	if wildcard_unlock_overlay == null or wildcard_unlock_card == null:
 		return
-	var viewport_size = get_viewport_rect().size
-	var scale = clampf(min(viewport_size.x / 1080.0, viewport_size.y / 1920.0), 0.75, 1.2)
-	var card_size = Vector2(min(viewport_size.x * 0.92, MENU_CARD_WIDTH_MAX * scale), WILDCARD_UNLOCK_CARD_HEIGHT * scale)
+	var viewport_size: Vector2 = get_viewport_rect().size
+	if viewport_size.x < 2.0 or viewport_size.y < 2.0:
+		return
+	var ui_scale: float = clampf(minf(viewport_size.x / 1080.0, viewport_size.y / 1920.0), 0.75, 1.2)
+	var card_w: float = minf(viewport_size.x * 0.86, 720.0 * ui_scale)
+	var card_h: float = WILDCARD_UNLOCK_CARD_HEIGHT * ui_scale
+	var card_size := Vector2(card_w, card_h)
 	wildcard_unlock_card.size = card_size
 	wildcard_unlock_card.position = (viewport_size - card_size) * 0.5
 
 	if wildcard_unlock_margin != null:
-		wildcard_unlock_margin.add_theme_constant_override("margin_left", int(52 * scale))
-		wildcard_unlock_margin.add_theme_constant_override("margin_right", int(52 * scale))
-		wildcard_unlock_margin.add_theme_constant_override("margin_top", int(52 * scale))
-		wildcard_unlock_margin.add_theme_constant_override("margin_bottom", int(48 * scale))
+		wildcard_unlock_margin.add_theme_constant_override("margin_left", int(36 * ui_scale))
+		wildcard_unlock_margin.add_theme_constant_override("margin_right", int(36 * ui_scale))
+		wildcard_unlock_margin.add_theme_constant_override("margin_top", int(36 * ui_scale))
+		wildcard_unlock_margin.add_theme_constant_override("margin_bottom", int(32 * ui_scale))
 	if wildcard_unlock_vbox != null:
-		wildcard_unlock_vbox.add_theme_constant_override("separation", int(16 * scale))
+		wildcard_unlock_vbox.add_theme_constant_override("separation", int(14 * ui_scale))
 	if wildcard_unlock_title_label != null:
-		_style_dialog_title_label(wildcard_unlock_title_label, int(WILDCARD_UNLOCK_TITLE_FONT_SIZE * scale))
+		_style_dialog_title_label(wildcard_unlock_title_label, int(WILDCARD_UNLOCK_TITLE_FONT_SIZE * ui_scale))
 	if wildcard_unlock_subtitle_label != null:
-		_style_dialog_title_label(wildcard_unlock_subtitle_label, int(44 * scale))
+		_style_dialog_title_label(wildcard_unlock_subtitle_label, int(40 * ui_scale))
 	var btn_w: float = _dialog_inner_button_width(card_size.x)
-	_layout_dialog_gradient_button(wildcard_unlock_continue_button, btn_w, scale, DIALOG_COMPACT_BTN_FONT_SIZE)
+	_layout_dialog_gradient_button(wildcard_unlock_continue_button, btn_w, ui_scale, DIALOG_COMPACT_BTN_FONT_SIZE)
 
 func queue_wildcard_unlock_panel(wildcard_type: String) -> void:
 	if wildcard_type.is_empty():
@@ -3767,6 +3980,8 @@ func try_show_wildcard_unlock_panel() -> void:
 	if level_up_overlay != null and level_up_overlay.visible:
 		return
 	if not _pending_level_up_alerts.is_empty():
+		return
+	if _pending_cycle_reset_milestone > 0 or _cycle_reset_transition_playing:
 		return
 	if no_moves_overlay != null and no_moves_overlay.visible:
 		return
