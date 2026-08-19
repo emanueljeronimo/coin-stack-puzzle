@@ -1,6 +1,8 @@
 extends RefCounted
 class_name GameBoardEngine
 
+const GameEngineScript := preload("res://game_engine.gd")
+
 # Motor puro para decisiones de tablero (checkpoint/reset/subida de nivel).
 
 static func has_level_up(top_values: Array, max_value: int) -> bool:
@@ -44,11 +46,20 @@ static func build_cycle_reset_state(milestone_level: int, config: Dictionary) ->
 	if milestone_level < board_cycle_levels or milestone_level % board_cycle_levels != 0:
 		return {"valid": false}
 	var checkpoint_base_value := int(config.get("checkpoint_base_value", 5))
+	var prestige_checkpoint := int(config.get("checkpoint_level", milestone_level))
 	return {
 		"valid": true,
 		"active_stacks": int(config.get("cycle_reset_stacks", 5)),
+		# Igual que el arranque: objetivo = hito, tirada hasta hito-1.
 		"current_level": 1,
-		"max_value": milestone_level,
-		"roll_value_floor": milestone_level - checkpoint_base_value,
+		"max_value": GameEngineScript.cycle_reset_max_value(milestone_level),
+		"roll_value_floor": GameEngineScript.cycle_reset_roll_value_floor(
+			milestone_level,
+			checkpoint_base_value
+		),
+		"cycle_checkpoint_origin": GameEngineScript.cycle_checkpoint_origin(
+			milestone_level,
+			prestige_checkpoint
+		),
 		"adjacent_slot_next_price": int(config.get("adjacent_slot_base_price", 600)),
 	}

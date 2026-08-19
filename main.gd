@@ -77,7 +77,10 @@ const BOARD_SLOT_INSET := 3.0
 const HUD_SIZE_MULTIPLIER = 1.0
 const HUD_CHIP_HEIGHT = 50.0
 const HUD_CORNER_SIZE = 70.0
-const HUD_CHIP_STAT_W = 172.0
+const HUD_CHIP_STAT_W = 118.0
+## Pastillas de vidas/estrellas a la misma altura que casa/tienda/ajustes.
+const HUD_RESOURCE_PILL_H_RATIO := 1.0
+const HUD_RESOURCE_ICON_H_RATIO := 1.48
 const HUD_BOARD_STAT_FONT_SIZE = 30
 const HUD_BOARD_LONG_ICON_RATIO = 0.56
 const HUD_BOARD_ROUND_ICON_RATIO = 0.74
@@ -122,6 +125,8 @@ const AD_FOOTER_MAX_HEIGHT = 200.0
 const WILDCARD_TYPES := ["mix", "hammer", "glove"]
 const WILDCARD_INITIAL_USES := 3
 const WILDCARD_COST_STARS := 200
+const WILDCARD_PACK_AMOUNT := 3
+const WILDCARD_PACK_COST_STARS := 500
 ## Nivel de checkpoint para desbloquear cada comodín (ver barra de progreso).
 const WILDCARD_UNLOCK_LEVEL := {
 	"mix": 5,
@@ -177,8 +182,12 @@ var checkpoint_snapshot: Dictionary = {}
 ## True cuando ya existe la primera ficha del objetivo actual (max_value).
 var fusion_target_bonus_unlocked: bool = false
 var max_value: int = 5
-## Piso del generador de fichas (ciclo 1: 1; tras nivel 15: 10; tras 30: 25; …).
+## Piso del generador de fichas (ciclo 1: 1; tras ficha 15: 11; tras 30: 26; …).
 var roll_value_floor: int = 1
+## Ancla de checkpoints post-prestige si el nivel ya iba por delante del hito (0 = ciclo 1).
+var cycle_checkpoint_origin: int = 0
+## Revisión de reglas de ciclo (cura el salto 21→23 de saves viejos).
+var cycle_rules_revision: int = 0
 var stacks: Array = []
 var selected_stack: Node = null
 var board_locked: bool = false
@@ -213,7 +222,10 @@ var shop_chip_icon: TextureRect = null
 var life_chip_shadow: Panel = null
 var life_chip: Control = null
 var life_chip_icon: TextureRect = null
+var life_chip_heart: Control = null
+var life_chip_count_label: Label = null
 var life_chip_label: Label = null
+var life_chip_parts: Dictionary = {}
 var settings_chip_shadow: Panel = null
 var settings_chip: Control = null
 var settings_chip_icon: TextureRect = null
@@ -305,18 +317,25 @@ var stars_chip_shadow: Panel = null
 var stars_chip: Control = null
 var stars_chip_icon: TextureRect = null
 var stars_chip_label: Label = null
+var stars_chip_parts: Dictionary = {}
 var purchase_overlay: ColorRect = null
 var purchase_card: Panel = null
 var purchase_title_label: Label = null
+var purchase_subtitle_label: Label = null
 var purchase_icon_circle: Panel = null
 var purchase_icon_texture_rect: TextureRect = null
-var purchase_count_badge: Panel = null
-var purchase_count_label: Label = null
 var purchase_buy_button: Button = null
 var purchase_buy_center: CenterContainer = null
 var purchase_buy_content: HBoxContainer = null
+var purchase_buy_qty_label: Label = null
 var purchase_buy_gem_icon: TextureRect = null
 var purchase_buy_cost_label: Label = null
+var purchase_buy_pack_button: Button = null
+var purchase_buy_pack_center: CenterContainer = null
+var purchase_buy_pack_content: HBoxContainer = null
+var purchase_buy_pack_qty_label: Label = null
+var purchase_buy_pack_gem_icon: TextureRect = null
+var purchase_buy_pack_cost_label: Label = null
 var purchase_close_button: Button = null
 var pending_purchase_type: String = ""
 var lives: int = INITIAL_LIVES
@@ -361,6 +380,8 @@ func _ready() -> void:
 	update_background_scale()
 	if not GameState.background_theme_changed.is_connected(_on_background_theme_changed):
 		GameState.background_theme_changed.connect(_on_background_theme_changed)
+	if not GameState.lives_changed.is_connected(_on_lives_changed):
+		GameState.lives_changed.connect(_on_lives_changed)
 	if not get_viewport().size_changed.is_connected(_on_viewport_resized):
 		get_viewport().size_changed.connect(_on_viewport_resized)
 	build_mock_ui()
@@ -379,6 +400,7 @@ func _ready() -> void:
 	configure_process_for_temp_slot()
 	queue_redraw()
 	print_status()
+	GameState.start_board_music()
 
 ## Fuerza orientación vertical en móvil (Godot 4 usa sobre todo project.godot > Handheld > Orientation).
 func _apply_portrait_orientation() -> void:
@@ -388,6 +410,7 @@ func _apply_portrait_orientation() -> void:
 	DisplayServer.screen_set_orientation(DisplayServer.SCREEN_PORTRAIT)
 
 func _exit_tree() -> void:
+	GameState.stop_board_music()
 	save_game()
 
 func _process(delta: float) -> void:
@@ -506,6 +529,8 @@ func setup_board() -> void:
 	current_level = 1
 	max_value = CHECKPOINT_BASE_VALUE
 	roll_value_floor = 1
+	cycle_checkpoint_origin = 0
+	cycle_rules_revision = GameEngineScript.CYCLE_RULES_REVISION
 	active_stacks = INITIAL_PERMANENT_STACKS
 	reset_wildcard_state()
 	clear_board_stacks()
@@ -532,6 +557,8 @@ func capture_board_snapshot() -> Dictionary:
 		"checkpoint_level": checkpoint_level,
 		"max_value": max_value,
 		"roll_value_floor": roll_value_floor,
+		"cycle_checkpoint_origin": cycle_checkpoint_origin,
+		"cycle_rules_revision": cycle_rules_revision,
 		"fusion_target_bonus_unlocked": fusion_target_bonus_unlocked,
 		"checkpoint_snapshot": checkpoint_snapshot,
 		"active_stacks": active_stacks,
@@ -646,6 +673,66 @@ func _grant_missing_cycle_floor_stacks() -> int:
 		print("Migración post-ciclo: +%d ranura(s) vacía(s) (piso %d)" % [added, active_stacks])
 	return added
 
+## Saves del prestige viejo: 10-14, objetivo 16 prematuro, o salto 21→23 por fichas 15/16 residuales.
+func _migrate_legacy_cycle_roll_range() -> bool:
+	var milestone := get_cycle_base_level()
+	if milestone <= 0:
+		return false
+	var healed := GameEngineScript.heal_legacy_cycle_progress({
+		"milestone_level": milestone,
+		"checkpoint_level": checkpoint_level,
+		"current_level": current_level,
+		"max_value": max_value,
+		"roll_value_floor": roll_value_floor,
+		"cycle_checkpoint_origin": cycle_checkpoint_origin,
+		"cycle_rules_revision": cycle_rules_revision,
+	}, CHECKPOINT_BASE_VALUE)
+	var progress_changed := bool(healed.get("changed", false))
+	if progress_changed:
+		checkpoint_level = int(healed.get("checkpoint_level", checkpoint_level))
+		current_level = int(healed.get("current_level", current_level))
+		max_value = int(healed.get("max_value", max_value))
+		roll_value_floor = int(healed.get("roll_value_floor", roll_value_floor))
+		cycle_checkpoint_origin = int(healed.get("cycle_checkpoint_origin", cycle_checkpoint_origin))
+		cycle_rules_revision = int(healed.get("cycle_rules_revision", cycle_rules_revision))
+		_pending_level_up_alerts.clear()
+	var slot_heal := GameRulesScript.heal_inflated_cycle_free_slots(
+		active_stacks,
+		next_free_slot_unlock_level,
+		checkpoint_level,
+		milestone,
+		CYCLE_RESET_STACKS
+	)
+	var slots_changed := bool(slot_heal.get("changed", false))
+	if slots_changed:
+		active_stacks = int(slot_heal.get("active_stacks", active_stacks))
+		next_free_slot_unlock_level = int(
+			slot_heal.get("next_free_slot_unlock_level", next_free_slot_unlock_level)
+		)
+	if not progress_changed and not slots_changed:
+		return false
+	var refill := bool(healed.get("refill", false)) or slots_changed
+	if refill:
+		if stacks.size() != active_stacks:
+			clear_board_stacks()
+			create_stack_nodes(active_stacks)
+		fill_board_initial_random()
+		refresh_fusion_target_bonus_unlock()
+		refresh_all_stack_layout()
+		_sync_slot_overlay_controls()
+		update_progress_bar(false)
+	_clear_undo_snapshot()
+	capture_checkpoint_snapshot()
+	GameState.player_level = checkpoint_level
+	GameState.checkpoint_snapshot = checkpoint_snapshot.duplicate(true)
+	save_game()
+	queue_redraw()
+	print(
+		"Migración post-ciclo: nivel %d, %d ranuras, tiradas %d..%d (objetivo %d)"
+		% [checkpoint_level, active_stacks, roll_value_floor, max_value - 1, max_value]
+	)
+	return true
+
 func _expected_stack_count_for_snapshot(snap: Dictionary) -> int:
 	var permanent := maxi(1, int(snap.get("active_stacks", 1)))
 	var temp_on := bool(snap.get("temp_slot_bonus_active", false))
@@ -664,6 +751,8 @@ func _restore_board_from_snapshot(snap: Dictionary) -> void:
 	checkpoint_level = maxi(1, int(snap.get("checkpoint_level", checkpoint_level)))
 	max_value = maxi(CHECKPOINT_BASE_VALUE, int(snap.get("max_value", max_value)))
 	roll_value_floor = maxi(1, int(snap.get("roll_value_floor", roll_value_floor)))
+	cycle_checkpoint_origin = maxi(0, int(snap.get("cycle_checkpoint_origin", cycle_checkpoint_origin)))
+	cycle_rules_revision = maxi(0, int(snap.get("cycle_rules_revision", cycle_rules_revision)))
 	fusion_target_bonus_unlocked = bool(snap.get("fusion_target_bonus_unlocked", false))
 	var snap_checkpoint = snap.get("checkpoint_snapshot", {})
 	if snap_checkpoint is Dictionary:
@@ -687,6 +776,7 @@ func _restore_board_from_snapshot(snap: Dictionary) -> void:
 			)
 		)
 	)
+	_reconcile_future_free_slot_unlock_cursor()
 	temp_slot_actions_remaining = maxi(0, int(snap.get("temp_slot_actions_remaining", temp_slot_actions_remaining)))
 	var normalized_temp := GameRulesScript.normalize_temp_state(
 		bool(snap.get("temp_slot_bonus_active", false)),
@@ -718,6 +808,7 @@ func _restore_board_from_snapshot(snap: Dictionary) -> void:
 	update_progress_bar(false)
 	_sync_slot_overlay_controls()
 	_grant_missing_cycle_floor_stacks()
+	_migrate_legacy_cycle_roll_range()
 	if _pending_cycle_reset_milestone > 0:
 		board_locked = true
 		_pending_level_up_alerts.clear()
@@ -775,10 +866,12 @@ func collect_save_dict() -> Dictionary:
 		"current_level": current_level,
 		"max_value": max_value,
 		"roll_value_floor": roll_value_floor,
+		"cycle_checkpoint_origin": cycle_checkpoint_origin,
+		"cycle_rules_revision": cycle_rules_revision,
 		"active_stacks": active_stacks,
 		"next_free_slot_unlock_level": next_free_slot_unlock_level,
 		"temp_slot_actions_remaining": temp_slot_actions_remaining,
-		"lives": lives,
+		"lives": GameState.lives,
 		"gems": gems,
 		"player_stars": player_stars,
 	})
@@ -793,6 +886,8 @@ func apply_save_dict(data: Dictionary) -> void:
 		"current_level": current_level,
 		"max_value": max_value,
 		"roll_value_floor": roll_value_floor,
+		"cycle_checkpoint_origin": cycle_checkpoint_origin,
+		"cycle_rules_revision": cycle_rules_revision,
 		"active_stacks": active_stacks,
 		"next_free_slot_unlock_level": GameRulesScript.initial_free_slot_unlock_level(get_cycle_base_level()),
 		"temp_slot_actions_remaining": temp_slot_actions_remaining,
@@ -806,16 +901,22 @@ func apply_save_dict(data: Dictionary) -> void:
 	current_level = int(parsed.get("current_level", current_level))
 	max_value = int(parsed.get("max_value", max_value))
 	roll_value_floor = int(parsed.get("roll_value_floor", roll_value_floor))
+	cycle_checkpoint_origin = int(parsed.get("cycle_checkpoint_origin", cycle_checkpoint_origin))
+	cycle_rules_revision = int(parsed.get("cycle_rules_revision", cycle_rules_revision))
 	active_stacks = int(parsed.get("active_stacks", active_stacks))
 	next_free_slot_unlock_level = int(parsed.get("next_free_slot_unlock_level", next_free_slot_unlock_level))
+	_reconcile_future_free_slot_unlock_cursor()
 	temp_slot_actions_remaining = int(parsed.get("temp_slot_actions_remaining", temp_slot_actions_remaining))
-	lives = int(parsed.get("lives", lives))
+	lives = GameState.lives
 	gems = int(parsed.get("gems", gems))
 	player_stars = int(parsed.get("player_stars", player_stars))
 	runtime_snapshot = (parsed.get("runtime_snapshot", {}) as Dictionary).duplicate(true)
 	if not data.has("roll_value_floor") and not checkpoint_snapshot.has("roll_value_floor"):
 		var milestone := get_cycle_base_level()
-		roll_value_floor = 1 if milestone <= 0 else milestone - CHECKPOINT_BASE_VALUE
+		roll_value_floor = 1 if milestone <= 0 else GameEngineScript.cycle_reset_roll_value_floor(
+			milestone,
+			CHECKPOINT_BASE_VALUE
+		)
 
 func _input(event: InputEvent) -> void:
 	if settings_ui != null and settings_ui.is_open():
@@ -974,7 +1075,6 @@ func _sync_player_resources_from_game_state() -> void:
 		checkpoint_snapshot = GameState.checkpoint_snapshot.duplicate(true)
 
 func _push_player_resources_to_game_state() -> void:
-	GameState.lives = lives
 	GameState.player_stars = player_stars
 	GameState.gems = gems
 	GameState.player_level = checkpoint_level
@@ -1434,19 +1534,33 @@ func get_roll_value() -> int:
 ## Meta de progreso del ciclo (piso de tirada / objetivo). No toca el tablero visible.
 func _apply_cycle_reset_meta(milestone_level: int, cycle_state: Dictionary) -> void:
 	adjacent_slot_next_price = int(cycle_state.get("adjacent_slot_next_price", ADJACENT_EXTRA_SLOT_BASE_PRICE))
-	next_free_slot_unlock_level = GameRulesScript.initial_free_slot_unlock_level(milestone_level)
+	# Si el checkpoint ya pasó el primer hito del ciclo (p.ej. 21 al crear la ficha 15),
+	# no dejar el cursor en el pasado ni otorgar ranuras retroactivas.
+	next_free_slot_unlock_level = GameRulesScript.first_future_free_slot_unlock_level(
+		milestone_level,
+		checkpoint_level
+	)
 	current_level = int(cycle_state.get("current_level", 1))
-	max_value = int(cycle_state.get("max_value", milestone_level))
-	roll_value_floor = int(cycle_state.get("roll_value_floor", milestone_level - CHECKPOINT_BASE_VALUE))
+	max_value = int(cycle_state.get("max_value", GameEngineScript.cycle_reset_max_value(milestone_level)))
+	roll_value_floor = int(cycle_state.get(
+		"roll_value_floor",
+		GameEngineScript.cycle_reset_roll_value_floor(milestone_level, CHECKPOINT_BASE_VALUE)
+	))
+	cycle_checkpoint_origin = int(cycle_state.get(
+		"cycle_checkpoint_origin",
+		GameEngineScript.cycle_checkpoint_origin(milestone_level, checkpoint_level)
+	))
+	cycle_rules_revision = GameEngineScript.CYCLE_RULES_REVISION
 
 ## Reinicia el tablero al conseguir la ficha hito (15, 30, 45…).
-## 5 ranuras; objetivo = milestone; tiradas en (milestone-5)..(milestone-1).
+## 5 ranuras; tiradas 11-14 / objetivo 15 (como 1-4 / 5). El 15 entra en la tirada al crear el 16.
 func reset_board_for_cycle_milestone(milestone_level: int) -> void:
 	var cycle_state := GameBoardEngineScript.build_cycle_reset_state(milestone_level, {
 		"board_cycle_levels": BOARD_CYCLE_LEVELS,
 		"checkpoint_base_value": CHECKPOINT_BASE_VALUE,
 		"cycle_reset_stacks": CYCLE_RESET_STACKS,
 		"adjacent_slot_base_price": ADJACENT_EXTRA_SLOT_BASE_PRICE,
+		"checkpoint_level": checkpoint_level,
 	})
 	if not bool(cycle_state.get("valid", false)):
 		return
@@ -1592,7 +1706,8 @@ func evaluate_checkpoint_level() -> int:
 		roll_value_floor,
 		CHECKPOINT_BASE_VALUE,
 		CHECKPOINT_HALF_THRESHOLD,
-		BOARD_CYCLE_LEVELS
+		BOARD_CYCLE_LEVELS,
+		cycle_checkpoint_origin
 	)
 
 ## Progreso 0..1 hacia un nivel objetivo (según el estado actual del tablero).
@@ -1605,7 +1720,8 @@ func get_progress_toward_checkpoint_level(target_level: int) -> float:
 		roll_value_floor,
 		CHECKPOINT_BASE_VALUE,
 		CHECKPOINT_HALF_THRESHOLD,
-		BOARD_CYCLE_LEVELS
+		BOARD_CYCLE_LEVELS,
+		cycle_checkpoint_origin
 	)
 
 ## Texto descriptivo del hito alcanzado (N2..Nx).
@@ -1613,7 +1729,8 @@ func get_checkpoint_level_description(level: int) -> String:
 	return GameEngineScript.checkpoint_level_description(
 		level,
 		CHECKPOINT_BASE_VALUE,
-		BOARD_CYCLE_LEVELS
+		BOARD_CYCLE_LEVELS,
+		cycle_checkpoint_origin
 	)
 
 ## Progreso hacia el siguiente checkpoint guardado (0..1).
@@ -1697,6 +1814,7 @@ func update_checkpoint_level() -> bool:
 			"checkpoint_base_value": CHECKPOINT_BASE_VALUE,
 			"cycle_reset_stacks": CYCLE_RESET_STACKS,
 			"adjacent_slot_base_price": ADJACENT_EXTRA_SLOT_BASE_PRICE,
+			"checkpoint_level": checkpoint_level,
 		})
 		if bool(cycle_state.get("valid", false)):
 			# Aplicar meta ya (evita re-disparar el hito), pero diferir el tablero nuevo.
@@ -1744,6 +1862,8 @@ func capture_checkpoint_snapshot() -> void:
 		"current_level": current_level,
 		"max_value": max_value,
 		"roll_value_floor": roll_value_floor,
+		"cycle_checkpoint_origin": cycle_checkpoint_origin,
+		"cycle_rules_revision": cycle_rules_revision,
 		"active_stacks": active_stacks,
 		"next_free_slot_unlock_level": next_free_slot_unlock_level,
 		"adjacent_slot_next_price": adjacent_slot_next_price,
@@ -1773,6 +1893,8 @@ func restore_checkpoint() -> void:
 	current_level = maxi(1, int(checkpoint_snapshot.get("current_level", 1)))
 	max_value = maxi(CHECKPOINT_BASE_VALUE, int(checkpoint_snapshot.get("max_value", CHECKPOINT_BASE_VALUE)))
 	roll_value_floor = maxi(1, int(checkpoint_snapshot.get("roll_value_floor", 1)))
+	cycle_checkpoint_origin = maxi(0, int(checkpoint_snapshot.get("cycle_checkpoint_origin", cycle_checkpoint_origin)))
+	cycle_rules_revision = maxi(0, int(checkpoint_snapshot.get("cycle_rules_revision", cycle_rules_revision)))
 	active_stacks = maxi(1, int(checkpoint_snapshot.get("active_stacks", 5)))
 	next_free_slot_unlock_level = int(
 		checkpoint_snapshot.get(
@@ -1780,13 +1902,17 @@ func restore_checkpoint() -> void:
 			GameRulesScript.initial_free_slot_unlock_level(get_cycle_base_level())
 		)
 	)
+	_reconcile_future_free_slot_unlock_cursor()
 	adjacent_slot_next_price = int(checkpoint_snapshot.get(
 		"adjacent_slot_next_price", ADJACENT_EXTRA_SLOT_BASE_PRICE
 	))
 	# Saves viejos sin roll_value_floor: inferir desde el ciclo.
 	if not checkpoint_snapshot.has("roll_value_floor"):
 		var milestone := get_cycle_base_level()
-		roll_value_floor = 1 if milestone <= 0 else milestone - CHECKPOINT_BASE_VALUE
+		roll_value_floor = 1 if milestone <= 0 else GameEngineScript.cycle_reset_roll_value_floor(
+			milestone,
+			CHECKPOINT_BASE_VALUE
+		)
 	clear_board_stacks()
 	create_stack_nodes(active_stacks)
 	var stack_data: Array = checkpoint_snapshot.get("stacks", [])
@@ -1799,6 +1925,7 @@ func restore_checkpoint() -> void:
 	_sync_slot_overlay_controls()
 	update_progress_bar(false)
 	_grant_missing_cycle_floor_stacks()
+	_migrate_legacy_cycle_roll_range()
 	queue_redraw()
 	print("Checkpoint restaurado: nivel ", checkpoint_level)
 
@@ -2044,24 +2171,20 @@ func _apply_purchase_dialog_theme_colors() -> void:
 		)
 		purchase_title_label.add_theme_color_override("font_outline_color", Color(0.22, 0.20, 0.24, 0.78))
 		purchase_title_label.add_theme_constant_override("outline_size", 5)
-	if purchase_icon_circle != null:
-		var inset: Color = btn_off
-		inset.a = 0.98
-		_set_panel_colors(purchase_icon_circle, inset.darkened(0.08), btn_border.darkened(0.15))
-	if purchase_buy_button != null:
-		var buy_hover := btn_on.lightened(0.08)
-		var buy_pressed := btn_on.darkened(0.08)
-		purchase_buy_button.add_theme_stylebox_override(
-			"normal", make_flat_style(btn_on, btn_border, 36, 2)
+	if purchase_subtitle_label != null:
+		purchase_subtitle_label.add_theme_color_override(
+			"font_color", p.get("settings_label", font_on)
 		)
-		purchase_buy_button.add_theme_stylebox_override(
-			"hover", make_flat_style(buy_hover, btn_border.lightened(0.05), 36, 2)
-		)
-		purchase_buy_button.add_theme_stylebox_override(
-			"pressed", make_flat_style(buy_pressed, btn_border.darkened(0.05), 36, 2)
-		)
-	if purchase_buy_cost_label != null:
-		purchase_buy_cost_label.add_theme_color_override("font_color", font_on)
+	_apply_purchase_offer_button_theme(purchase_buy_button, btn_on, btn_border)
+	_apply_purchase_offer_button_theme(purchase_buy_pack_button, btn_on.lightened(0.06), btn_border)
+	for lbl in [
+		purchase_buy_qty_label,
+		purchase_buy_cost_label,
+		purchase_buy_pack_qty_label,
+		purchase_buy_pack_cost_label,
+	]:
+		if lbl != null:
+			lbl.add_theme_color_override("font_color", font_on)
 	if purchase_close_button != null:
 		var close_hover := btn_off.lightened(0.10)
 		var close_pressed := btn_off.darkened(0.08)
@@ -2078,8 +2201,15 @@ func _apply_purchase_dialog_theme_colors() -> void:
 		purchase_close_button.add_theme_stylebox_override(
 			"pressed", make_flat_style(close_pressed, close_border.darkened(0.05), 44, 2)
 		)
-	if purchase_count_badge != null:
-		_set_panel_colors(purchase_count_badge, btn_on, btn_border)
+
+func _apply_purchase_offer_button_theme(btn: Button, fill: Color, border: Color) -> void:
+	if btn == null:
+		return
+	var buy_hover := fill.lightened(0.08)
+	var buy_pressed := fill.darkened(0.08)
+	btn.add_theme_stylebox_override("normal", make_flat_style(fill, border, 36, 2))
+	btn.add_theme_stylebox_override("hover", make_flat_style(buy_hover, border.lightened(0.05), 36, 2))
+	btn.add_theme_stylebox_override("pressed", make_flat_style(buy_pressed, border.darkened(0.05), 36, 2))
 
 func _set_panel_colors(panel: Panel, bg: Color, border: Color) -> void:
 	if panel == null:
@@ -2197,6 +2327,20 @@ func _occupied_board_slot_index_set() -> Dictionary:
 		occ[bi] = true
 	return occ
 
+
+func _reconcile_future_free_slot_unlock_cursor() -> void:
+	next_free_slot_unlock_level = GameRulesScript.advance_free_slot_unlock_past_level(
+		next_free_slot_unlock_level,
+		checkpoint_level
+	)
+	if checkpoint_snapshot is Dictionary and not checkpoint_snapshot.is_empty():
+		var snap_level := int(checkpoint_snapshot.get("checkpoint_level", checkpoint_level))
+		var snap_unlock := int(
+			checkpoint_snapshot.get("next_free_slot_unlock_level", next_free_slot_unlock_level)
+		)
+		checkpoint_snapshot["next_free_slot_unlock_level"] = (
+			GameRulesScript.advance_free_slot_unlock_past_level(snap_unlock, snap_level)
+		)
 
 func get_adjacent_slot_free_unlock_level() -> int:
 	next_free_slot_unlock_level = GameSlotServiceScript.ensure_unlock_cursor(
@@ -2373,6 +2517,7 @@ func is_click_on_adjacent_extra_slot_offer(mouse_pos: Vector2) -> bool:
 
 
 func try_purchase_adjacent_extra_slot() -> void:
+	_reconcile_future_free_slot_unlock_cursor()
 	var economy := GameEconomyServiceScript.purchase_adjacent_slot(
 		{
 			"adjacent_offer_board_index": adjacent_offer_board_index,
@@ -2431,6 +2576,7 @@ func update_adjacent_slot_offer_ui() -> void:
 
 	var g := TEMP_LOCKED_PANEL_GREEN
 	if adjacent_slot_offer_lbl_level != null:
+		_reconcile_future_free_slot_unlock_cursor()
 		var free_level := get_adjacent_slot_free_unlock_level()
 		adjacent_slot_offer_lbl_level.text = "Gratis al nivel %d" % free_level
 		adjacent_slot_offer_lbl_level.add_theme_font_size_override("font_size", int(clampf(fit * 0.15, 16.0, 30.0)))
@@ -2698,10 +2844,10 @@ func _on_shop_pressed() -> void:
 	print("Tienda — próximamente")
 
 func _on_settings_restart_confirmed() -> void:
-	if lives <= 0:
+	if not GameState.spend_life():
 		print("Sin vidas: no se puede reiniciar el nivel.")
 		return
-	lives -= 1
+	lives = GameState.lives
 	update_life_display()
 	if settings_ui != null:
 		settings_ui.close()
@@ -2766,6 +2912,35 @@ func _build_hud_stat_chip(icon_texture: Texture2D, text: String) -> Dictionary:
 	row.add_child(lbl)
 	return {"shadow": shadow, "panel": panel, "icon": icon, "label": lbl}
 
+func _build_lives_chip() -> Dictionary:
+	var radius := HUD_PILL_RADIUS
+	var shadow := create_shadow_panel(radius)
+	var panel := HudTextureButtons.create_gradient_pill()
+	panel.clip_contents = false
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(center)
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 6)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	center.add_child(row)
+	var badge: Dictionary = HudTextureButtons.create_life_heart_badge(LifeIconTexture)
+	row.add_child(badge.stack)
+	var lbl := create_hud_text_label(GameState.get_life_chip_text(), HUD_BOARD_STAT_FONT_SIZE)
+	row.add_child(lbl)
+	if badge.count != null:
+		(badge.count as Label).text = str(GameState.lives)
+	return {
+		"shadow": shadow,
+		"panel": panel,
+		"icon": badge.icon,
+		"heart": badge.stack,
+		"count": badge.count,
+		"label": lbl,
+	}
+
 func build_mock_ui() -> void:
 	hud_layer = CanvasLayer.new()
 	hud_layer.layer = 10
@@ -2784,20 +2959,24 @@ func build_mock_ui() -> void:
 	shop_chip_shadow = shop_parts.shadow
 	shop_chip = shop_parts.panel
 	shop_chip_icon = shop_parts.icon
-	var life_parts := _build_hud_stat_chip(
-		LifeIconTexture, HudTextureButtons.format_lives_text(lives)
-	)
-	life_chip_shadow = life_parts.shadow
+	var life_parts := HudTextureButtons.create_resource_chip(LifeIconTexture, true)
+	life_chip_parts = life_parts
 	life_chip = life_parts.panel
 	life_chip_icon = life_parts.icon
+	life_chip_heart = life_parts.heart
+	life_chip_count_label = life_parts.count
 	life_chip_label = life_parts.label
-	var stars_parts := _build_hud_stat_chip(
-		StarIconTexture, HudTextureButtons.format_stat_number(player_stars)
-	)
-	stars_chip_shadow = stars_parts.shadow
+	_bind_hud_chip_click(life_chip, _on_shop_pressed)
+	if life_parts.plus != null:
+		(life_parts.plus as Button).pressed.connect(_on_shop_pressed)
+	var stars_parts := HudTextureButtons.create_resource_chip(StarIconTexture, false)
+	stars_chip_parts = stars_parts
 	stars_chip = stars_parts.panel
 	stars_chip_icon = stars_parts.icon
 	stars_chip_label = stars_parts.label
+	_bind_hud_chip_click(stars_chip, _on_shop_pressed)
+	if stars_parts.plus != null:
+		(stars_parts.plus as Button).pressed.connect(_on_shop_pressed)
 	var settings_parts := _build_hud_icon_chip(SettingsIconTexture)
 	settings_chip_shadow = settings_parts.shadow
 	settings_chip = settings_parts.panel
@@ -2807,9 +2986,7 @@ func build_mock_ui() -> void:
 	hud_root.add_child(home_chip)
 	hud_root.add_child(shop_chip_shadow)
 	hud_root.add_child(shop_chip)
-	hud_root.add_child(life_chip_shadow)
 	hud_root.add_child(life_chip)
-	hud_root.add_child(stars_chip_shadow)
 	hud_root.add_child(stars_chip)
 	hud_root.add_child(settings_chip_shadow)
 	hud_root.add_child(settings_chip)
@@ -2919,29 +3096,39 @@ func layout_mock_ui() -> void:
 	var scale = get_layout_scale()
 	var chip_y: float = maxf(12.0 * scale, board_rect.position.y - 132.0 * scale)
 	var edge_margin: float = HUD_EDGE_MARGIN * scale
-	var corner_w: float = HUD_CORNER_SIZE * scale
 	var stat_w: float = HUD_CHIP_STAT_W * scale
 	var chip_h: float = HUD_CHIP_HEIGHT * scale
+	# Home/tienda/ajustes: círculos del mismo alto que las pastillas de vidas/estrellas.
+	var corner_w: float = chip_h
 	var layout_w: float = viewport_size.x - edge_margin * 2.0
-	# Home, shop, vidas, estrellas, settings — justificados en una fila.
-	var chips_w: float = corner_w * 3.0 + stat_w * 2.0
+	# Home, shop, vidas, estrellas, settings — anchos reales (el ícono cuelga a la izquierda).
+	var hang: float = HudTextureButtons.resource_chip_hang(
+		chip_h, HUD_RESOURCE_PILL_H_RATIO, HUD_RESOURCE_ICON_H_RATIO
+	)
+	var resource_w: float = HudTextureButtons.resource_chip_visual_width(
+		chip_h, stat_w, HUD_RESOURCE_PILL_H_RATIO, HUD_RESOURCE_ICON_H_RATIO
+	)
+	var chips_w: float = corner_w * 3.0 + resource_w * 2.0
 	var gaps_count: float = 4.0
 	var gap: float = (layout_w - chips_w) / gaps_count
 	if gap < 6.0 * scale:
-		# Si no entra, achicar chips y recalcular separación.
 		var min_gap: float = 6.0 * scale
 		var shrink: float = clampf((layout_w - min_gap * gaps_count) / chips_w, 0.72, 1.0)
-		corner_w *= shrink
 		stat_w *= shrink
 		chip_h *= shrink
-		chips_w = corner_w * 3.0 + stat_w * 2.0
+		corner_w = chip_h
+		hang = HudTextureButtons.resource_chip_hang(
+			chip_h, HUD_RESOURCE_PILL_H_RATIO, HUD_RESOURCE_ICON_H_RATIO
+		)
+		resource_w = HudTextureButtons.resource_chip_visual_width(
+			chip_h, stat_w, HUD_RESOURCE_PILL_H_RATIO, HUD_RESOURCE_ICON_H_RATIO
+		)
+		chips_w = corner_w * 3.0 + resource_w * 2.0
 		gap = (layout_w - chips_w) / gaps_count
 	var corner_size := Vector2(corner_w, chip_h)
 	var stat_size := Vector2(stat_w, chip_h)
-	var pill_radius := _hud_pill_radius(scale)
+	var pill_radius := int(chip_h * 0.5)
 	var icon_corner: float = chip_h * HUD_BOARD_ROUND_ICON_RATIO
-	var icon_stat: float = chip_h * HUD_BOARD_LONG_ICON_RATIO
-	var stat_font: int = int(clampf(HUD_BOARD_STAT_FONT_SIZE * scale * (chip_h / maxf(HUD_CHIP_HEIGHT * scale, 1.0)), 20.0, chip_h * 0.52))
 
 	var chip_x: float = edge_margin
 	layout_hud_pill_pair(home_chip_shadow, home_chip, Vector2(chip_x, chip_y), corner_size, scale)
@@ -2956,22 +3143,29 @@ func layout_mock_ui() -> void:
 		shop_chip_icon.custom_minimum_size = Vector2(icon_corner, icon_corner)
 	chip_x += corner_size.x + gap
 
-	layout_hud_pill_pair(life_chip_shadow, life_chip, Vector2(chip_x, chip_y), stat_size, scale)
-	_apply_hud_chip_styles(life_chip_shadow, life_chip, pill_radius, stat_size)
-	if life_chip_icon != null:
-		life_chip_icon.custom_minimum_size = Vector2(icon_stat, icon_stat)
-	if life_chip_label != null:
-		life_chip_label.add_theme_font_size_override("font_size", stat_font)
-	chip_x += stat_size.x + gap
+	# pill_pos es el borde izquierdo del pill; el ícono cuelga `hang` hacia la izquierda.
+	HudTextureButtons.layout_resource_chip(
+		life_chip_parts,
+		Vector2(chip_x + hang, chip_y),
+		stat_size,
+		0.36,
+		38,
+		HUD_RESOURCE_PILL_H_RATIO,
+		HUD_RESOURCE_ICON_H_RATIO
+	)
+	chip_x += resource_w + gap
 
-	if stars_chip != null:
-		layout_hud_pill_pair(stars_chip_shadow, stars_chip, Vector2(chip_x, chip_y), stat_size, scale)
-		_apply_hud_chip_styles(stars_chip_shadow, stars_chip, pill_radius, stat_size)
-		if stars_chip_icon != null:
-			stars_chip_icon.custom_minimum_size = Vector2(icon_stat, icon_stat)
-		if stars_chip_label != null:
-			stars_chip_label.add_theme_font_size_override("font_size", stat_font)
-	chip_x += stat_size.x + gap
+	if not stars_chip_parts.is_empty():
+		HudTextureButtons.layout_resource_chip(
+			stars_chip_parts,
+			Vector2(chip_x + hang, chip_y),
+			stat_size,
+			0.36,
+			38,
+			HUD_RESOURCE_PILL_H_RATIO,
+			HUD_RESOURCE_ICON_H_RATIO
+		)
+	chip_x += resource_w + gap
 
 	layout_hud_pill_pair(settings_chip_shadow, settings_chip, Vector2(chip_x, chip_y), corner_size, scale)
 	_apply_hud_chip_styles(settings_chip_shadow, settings_chip, pill_radius, corner_size)
@@ -3059,8 +3253,14 @@ func layout_mock_ui() -> void:
 		settings_ui.layout_for_viewport(viewport_size)
 
 func update_life_display() -> void:
-	if life_chip_label != null:
-		life_chip_label.text = HudTextureButtons.format_lives_text(lives)
+	lives = GameState.lives
+	if life_chip_count_label != null:
+		life_chip_count_label.text = str(lives)
+	if not life_chip_parts.is_empty():
+		HudTextureButtons.set_resource_chip_value(life_chip_parts, GameState.get_life_chip_text())
+
+func _on_lives_changed() -> void:
+	update_life_display()
 
 func create_panel(bg: Color, border: Color, radius: int) -> Panel:
 	var panel = Panel.new()
@@ -3097,6 +3297,8 @@ func create_label(text: String, font_size: int, color: Color) -> Label:
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if UiFont != null:
+		lbl.add_theme_font_override("font", UiFont)
 	lbl.add_theme_font_size_override("font_size", font_size)
 	lbl.add_theme_color_override("font_color", color)
 	return lbl
@@ -3341,8 +3543,11 @@ func update_gem_display() -> void:
 
 
 func update_stars_display() -> void:
-	if stars_chip_label != null:
-		stars_chip_label.text = HudTextureButtons.format_stat_number(player_stars)
+	if not stars_chip_parts.is_empty():
+		HudTextureButtons.set_resource_chip_value(
+			stars_chip_parts,
+			HudTextureButtons.format_stat_number(player_stars)
+		)
 
 func build_purchase_dialog() -> void:
 	purchase_overlay = ColorRect.new()
@@ -3364,53 +3569,83 @@ func build_purchase_dialog() -> void:
 	purchase_title_label = create_label("Mezclar", 72, Color(0.24, 0.45, 0.26))
 	purchase_card.add_child(purchase_title_label)
 
-	purchase_icon_circle = create_panel(Color(0.92, 0.95, 0.88, 0.92), Color(0.79, 0.87, 0.72, 0.95), 200)
-	purchase_card.add_child(purchase_icon_circle)
+	purchase_subtitle_label = create_label("Sin usos. Elegí una oferta:", 36, Color(0.34, 0.42, 0.34))
+	purchase_subtitle_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	purchase_card.add_child(purchase_subtitle_label)
 
 	purchase_icon_texture_rect = create_wildcard_icon_texture_rect(MixIconTexture)
-	purchase_icon_circle.add_child(purchase_icon_texture_rect)
+	purchase_card.add_child(purchase_icon_texture_rect)
+	purchase_icon_circle = null
 
-	purchase_count_badge = create_panel(Color(0.63, 0.80, 0.44, 0.97), Color(0.76, 0.88, 0.58, 1.0), 30)
-	purchase_count_label = create_label("x1", 44, Color(0.95, 0.98, 0.92))
-	purchase_count_badge.add_child(purchase_count_label)
-	purchase_card.add_child(purchase_count_badge)
-
-	purchase_buy_button = Button.new()
-	purchase_buy_button.focus_mode = Control.FOCUS_NONE
-	purchase_buy_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	purchase_buy_button.pressed.connect(_on_purchase_confirmed)
+	var offer_one := _create_purchase_offer_button(1, WILDCARD_COST_STARS)
+	purchase_buy_button = offer_one.button
+	purchase_buy_center = offer_one.center
+	purchase_buy_content = offer_one.content
+	purchase_buy_qty_label = offer_one.qty_label
+	purchase_buy_gem_icon = offer_one.gem_icon
+	purchase_buy_cost_label = offer_one.cost_label
 	purchase_card.add_child(purchase_buy_button)
 
-	purchase_buy_center = CenterContainer.new()
-	purchase_buy_center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	purchase_buy_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	purchase_buy_button.add_child(purchase_buy_center)
-
-	purchase_buy_content = HBoxContainer.new()
-	purchase_buy_content.alignment = BoxContainer.ALIGNMENT_CENTER
-	purchase_buy_content.add_theme_constant_override("separation", 24)
-	purchase_buy_content.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	purchase_buy_center.add_child(purchase_buy_content)
-
-	purchase_buy_gem_icon = TextureRect.new()
-	purchase_buy_gem_icon.texture = StarIconTexture
-	purchase_buy_gem_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	purchase_buy_gem_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	purchase_buy_gem_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	purchase_buy_cost_label = create_label(str(WILDCARD_COST_STARS), 64, Color(0.95, 0.98, 0.92))
-	purchase_buy_content.add_child(purchase_buy_gem_icon)
-	purchase_buy_content.add_child(purchase_buy_cost_label)
+	var offer_pack := _create_purchase_offer_button(WILDCARD_PACK_AMOUNT, WILDCARD_PACK_COST_STARS)
+	purchase_buy_pack_button = offer_pack.button
+	purchase_buy_pack_center = offer_pack.center
+	purchase_buy_pack_content = offer_pack.content
+	purchase_buy_pack_qty_label = offer_pack.qty_label
+	purchase_buy_pack_gem_icon = offer_pack.gem_icon
+	purchase_buy_pack_cost_label = offer_pack.cost_label
+	purchase_card.add_child(purchase_buy_pack_button)
 
 	purchase_close_button = Button.new()
 	purchase_close_button.text = "✕"
 	purchase_close_button.focus_mode = Control.FOCUS_NONE
 	purchase_close_button.custom_minimum_size = Vector2(88, 88)
+	if UiFont != null:
+		purchase_close_button.add_theme_font_override("font", UiFont)
 	purchase_close_button.add_theme_font_size_override("font_size", 54)
 	purchase_close_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	purchase_close_button.pressed.connect(_on_purchase_close_pressed)
 	purchase_card.add_child(purchase_close_button)
 	_apply_purchase_dialog_theme_colors()
 	layout_purchase_dialog_controls()
+
+func _create_purchase_offer_button(amount: int, cost: int) -> Dictionary:
+	var btn := Button.new()
+	btn.focus_mode = Control.FOCUS_NONE
+	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	btn.pressed.connect(_on_purchase_confirmed.bind(amount, cost))
+
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	btn.add_child(center)
+
+	var content := HBoxContainer.new()
+	content.alignment = BoxContainer.ALIGNMENT_CENTER
+	content.add_theme_constant_override("separation", 18)
+	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	center.add_child(content)
+
+	var qty_label := create_label("x%d" % amount, 52, Color(0.95, 0.98, 0.92))
+	content.add_child(qty_label)
+
+	var gem_icon := TextureRect.new()
+	gem_icon.texture = StarIconTexture
+	gem_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	gem_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	gem_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.add_child(gem_icon)
+
+	var cost_label := create_label(str(cost), 56, Color(0.95, 0.98, 0.92))
+	content.add_child(cost_label)
+
+	return {
+		"button": btn,
+		"center": center,
+		"content": content,
+		"qty_label": qty_label,
+		"gem_icon": gem_icon,
+		"cost_label": cost_label,
+	}
 
 func open_purchase_dialog(wildcard_type: String) -> void:
 	if not is_wildcard_unlocked(wildcard_type):
@@ -3424,17 +3659,19 @@ func open_purchase_dialog(wildcard_type: String) -> void:
 	purchase_overlay.move_to_front()
 	layout_purchase_dialog_controls()
 
-func _on_purchase_confirmed() -> void:
+func _on_purchase_confirmed(amount: int, cost: int) -> void:
 	if pending_purchase_type.is_empty():
 		return
-	if player_stars < WILDCARD_COST_STARS:
+	if amount <= 0 or cost <= 0:
+		return
+	if player_stars < cost:
 		print(
-			"No alcanza: tenés %d monedas, necesitás %d."
-			% [player_stars, WILDCARD_COST_STARS]
+			"No alcanza: tenés %d estrellas, necesitás %d."
+			% [player_stars, cost]
 		)
 		return
-	player_stars -= WILDCARD_COST_STARS
-	add_wildcard_use(pending_purchase_type, 1)
+	player_stars -= cost
+	add_wildcard_use(pending_purchase_type, amount)
 	update_stars_display()
 	pending_purchase_type = ""
 	if purchase_overlay != null:
@@ -3446,44 +3683,104 @@ func layout_purchase_dialog_controls() -> void:
 		return
 	var viewport_size = get_viewport_rect().size
 	var scale = clampf(min(viewport_size.x / 1080.0, viewport_size.y / 1920.0), 0.75, 1.2)
-	var card_size = Vector2(760.0, 980.0) * scale
+
+	var title_h: float = 70.0 * scale
+	var subtitle_h: float = 40.0 * scale
+	var icon_size = Vector2(300, 300) * scale
+	var btn_h: float = 88.0 * scale
+	var side_pad: float = 40.0 * scale
+	var top_pad: float = 36.0 * scale
+	var gap_title_sub: float = 6.0 * scale
+	var gap_sub_icon: float = 12.0 * scale
+	var gap_icon_btns: float = 18.0 * scale
+	var bottom_pad: float = 36.0 * scale
+	var btn_gap: float = 16.0 * scale
+
+	var title_y: float = top_pad
+	var subtitle_y: float = title_y + title_h + gap_title_sub
+	var icon_y: float = subtitle_y + subtitle_h + gap_sub_icon
+	var btn_y: float = icon_y + icon_size.y + gap_icon_btns
+	var card_h: float = btn_y + btn_h + bottom_pad
+	var card_size = Vector2(700.0 * scale, card_h)
 	purchase_card.size = card_size
 	purchase_card.position = (viewport_size - card_size) * 0.5
 
-	purchase_title_label.position = Vector2(70, 78) * scale
-	purchase_title_label.size = Vector2(card_size.x - 140 * scale, 98 * scale)
-	purchase_title_label.add_theme_font_size_override("font_size", int(80 * scale))
+	purchase_title_label.position = Vector2(side_pad, title_y)
+	purchase_title_label.size = Vector2(card_size.x - side_pad * 2.0, title_h)
+	purchase_title_label.add_theme_font_size_override("font_size", int(64 * scale))
+	purchase_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
-	var circle_size = Vector2(460, 460) * scale
-	purchase_icon_circle.size = circle_size
-	purchase_icon_circle.position = Vector2((card_size.x - circle_size.x) * 0.5, 220 * scale)
+	if purchase_subtitle_label != null:
+		purchase_subtitle_label.position = Vector2(side_pad, subtitle_y)
+		purchase_subtitle_label.size = Vector2(card_size.x - side_pad * 2.0, subtitle_h)
+		purchase_subtitle_label.add_theme_font_size_override("font_size", int(30 * scale))
+
 	if purchase_icon_texture_rect != null:
-		var icon_size = circle_size * 0.64
 		purchase_icon_texture_rect.size = icon_size
-		purchase_icon_texture_rect.position = (circle_size - icon_size) * 0.5
+		purchase_icon_texture_rect.position = Vector2((card_size.x - icon_size.x) * 0.5, icon_y)
 
-	purchase_count_badge.size = Vector2(140, 90) * scale
-	purchase_count_badge.position = purchase_icon_circle.position + Vector2(circle_size.x - purchase_count_badge.size.x * 0.65, circle_size.y - purchase_count_badge.size.y * 0.95)
-	purchase_count_label.position = Vector2.ZERO
-	purchase_count_label.size = purchase_count_badge.size
-	purchase_count_label.add_theme_font_size_override("font_size", int(58 * scale))
+	var btn_w: float = (card_size.x - side_pad * 2.0 - btn_gap) * 0.5
+	var one_x: float = side_pad
+	var pack_x: float = side_pad + btn_w + btn_gap
 
-	purchase_buy_button.size = Vector2(card_size.x - 120 * scale, 132 * scale)
-	purchase_buy_button.position = Vector2((card_size.x - purchase_buy_button.size.x) * 0.5, card_size.y - purchase_buy_button.size.y - 70 * scale)
-	purchase_buy_center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	purchase_buy_center.offset_left = 0
-	purchase_buy_center.offset_top = 0
-	purchase_buy_center.offset_right = 0
-	purchase_buy_center.offset_bottom = 0
-	if purchase_buy_gem_icon != null:
-		var gem_icon_size = 74.0 * scale
-		purchase_buy_gem_icon.custom_minimum_size = Vector2(gem_icon_size, gem_icon_size)
-		purchase_buy_gem_icon.size = Vector2(gem_icon_size, gem_icon_size)
-	purchase_buy_cost_label.add_theme_font_size_override("font_size", int(76 * scale))
+	_layout_purchase_offer_button(
+		purchase_buy_button,
+		purchase_buy_center,
+		purchase_buy_content,
+		purchase_buy_qty_label,
+		purchase_buy_gem_icon,
+		purchase_buy_cost_label,
+		Vector2(one_x, btn_y),
+		Vector2(btn_w, btn_h),
+		scale
+	)
+	_layout_purchase_offer_button(
+		purchase_buy_pack_button,
+		purchase_buy_pack_center,
+		purchase_buy_pack_content,
+		purchase_buy_pack_qty_label,
+		purchase_buy_pack_gem_icon,
+		purchase_buy_pack_cost_label,
+		Vector2(pack_x, btn_y),
+		Vector2(btn_w, btn_h),
+		scale
+	)
 
-	purchase_close_button.size = Vector2(88, 88) * scale
+	purchase_close_button.size = Vector2(80, 80) * scale
 	purchase_close_button.position = Vector2(card_size.x - purchase_close_button.size.x * 0.65, -purchase_close_button.size.y * 0.40)
-	purchase_close_button.add_theme_font_size_override("font_size", int(54 * scale))
+	purchase_close_button.add_theme_font_size_override("font_size", int(48 * scale))
+
+func _layout_purchase_offer_button(
+	btn: Button,
+	center: CenterContainer,
+	content: HBoxContainer,
+	qty_label: Label,
+	gem_icon: TextureRect,
+	cost_label: Label,
+	pos: Vector2,
+	size: Vector2,
+	scale: float
+) -> void:
+	if btn == null:
+		return
+	btn.position = pos
+	btn.size = size
+	if center != null:
+		center.set_anchors_preset(Control.PRESET_FULL_RECT)
+		center.offset_left = 0
+		center.offset_top = 0
+		center.offset_right = 0
+		center.offset_bottom = 0
+	if content != null:
+		content.add_theme_constant_override("separation", int(10 * scale))
+	if qty_label != null:
+		qty_label.add_theme_font_size_override("font_size", int(36 * scale))
+	if gem_icon != null:
+		var gem_icon_size = 42.0 * scale
+		gem_icon.custom_minimum_size = Vector2(gem_icon_size, gem_icon_size)
+		gem_icon.size = Vector2(gem_icon_size, gem_icon_size)
+	if cost_label != null:
+		cost_label.add_theme_font_size_override("font_size", int(40 * scale))
 
 func _on_purchase_close_pressed() -> void:
 	pending_purchase_type = ""
@@ -3497,10 +3794,18 @@ func update_purchase_dialog_content(wildcard_type: String) -> void:
 	if purchase_title_label == null:
 		return
 	purchase_title_label.text = get_wildcard_display_name(wildcard_type)
+	if purchase_subtitle_label != null:
+		purchase_subtitle_label.text = "Sin usos. Elegí una oferta:"
 	if purchase_icon_texture_rect != null:
 		purchase_icon_texture_rect.texture = get_wildcard_icon_texture(wildcard_type)
-	purchase_count_label.text = "x1"
-	purchase_buy_cost_label.text = str(WILDCARD_COST_STARS)
+	if purchase_buy_qty_label != null:
+		purchase_buy_qty_label.text = "x1"
+	if purchase_buy_cost_label != null:
+		purchase_buy_cost_label.text = str(WILDCARD_COST_STARS)
+	if purchase_buy_pack_qty_label != null:
+		purchase_buy_pack_qty_label.text = "x%d" % WILDCARD_PACK_AMOUNT
+	if purchase_buy_pack_cost_label != null:
+		purchase_buy_pack_cost_label.text = str(WILDCARD_PACK_COST_STARS)
 
 func get_wildcard_display_name(wildcard_type: String) -> String:
 	match wildcard_type:
@@ -3742,10 +4047,10 @@ func _restart_after_no_moves() -> void:
 	check_blocked_state()
 
 func _on_no_moves_restart_pressed() -> void:
-	if lives <= 0:
+	if not GameState.spend_life():
 		update_no_moves_buttons()
 		return
-	lives -= 1
+	lives = GameState.lives
 	update_life_display()
 	if lives <= 0:
 		# Se perdió la última vida: no se reinicia. El cartel pasa a ofrecer comprar vidas o ver anuncio.
@@ -3759,14 +4064,16 @@ func _on_no_moves_buy_lives_pressed() -> void:
 		print("No alcanza: necesitas %d para comprar vidas." % BUY_LIVES_COST)
 		return
 	player_stars -= BUY_LIVES_COST
-	lives = BUY_LIVES_AMOUNT
+	GameState.add_lives(BUY_LIVES_AMOUNT)
+	lives = GameState.lives
 	update_life_display()
 	update_stars_display()
 	_restart_after_no_moves()
 
 func _on_no_moves_watch_ad_pressed() -> void:
 	# Mock: ver un anuncio otorga 1 vida.
-	lives = mini(INITIAL_LIVES, lives + AD_LIVES_AMOUNT)
+	GameState.add_lives(AD_LIVES_AMOUNT)
+	lives = GameState.lives
 	update_life_display()
 	_restart_after_no_moves()
 

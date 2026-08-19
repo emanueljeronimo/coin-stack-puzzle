@@ -19,8 +19,8 @@ const PEDESTAL_COIN_Y_RATIO := 0.505
 const PEDESTAL_COIN_SCALE := 3.6
 const BTN_GAP := 16.0
 const CORNER_BTN_WIDTH_RATIO := 0.12
-const STAT_BTN_WIDTH_RATIO := 0.24
-const LOBBY_STAT_FONT_SIZE := 44
+const STAT_BTN_WIDTH_RATIO := 0.16
+const LOBBY_STAT_FONT_SIZE := 48
 const HUD_PILL_TEXT := Color(0.95, 0.98, 0.92)
 const HUD_PILL_RADIUS := 34
 const LOBBY_CHIP_HEIGHT_RATIO := 0.76
@@ -44,11 +44,15 @@ var shop_button_icon: TextureRect = null
 var life_button_shadow: Panel = null
 var life_button: Control = null
 var life_button_icon: TextureRect = null
+var life_button_count_label: Label = null
+var life_button_heart: Control = null
 var life_button_label: Label = null
+var life_chip_parts: Dictionary = {}
 var stars_button_shadow: Panel = null
 var stars_button: Control = null
 var stars_button_icon: TextureRect = null
 var stars_button_label: Label = null
+var stars_chip_parts: Dictionary = {}
 var settings_button_shadow: Panel = null
 var settings_button: Control = null
 var settings_button_icon: TextureRect = null
@@ -71,6 +75,8 @@ func _ready() -> void:
 		GameState.background_theme_changed.connect(_on_background_theme_changed)
 	if not SaveManager.player_data_changed.is_connected(_on_player_data_changed):
 		SaveManager.player_data_changed.connect(_on_player_data_changed)
+	if not GameState.lives_changed.is_connected(_on_lives_changed):
+		GameState.lives_changed.connect(_on_lives_changed)
 	update_displays()
 	layout_ui()
 
@@ -78,6 +84,9 @@ func _on_background_theme_changed(_theme_id: String) -> void:
 	layout_ui()
 
 func _on_player_data_changed() -> void:
+	update_displays()
+
+func _on_lives_changed() -> void:
 	update_displays()
 
 func _apply_portrait_orientation() -> void:
@@ -116,16 +125,24 @@ func build_ui() -> void:
 	shop_button_icon = shop_parts.icon
 	_bind_chip_click(shop_button, _on_shop_pressed)
 
-	var life_parts := _build_hud_stat_chip(LifeIconTexture, "0 Vidas")
-	life_button_shadow = life_parts.shadow
+	var life_parts := HudTextureButtons.create_resource_chip(LifeIconTexture, true)
+	life_chip_parts = life_parts
 	life_button = life_parts.panel
 	life_button_icon = life_parts.icon
+	life_button_heart = life_parts.heart
+	life_button_count_label = life_parts.count
 	life_button_label = life_parts.label
-	var stars_parts := _build_hud_stat_chip(StarIconTexture, "0")
-	stars_button_shadow = stars_parts.shadow
+	_bind_chip_click(life_button, _on_shop_pressed)
+	if life_parts.plus != null:
+		(life_parts.plus as Button).pressed.connect(_on_shop_pressed)
+	var stars_parts := HudTextureButtons.create_resource_chip(StarIconTexture, false)
+	stars_chip_parts = stars_parts
 	stars_button = stars_parts.panel
 	stars_button_icon = stars_parts.icon
 	stars_button_label = stars_parts.label
+	_bind_chip_click(stars_button, _on_shop_pressed)
+	if stars_parts.plus != null:
+		(stars_parts.plus as Button).pressed.connect(_on_shop_pressed)
 	var settings_parts := _build_hud_icon_chip(SettingsIconTexture)
 	settings_button_shadow = settings_parts.shadow
 	settings_button = settings_parts.panel
@@ -134,9 +151,7 @@ func build_ui() -> void:
 
 	hud_root.add_child(profile_button_shadow)
 	hud_root.add_child(profile_button)
-	hud_root.add_child(life_button_shadow)
 	hud_root.add_child(life_button)
-	hud_root.add_child(stars_button_shadow)
 	hud_root.add_child(stars_button)
 	hud_root.add_child(settings_button_shadow)
 	hud_root.add_child(settings_button)
@@ -194,10 +209,15 @@ func _on_profile_saved() -> void:
 	update_displays()
 
 func update_displays() -> void:
-	if life_button_label != null:
-		life_button_label.text = HudTextureButtons.format_lives_text(GameState.lives)
-	if stars_button_label != null:
-		stars_button_label.text = HudTextureButtons.format_stat_number(GameState.player_stars)
+	if life_button_count_label != null:
+		life_button_count_label.text = str(GameState.lives)
+	if not life_chip_parts.is_empty():
+		HudTextureButtons.set_resource_chip_value(life_chip_parts, GameState.get_life_chip_text())
+	if not stars_chip_parts.is_empty():
+		HudTextureButtons.set_resource_chip_value(
+			stars_chip_parts,
+			HudTextureButtons.format_stat_number(GameState.player_stars)
+		)
 	if level_label != null:
 		level_label.text = "Nivel %d" % GameState.player_level
 	if showcase_coin != null and showcase_coin.has_method("set_value"):
@@ -285,6 +305,35 @@ func _build_hud_stat_chip(icon_texture: Texture2D, text: String) -> Dictionary:
 	row.add_child(lbl)
 	return {"shadow": shadow, "panel": panel, "icon": icon, "label": lbl}
 
+func _build_lives_chip() -> Dictionary:
+	var radius := HUD_PILL_RADIUS
+	var shadow := create_shadow_panel(radius)
+	var panel := HudTextureButtons.create_gradient_pill()
+	panel.clip_contents = false
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(center)
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 6)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	center.add_child(row)
+	var badge: Dictionary = HudTextureButtons.create_life_heart_badge(LifeIconTexture)
+	row.add_child(badge.stack)
+	var lbl := create_hud_text_label(GameState.get_life_chip_text(), LOBBY_STAT_FONT_SIZE)
+	row.add_child(lbl)
+	if badge.count != null:
+		(badge.count as Label).text = str(GameState.lives)
+	return {
+		"shadow": shadow,
+		"panel": panel,
+		"icon": badge.icon,
+		"heart": badge.stack,
+		"count": badge.count,
+		"label": lbl,
+	}
+
 func _bind_chip_click(panel: Control, callback: Callable) -> void:
 	panel.gui_input.connect(func(event: InputEvent) -> void:
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
@@ -328,15 +377,14 @@ func layout_ui() -> void:
 	var corner_size := Vector2(corner_w, chip_h)
 	var stat_size := Vector2(stat_w, chip_h)
 	var pill_radius := _hud_pill_radius(scale)
-	var total_center_w := stat_size.x + gap + stat_size.x
+	var resource_gap := HudTextureButtons.resource_chip_pair_gap(chip_h, gap)
+	var total_center_w := stat_size.x + resource_gap + stat_size.x
 	var center_x := (viewport_size.x - total_center_w) * 0.5
 	var avatar_side := chip_h * 1.35
 	var min_center_x := edge_margin + avatar_side + 4.0
 	var max_center_x := viewport_size.x - edge_margin - corner_w - total_center_w - 4.0
 	center_x = clampf(center_x, min_center_x, maxf(min_center_x, max_center_x))
 	var icon_corner := chip_h * LOBBY_CORNER_ICON_RATIO
-	var icon_stat := chip_h * LOBBY_STAT_ICON_RATIO
-	var stat_font := int(clampf(LOBBY_STAT_FONT_SIZE * scale, 22.0, chip_h * 0.44))
 
 	# Perfil arriba a la izquierda (un poco más grande que el resto de chips).
 	var avatar_size := Vector2(avatar_side, avatar_side)
@@ -349,23 +397,15 @@ func layout_ui() -> void:
 		avatar_size
 	)
 
-	layout_hud_pill_pair(life_button_shadow, life_button, Vector2(center_x, row_y), stat_size, scale)
-	_apply_hud_chip_styles(life_button_shadow, life_button, pill_radius, stat_size)
-	life_button_icon.custom_minimum_size = Vector2(icon_stat, icon_stat)
-	if life_button_label != null:
-		life_button_label.add_theme_font_size_override("font_size", stat_font)
+	HudTextureButtons.layout_resource_chip(life_chip_parts, Vector2(center_x, row_y), stat_size, 0.40, 48)
 
-	layout_hud_pill_pair(
-		stars_button_shadow,
-		stars_button,
-		Vector2(center_x + stat_size.x + gap, row_y),
+	HudTextureButtons.layout_resource_chip(
+		stars_chip_parts,
+		Vector2(center_x + stat_size.x + resource_gap, row_y),
 		stat_size,
-		scale
+		0.38,
+		42
 	)
-	_apply_hud_chip_styles(stars_button_shadow, stars_button, pill_radius, stat_size)
-	stars_button_icon.custom_minimum_size = Vector2(icon_stat, icon_stat)
-	if stars_button_label != null:
-		stars_button_label.add_theme_font_size_override("font_size", stat_font)
 
 	layout_hud_pill_pair(
 		settings_button_shadow,

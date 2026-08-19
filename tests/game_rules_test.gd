@@ -32,6 +32,32 @@ func _test_unlock_levels() -> void:
 	if next != 21:
 		_fail("next_unlock", str(next))
 		return
+	if GameRulesScript.first_future_free_slot_unlock_level(15, 15) != 19:
+		_fail("future_at_milestone", str(GameRulesScript.first_future_free_slot_unlock_level(15, 15)))
+		return
+	if GameRulesScript.first_future_free_slot_unlock_level(15, 19) != 21:
+		_fail("future_at_first_hito", str(GameRulesScript.first_future_free_slot_unlock_level(15, 19)))
+		return
+	if GameRulesScript.first_future_free_slot_unlock_level(15, 21) != 23:
+		_fail("future_at_level_21", str(GameRulesScript.first_future_free_slot_unlock_level(15, 21)))
+		return
+	if GameRulesScript.advance_free_slot_unlock_past_level(19, 21) != 23:
+		_fail("advance_stale_19_at_21", str(GameRulesScript.advance_free_slot_unlock_past_level(19, 21)))
+		return
+	var false_23 := GameRulesScript.heal_inflated_cycle_free_slots(6, 25, 21, 15, 5)
+	if not bool(false_23.get("changed", false)):
+		_fail("heal_slots_detects_false_23", str(false_23))
+		return
+	if int(false_23.get("active_stacks", 0)) != 5:
+		_fail("heal_slots_back_to_5", str(false_23))
+		return
+	if int(false_23.get("next_free_slot_unlock_level", 0)) != 23:
+		_fail("heal_slots_cursor_23", str(false_23))
+		return
+	var real_23 := GameRulesScript.heal_inflated_cycle_free_slots(6, 25, 23, 15, 5)
+	if bool(real_23.get("changed", true)):
+		_fail("heal_slots_keeps_real_23", str(real_23))
+		return
 	_ok("unlock_levels")
 
 func _test_normalize_temp_state() -> void:

@@ -21,6 +21,7 @@ func _initialize() -> void:
 func _run() -> void:
 	print("=== integration_gameplay_progression test ===")
 	_test_progression_purchase_and_cycle_reset()
+	_test_cycle_reset_skips_stale_unlocks_when_checkpoint_ahead()
 	_test_free_unlock_applies_immediately_on_level_threshold()
 	_test_reconcile_missing_free_unlock_state()
 	_test_no_early_unlock_before_target_level()
@@ -55,7 +56,8 @@ func _advance_checkpoint(state: Dictionary, highest_value: int, highest_value_co
 		roll_value_floor,
 		CHECKPOINT_BASE_VALUE,
 		CHECKPOINT_HALF_THRESHOLD,
-		BOARD_CYCLE_LEVELS
+		BOARD_CYCLE_LEVELS,
+		int(state.get("cycle_checkpoint_origin", 0))
 	)
 	var milestone := GameEngineScript.reached_cycle_coin_milestone(
 		highest_value,
@@ -79,15 +81,32 @@ func _advance_checkpoint(state: Dictionary, highest_value: int, highest_value_co
 				"checkpoint_base_value": CHECKPOINT_BASE_VALUE,
 				"cycle_reset_stacks": CYCLE_RESET_STACKS,
 				"adjacent_slot_base_price": ADJACENT_BASE_PRICE,
+				"checkpoint_level": int(state.get("checkpoint_level", milestone)),
 			}
 		)
 		if bool(cycle_state.get("valid", false)):
 			state["active_stacks"] = int(cycle_state.get("active_stacks", CYCLE_RESET_STACKS))
 			state["current_level"] = int(cycle_state.get("current_level", 1))
-			state["max_value"] = int(cycle_state.get("max_value", milestone))
-			state["roll_value_floor"] = int(cycle_state.get("roll_value_floor", milestone - CHECKPOINT_BASE_VALUE))
+			state["max_value"] = int(cycle_state.get(
+				"max_value",
+				GameEngineScript.cycle_reset_max_value(milestone)
+			))
+			state["roll_value_floor"] = int(cycle_state.get(
+				"roll_value_floor",
+				GameEngineScript.cycle_reset_roll_value_floor(milestone, CHECKPOINT_BASE_VALUE)
+			))
+			state["cycle_checkpoint_origin"] = int(cycle_state.get(
+				"cycle_checkpoint_origin",
+				GameEngineScript.cycle_checkpoint_origin(
+					milestone,
+					int(state.get("checkpoint_level", milestone))
+				)
+			))
 			state["adjacent_slot_next_price"] = int(cycle_state.get("adjacent_slot_next_price", ADJACENT_BASE_PRICE))
-			state["next_free_slot_unlock_level"] = GameRulesScript.initial_free_slot_unlock_level(milestone)
+			state["next_free_slot_unlock_level"] = GameRulesScript.first_future_free_slot_unlock_level(
+				milestone,
+				int(state.get("checkpoint_level", milestone))
+			)
 	else:
 		_apply_free_unlocks(state, previous_checkpoint, int(state.get("checkpoint_level", previous_checkpoint)))
 	return state
@@ -137,14 +156,58 @@ func _test_progression_purchase_and_cycle_reset() -> void:
 	if int(state.get("active_stacks", 0)) != CYCLE_RESET_STACKS:
 		_fail("cycle_reset_stacks", str(state))
 		return
-	if int(state.get("roll_value_floor", 0)) != 10:
+	if int(state.get("roll_value_floor", 0)) != 11:
 		_fail("cycle_reset_floor", str(state))
+		return
+	if int(state.get("max_value", 0)) != 15:
+		_fail("cycle_reset_max", str(state))
 		return
 	if int(state.get("next_free_slot_unlock_level", 0)) != 19:
 		_fail("cycle_reset_unlock_cursor", str(state))
 		return
 
 	_ok("progression_purchase_and_cycle_reset")
+
+func _test_cycle_reset_skips_stale_unlocks_when_checkpoint_ahead() -> void:
+	# Mitad de 14 deja checkpoint 21 sin ficha 15; al crear la 15 el tablero
+	# reinicia, pero el cursor no puede quedar en 19 (ya pasado).
+	var state := {
+		"checkpoint_level": 21,
+		"current_level": 20,
+		"max_value": 14,
+		"roll_value_floor": 1,
+		"active_stacks": 12,
+		"adjacent_slot_next_price": ADJACENT_BASE_PRICE,
+		"next_free_slot_unlock_level": 22,
+	}
+
+	state = _advance_checkpoint(state, 15, 1)
+	if int(state.get("checkpoint_level", 0)) != 21:
+		_fail("prestige_keeps_checkpoint_21", str(state))
+		return
+	if int(state.get("active_stacks", 0)) != CYCLE_RESET_STACKS:
+		_fail("prestige_resets_stacks", str(state))
+		return
+	if int(state.get("next_free_slot_unlock_level", 0)) != 23:
+		_fail("prestige_unlock_cursor_skips_past", str(state))
+		return
+	if int(state.get("roll_value_floor", 0)) != 11:
+		_fail("prestige_roll_floor_11", str(state))
+		return
+	if int(state.get("max_value", 0)) != 15:
+		_fail("prestige_max_15", str(state))
+		return
+	if int(state.get("cycle_checkpoint_origin", 0)) != 20:
+		_fail("prestige_origin_20", str(state))
+		return
+
+	# Crear 16 (como crear 6 en el ciclo 1) = nivel 23: ahí la tirada pasa a 11-15.
+	state = _advance_checkpoint(state, 16, 1)
+	if int(state.get("checkpoint_level", 0)) != 23:
+		_fail("prestige_create_16_is_level_23", str(state))
+		return
+
+	_ok("cycle_reset_skips_stale_unlocks_when_checkpoint_ahead")
 
 func _test_free_unlock_applies_immediately_on_level_threshold() -> void:
 	var state := {

@@ -17,6 +17,47 @@ static func initial_free_slot_unlock_level(cycle_base_level: int) -> int:
 static func next_free_slot_unlock_level(current_unlock_level: int) -> int:
 	return current_unlock_level + ADJACENT_SLOT_FREE_LEVEL_INTERVAL
 
+## Próximo hito gratis estrictamente posterior a reached_level (sin desbloqueo retroactivo).
+static func advance_free_slot_unlock_past_level(current_unlock_level: int, reached_level: int) -> int:
+	var unlock := current_unlock_level
+	if unlock <= 0:
+		unlock = ADJACENT_SLOT_FREE_FIRST_LEVEL
+	var guard := 0
+	while unlock <= reached_level and guard < 64:
+		unlock = next_free_slot_unlock_level(unlock)
+		guard += 1
+	return unlock
+
+## Primer hito gratis del ciclo que todavía no se alcanzó.
+static func first_future_free_slot_unlock_level(cycle_base_level: int, reached_level: int) -> int:
+	return advance_free_slot_unlock_past_level(
+		initial_free_slot_unlock_level(cycle_base_level),
+		reached_level
+	)
+
+## Quita ranuras gratis adelantadas por un checkpoint inflado (p.ej. 21→23).
+## Si el cursor quedó más adelante de lo que el nivel actual permite, deshace esos grants.
+static func heal_inflated_cycle_free_slots(
+	active_stacks: int,
+	next_free_slot_unlock_level: int,
+	checkpoint_level: int,
+	cycle_base_level: int,
+	cycle_reset_stacks: int
+) -> Dictionary:
+	var expected_unlock := first_future_free_slot_unlock_level(cycle_base_level, checkpoint_level)
+	var stacks := active_stacks
+	var unlock := next_free_slot_unlock_level
+	var changed := false
+	while stacks > cycle_reset_stacks and unlock > expected_unlock:
+		stacks -= 1
+		unlock -= ADJACENT_SLOT_FREE_LEVEL_INTERVAL
+		changed = true
+	return {
+		"changed": changed,
+		"active_stacks": stacks,
+		"next_free_slot_unlock_level": unlock,
+	}
+
 static func normalize_temp_state(
 	temp_active: bool,
 	temp_time_remaining: float,

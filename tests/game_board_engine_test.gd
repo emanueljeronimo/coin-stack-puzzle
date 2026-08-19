@@ -59,7 +59,10 @@ func _test_cycle_reset_state() -> void:
 	if not bool(st.get("valid", false)):
 		_fail("cycle_reset_valid", str(st))
 		return
-	if int(st.get("roll_value_floor", 0)) != 25:
+	if int(st.get("roll_value_floor", 0)) != 26:
 		_fail("cycle_reset_floor", str(st))
+		return
+	if int(st.get("max_value", 0)) != 30:
+		_fail("cycle_reset_max", str(st))
 		return
 	_ok("cycle_reset_state")

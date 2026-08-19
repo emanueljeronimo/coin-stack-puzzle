@@ -44,7 +44,7 @@ func _coin_offset_from_floor(roll_value_floor: int) -> int:
 	return idx * BOARD_CYCLE_LEVELS - CHECKPOINT_BASE_VALUE
 
 func _floor_for_milestone(milestone: int) -> int:
-	return milestone - CHECKPOINT_BASE_VALUE
+	return milestone - CHECKPOINT_BASE_VALUE + 1
 
 func _next_milestone(roll_value_floor: int) -> int:
 	return (_cycle_index_from_floor(roll_value_floor) + 1) * BOARD_CYCLE_LEVELS
@@ -62,20 +62,20 @@ func _test_milestones() -> void:
 		if m % BOARD_CYCLE_LEVELS != 0:
 			_fail("milestone_%d" % m)
 			return
-		if _floor_for_milestone(m) != m - 5:
+		if _floor_for_milestone(m) != m - 4:
 			_fail("floor_%d" % m)
 			return
 	_ok("milestones_15_30_45_60")
 
 func _test_roll_ranges() -> void:
-	# Tras reset @15: piso 10, techo 14 (objetivo 15)
-	if not (_floor_for_milestone(15) == 10):
+	# Tras reset @15: piso 11, techo 14 (objetivo 15)
+	if not (_floor_for_milestone(15) == 11):
 		_fail("range_15_floor")
 		return
-	if not (_floor_for_milestone(30) == 25):
+	if not (_floor_for_milestone(30) == 26):
 		_fail("range_30_floor")
 		return
-	if not (_floor_for_milestone(45) == 40):
+	if not (_floor_for_milestone(45) == 41):
 		_fail("range_45_floor")
 		return
 	_ok("roll_ranges_post_reset")
@@ -100,13 +100,13 @@ func _test_evaluate_mapping() -> void:
 	if _evaluate(11, 1, true) != 15:
 		_fail("c1_half11", str(_evaluate(11, 1, true)))
 		return
-	# Tras reset @15 (floor 10), fichas 10-14 no deben saltar checkpoint
-	if _evaluate(14, 10, false) != 15:
-		_fail("c2_stay15", str(_evaluate(14, 10, false)))
+	# Tras reset @15 (floor 11), fichas 11-14 no deben saltar checkpoint
+	if _evaluate(14, 11, false) != 15:
+		_fail("c2_stay15", str(_evaluate(14, 11, false)))
 		return
-	# Crear 15 con floor 10 (local 5) → nivel 16
-	if _evaluate(15, 10, false) != 16:
-		_fail("c2_create15", str(_evaluate(15, 10, false)))
+	# Tener 15 con floor 11 (local 5) → nivel 16; no hay que volver a crearla
+	if _evaluate(15, 11, false) != 16:
+		_fail("c2_has15", str(_evaluate(15, 11, false)))
 		return
 	_ok("evaluate_cycle_mapping")
 
@@ -125,11 +125,11 @@ func _test_reset_trigger_is_coin_not_level() -> void:
 		_fail("coin15_reset", str(_reached_milestone(15, 1)))
 		return
 	# Tras ciclo 1, crear 30 → reset a 30
-	if _reached_milestone(30, 10) != 30:
-		_fail("coin30_reset", str(_reached_milestone(30, 10)))
+	if _reached_milestone(30, 11) != 30:
+		_fail("coin30_reset", str(_reached_milestone(30, 11)))
 		return
 	# Tras ciclo 1, ficha 15 no vuelve a resetear
-	if _reached_milestone(15, 10) != 0:
-		_fail("coin15_after_reset_no_rerun", str(_reached_milestone(15, 10)))
+	if _reached_milestone(15, 11) != 0:
+		_fail("coin15_after_reset_no_rerun", str(_reached_milestone(15, 11)))
 		return
 	_ok("reset_trigger_is_coin_value")

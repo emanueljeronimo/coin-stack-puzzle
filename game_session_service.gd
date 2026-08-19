@@ -16,6 +16,8 @@ static func build_runtime_snapshot(state: Dictionary) -> Dictionary:
 		"checkpoint_level": int(state.get("checkpoint_level", 1)),
 		"max_value": int(state.get("max_value", 5)),
 		"roll_value_floor": int(state.get("roll_value_floor", 1)),
+		"cycle_checkpoint_origin": int(state.get("cycle_checkpoint_origin", 0)),
+		"cycle_rules_revision": int(state.get("cycle_rules_revision", 0)),
 		"fusion_target_bonus_unlocked": bool(state.get("fusion_target_bonus_unlocked", false)),
 		"checkpoint_snapshot": (state.get("checkpoint_snapshot", {}) as Dictionary).duplicate(true),
 		"active_stacks": int(state.get("active_stacks", 1)),
@@ -35,6 +37,8 @@ static func build_checkpoint_snapshot(state: Dictionary) -> Dictionary:
 		"current_level": int(state.get("current_level", 1)),
 		"max_value": int(state.get("max_value", 5)),
 		"roll_value_floor": int(state.get("roll_value_floor", 1)),
+		"cycle_checkpoint_origin": int(state.get("cycle_checkpoint_origin", 0)),
+		"cycle_rules_revision": int(state.get("cycle_rules_revision", 0)),
 		"active_stacks": int(state.get("active_stacks", 1)),
 		"next_free_slot_unlock_level": int(state.get("next_free_slot_unlock_level", 1)),
 		"adjacent_slot_next_price": int(state.get("adjacent_slot_next_price", 0)),
@@ -51,6 +55,8 @@ static func build_save_payload(state: Dictionary) -> Dictionary:
 		"current_level": int(state.get("current_level", 1)),
 		"max_value": int(state.get("max_value", 5)),
 		"roll_value_floor": int(state.get("roll_value_floor", 1)),
+		"cycle_checkpoint_origin": int(state.get("cycle_checkpoint_origin", 0)),
+		"cycle_rules_revision": int(state.get("cycle_rules_revision", 0)),
 		"active_stacks": int(state.get("active_stacks", 1)),
 		"next_free_slot_unlock_level": int(state.get("next_free_slot_unlock_level", 1)),
 		"temp_slot_actions_remaining": int(state.get("temp_slot_actions_remaining", 0)),
@@ -67,6 +73,8 @@ static func parse_save_payload(data: Dictionary, defaults: Dictionary) -> Dictio
 	parsed["current_level"] = maxi(1, int(data.get("current_level", parsed["current_level"])))
 	parsed["max_value"] = maxi(int(defaults.get("checkpoint_base_value", 5)), int(data.get("max_value", parsed["max_value"])))
 	parsed["roll_value_floor"] = maxi(1, int(data.get("roll_value_floor", parsed["roll_value_floor"])))
+	parsed["cycle_checkpoint_origin"] = maxi(0, int(data.get("cycle_checkpoint_origin", parsed.get("cycle_checkpoint_origin", 0))))
+	parsed["cycle_rules_revision"] = maxi(0, int(data.get("cycle_rules_revision", parsed.get("cycle_rules_revision", 0))))
 	parsed["active_stacks"] = int(data.get("active_stacks", parsed["active_stacks"]))
 	parsed["next_free_slot_unlock_level"] = int(data.get("next_free_slot_unlock_level", parsed["next_free_slot_unlock_level"]))
 	parsed["temp_slot_actions_remaining"] = maxi(0, int(data.get("temp_slot_actions_remaining", parsed["temp_slot_actions_remaining"])))

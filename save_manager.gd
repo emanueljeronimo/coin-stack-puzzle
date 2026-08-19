@@ -201,18 +201,42 @@ func _border_color_for_id(border_id: String) -> Variant:
 	return null
 
 
-## Mayor valor de ficha del progreso guardado (objetivo actual del nivel).
+## Mayor valor de ficha desbloqueado para la portada (no el próximo objetivo).
 func get_max_unlocked_coin_value() -> int:
-	var best := 0
-	var snap: Variant = player_data.get("checkpoint_snapshot", {})
-	if snap is Dictionary:
-		best = maxi(best, int(snap.get("max_value", 0)))
-	best = maxi(best, int(player_data.get("max_value", 0)))
-	if best <= 0 and GameState != null:
+	var max_value := 0
+	var highest := 0
+	var rs: Variant = player_data.get("runtime_snapshot", {})
+	if rs is Dictionary and not (rs as Dictionary).is_empty():
+		max_value = int(rs.get("max_value", 0))
+		highest = _highest_coin_in_rows(rs.get("stacks", []))
+	if max_value <= 0 or highest <= 0:
+		var snap: Variant = player_data.get("checkpoint_snapshot", {})
+		if snap is Dictionary:
+			if max_value <= 0:
+				max_value = int(snap.get("max_value", 0))
+			if highest <= 0:
+				highest = _highest_coin_in_rows(snap.get("stacks", []))
+	if max_value <= 0:
+		max_value = int(player_data.get("max_value", 0))
+	if max_value <= 0 and GameState != null:
 		var gs: Variant = GameState.checkpoint_snapshot
 		if gs is Dictionary:
-			best = maxi(best, int(gs.get("max_value", 0)))
-	return maxi(5, best)
+			max_value = int(gs.get("max_value", 0))
+			if highest <= 0:
+				highest = _highest_coin_in_rows(gs.get("stacks", []))
+	return GameEngine.cover_showcase_coin_value(max_value, highest)
+
+
+func _highest_coin_in_rows(rows: Variant) -> int:
+	var best := 0
+	if not rows is Array:
+		return 0
+	for row in rows:
+		if not row is Array:
+			continue
+		for raw in row:
+			best = maxi(best, int(raw))
+	return best
 
 
 func _avatar_path_for_id(avatar_id: String) -> String:
@@ -257,7 +281,7 @@ func merge_session_data(session: Dictionary) -> void:
 func load_game() -> bool:
 	if not has_save_file():
 		player_data = _create_default_player_data()
-		_apply_to_game_state()
+		_apply_to_game_state(true)
 		save_game()
 		player_data_changed.emit()
 		return false
@@ -266,7 +290,7 @@ func load_game() -> bool:
 	if file == null:
 		push_error("SaveManager: no se pudo abrir %s" % SAVE_PATH)
 		player_data = _create_default_player_data()
-		_apply_to_game_state()
+		_apply_to_game_state(true)
 		return false
 
 	var text := file.get_as_text()
@@ -276,11 +300,16 @@ func load_game() -> bool:
 	if not parsed is Dictionary:
 		push_error("SaveManager: JSON inválido en %s" % SAVE_PATH)
 		player_data = _create_default_player_data()
-		_apply_to_game_state()
+		_apply_to_game_state(true)
 		return false
 
-	player_data = _merge_with_defaults(parsed as Dictionary)
-	_apply_to_game_state()
+	var loaded := parsed as Dictionary
+	var had_life_timer := loaded.has("next_free_life_unix")
+	var lives_loaded := int(loaded.get("lives", GameState.INITIAL_LIVES))
+	player_data = _merge_with_defaults(loaded)
+	_apply_to_game_state(had_life_timer)
+	if not had_life_timer or GameState.lives != lives_loaded:
+		save_game()
 	player_data_changed.emit()
 	return true
 
@@ -370,19 +399,32 @@ func _sync_core_fields_to_player_data() -> void:
 	player_data["checkpoint_level"] = level
 	player_data["coins"] = int(player_data.get("player_stars", GameState.player_stars))
 	player_data["lives"] = GameState.lives
+	player_data["next_free_life_unix"] = GameState.next_free_life_unix
 	player_data["gems"] = GameState.gems
 	if not player_data.has("username") or str(player_data["username"]).is_empty():
 		player_data["username"] = _generate_random_username()
 
 
-func _apply_to_game_state() -> void:
+func _apply_to_game_state(had_life_timer: bool = true) -> void:
 	if GameState == null:
 		return
 	GameState.username = get_username()
-	GameState.player_level = maxi(1, int(player_data.get("level", player_data.get("checkpoint_level", 1))))
+	GameState.player_level = GameEngine.healed_display_checkpoint(
+		maxi(1, int(player_data.get("level", player_data.get("checkpoint_level", 1)))),
+		player_data
+	)
 	GameState.player_stars = int(player_data.get("coins", player_data.get("player_stars", GameState.INITIAL_STARS)))
 	GameState.lives = int(player_data.get("lives", GameState.INITIAL_LIVES))
+	GameState.next_free_life_unix = int(player_data.get("next_free_life_unix", 0))
 	GameState.gems = int(player_data.get("gems", GameState.INITIAL_GEMS))
 	var snap: Variant = player_data.get("checkpoint_snapshot", {})
 	if snap is Dictionary:
 		GameState.checkpoint_snapshot = snap.duplicate(true)
+	if had_life_timer:
+		GameState.refresh_lives()
+	else:
+		var mtime := 0
+		if has_save_file():
+			mtime = int(FileAccess.get_modified_time(SAVE_PATH))
+		GameState.migrate_life_timer(mtime)
+	_sync_core_fields_to_player_data()

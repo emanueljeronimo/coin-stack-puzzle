@@ -1,6 +1,10 @@
 extends Node
 
 signal background_theme_changed(theme_id: String)
+signal music_enabled_changed(enabled: bool)
+signal lives_changed
+
+const GameLivesServiceScript = preload("res://game_lives_service.gd")
 
 ## Recursos del jugador compartidos entre Lobby y partida.
 const INITIAL_LIVES := 5
@@ -9,6 +13,7 @@ const INITIAL_GEMS := 756
 
 const SETTINGS_PATH := "user://settings.cfg"
 const DEFAULT_BACKGROUND_THEME_ID := "fondo2-verde"
+const BOARD_MUSIC_PATH := "res://musica/musica tablero.mp3"
 
 const BACKGROUND_THEMES: Array = [
 	{"id": "fonde2-rosa", "path": "res://Imagenes/fonde2-rosa.png"},
@@ -109,6 +114,7 @@ const UI_PALETTES_BY_THEME := {
 }
 
 var lives: int = INITIAL_LIVES
+var next_free_life_unix: int = 0
 var player_stars: int = INITIAL_STARS
 var gems: int = INITIAL_GEMS
 var player_level: int = 1
@@ -120,9 +126,78 @@ var sounds_enabled: bool = true
 var vibration_enabled: bool = true
 
 var _background_textures: Dictionary = {}
+var _board_music_player: AudioStreamPlayer = null
+var _board_music_active: bool = false
+var _life_hud_tick: float = 0.0
 
 func _ready() -> void:
 	load_settings()
+	_ensure_board_music_player()
+
+func _process(delta: float) -> void:
+	if lives >= GameLivesServiceScript.MAX_LIVES:
+		_life_hud_tick = 0.0
+		return
+	_life_hud_tick += delta
+	if next_free_life_unix > 0 and _now_unix() >= next_free_life_unix:
+		refresh_lives(true)
+		_life_hud_tick = 0.0
+		return
+	if _life_hud_tick >= 1.0:
+		_life_hud_tick = 0.0
+		lives_changed.emit()
+
+func _now_unix() -> int:
+	return int(Time.get_unix_time_from_system())
+
+func get_life_regen_remaining() -> int:
+	return GameLivesServiceScript.remaining_seconds(lives, next_free_life_unix, _now_unix())
+
+func get_life_chip_text() -> String:
+	return GameLivesServiceScript.format_chip_text(lives, get_life_regen_remaining())
+
+func refresh_lives(persist: bool = false) -> bool:
+	var before_lives := lives
+	var before_next := next_free_life_unix
+	var out := GameLivesServiceScript.catch_up(lives, next_free_life_unix, _now_unix())
+	lives = int(out.get("lives", lives))
+	next_free_life_unix = int(out.get("next_unix", next_free_life_unix))
+	var changed := lives != before_lives or next_free_life_unix != before_next
+	if changed:
+		lives_changed.emit()
+		if persist:
+			_persist_lives()
+	return changed
+
+func migrate_life_timer(save_mtime: int) -> void:
+	var out := GameLivesServiceScript.migrate_missing_timer(lives, _now_unix(), save_mtime)
+	lives = int(out.get("lives", lives))
+	next_free_life_unix = int(out.get("next_unix", 0))
+	lives_changed.emit()
+
+func spend_life() -> bool:
+	var out := GameLivesServiceScript.on_spend(lives, next_free_life_unix, _now_unix())
+	if not bool(out.get("ok", false)):
+		return false
+	lives = int(out.get("lives", lives))
+	next_free_life_unix = int(out.get("next_unix", next_free_life_unix))
+	lives_changed.emit()
+	_persist_lives()
+	return true
+
+func add_lives(amount: int) -> void:
+	var out := GameLivesServiceScript.on_grant(lives, amount, next_free_life_unix, _now_unix())
+	lives = int(out.get("lives", lives))
+	next_free_life_unix = int(out.get("next_unix", next_free_life_unix))
+	lives_changed.emit()
+	_persist_lives()
+
+func _persist_lives() -> void:
+	if SaveManager == null:
+		return
+	SaveManager.player_data["lives"] = lives
+	SaveManager.player_data["next_free_life_unix"] = next_free_life_unix
+	SaveManager.save_game()
 
 func load_settings() -> void:
 	var cfg := ConfigFile.new()
@@ -187,8 +262,12 @@ func set_background_theme(theme_id: String) -> void:
 	background_theme_changed.emit(theme_id)
 
 func set_music_enabled(enabled: bool) -> void:
+	if music_enabled == enabled:
+		return
 	music_enabled = enabled
 	save_settings()
+	music_enabled_changed.emit(enabled)
+	_apply_board_music_playback()
 
 func set_sounds_enabled(enabled: bool) -> void:
 	sounds_enabled = enabled
@@ -197,3 +276,48 @@ func set_sounds_enabled(enabled: bool) -> void:
 func set_vibration_enabled(enabled: bool) -> void:
 	vibration_enabled = enabled
 	save_settings()
+
+## Reproduce la música del tablero en loop mientras hay partida activa.
+func start_board_music() -> void:
+	_board_music_active = true
+	_ensure_board_music_player()
+	_apply_board_music_playback()
+
+## Detiene la música del tablero al salir de la partida.
+func stop_board_music() -> void:
+	_board_music_active = false
+	if _board_music_player == null:
+		return
+	_board_music_player.stream_paused = false
+	if _board_music_player.playing:
+		_board_music_player.stop()
+
+func _ensure_board_music_player() -> void:
+	if _board_music_player != null:
+		return
+	var stream := load(BOARD_MUSIC_PATH) as AudioStream
+	if stream == null:
+		push_warning("No se pudo cargar la música del tablero: %s" % BOARD_MUSIC_PATH)
+		return
+	stream = stream.duplicate()
+	if stream is AudioStreamMP3:
+		(stream as AudioStreamMP3).loop = true
+	_board_music_player = AudioStreamPlayer.new()
+	_board_music_player.name = "BoardMusicPlayer"
+	_board_music_player.stream = stream
+	add_child(_board_music_player)
+
+func _apply_board_music_playback() -> void:
+	if _board_music_player == null:
+		return
+	if _board_music_active and music_enabled:
+		if _board_music_player.stream_paused:
+			_board_music_player.stream_paused = false
+		elif not _board_music_player.playing:
+			_board_music_player.play()
+	elif _board_music_player.playing:
+		if _board_music_active:
+			_board_music_player.stream_paused = true
+		else:
+			_board_music_player.stream_paused = false
+			_board_music_player.stop()

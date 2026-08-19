@@ -6,6 +6,7 @@ const RoundButtonTexture := preload("res://Imagenes/boton-redondo.png")
 const PlayPastelButtonTexture := preload("res://Imagenes/boton-jugar-ahora-pastel.png")
 const PlayButtonTexture := preload("res://Imagenes/boton-jugar_ahora.png")
 const LogoFont := preload("res://Fonts/Chewy-Regular.ttf")
+const GameLivesServiceScript := preload("res://game_lives_service.gd")
 const SlotOverlayBgScript := preload("res://slot_overlay_bg.gd")
 
 const PILL_GRAD_CELESTE := Color(0.62, 0.82, 0.97, 0.94)
@@ -23,6 +24,18 @@ const CHIP_STAT_OUTLINE_SIZE := 2
 const CHIP_STAT_FONT_SIZE := 33
 const ROUND_ICON_SIZE_RATIO := 0.58
 const LONG_CHIP_ICON_SIZE_RATIO := 0.52
+const LIFE_HEART_ICON_SIZE_RATIO := 1.12
+const LIFE_COUNT_COLOR := Color(0.98, 0.97, 0.94)
+const LIFE_COUNT_OUTLINE := Color(0.28, 0.10, 0.14, 0.92)
+const RESOURCE_PILL_BG := Color(0.97, 0.94, 0.88, 0.98)
+const RESOURCE_PILL_SHADOW := Color(0.18, 0.12, 0.10, 0.22)
+const RESOURCE_TEXT := Color(0.16, 0.20, 0.34)
+const RESOURCE_PLUS_BG := Color(0.40, 0.78, 0.30, 1.0)
+const RESOURCE_PLUS_BORDER := Color(0.28, 0.58, 0.20, 1.0)
+## El pill es más bajo que la fila HUD; el ícono queda claramente más grande.
+const RESOURCE_PILL_HEIGHT_RATIO := 0.66
+const RESOURCE_ICON_HEIGHT_RATIO := 2.15
+const RESOURCE_ICON_HANG := 0.40
 
 static func get_button_size(texture: Texture2D, width: float) -> Vector2:
 	var tex_size := texture.get_size()
@@ -70,8 +83,8 @@ static func format_stat_number(value: int) -> String:
 		count += 1
 	return out
 
-static func format_lives_text(value: int) -> String:
-	return "%s Vidas" % format_stat_number(value)
+static func format_lives_text(value: int, remaining_sec: int = 0) -> String:
+	return GameLivesServiceScript.format_chip_text(value, remaining_sec)
 
 ## Ajusta chips del HUD superior para que no se superpongan en pantallas angostas.
 static func fit_top_hud_chip_row(
@@ -316,6 +329,271 @@ static func create_chip_stat_label(text: String, font_size: int) -> Label:
 	lbl.add_theme_color_override("font_outline_color", CHIP_STAT_OUTLINE)
 	lbl.add_theme_constant_override("outline_size", CHIP_STAT_OUTLINE_SIZE)
 	return lbl
+
+static func create_life_heart_badge(icon_texture: Texture2D) -> Dictionary:
+	var stack := Control.new()
+	stack.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var icon := TextureRect.new()
+	icon.texture = icon_texture
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	icon.set_anchors_preset(Control.PRESET_FULL_RECT)
+	icon.offset_left = 0
+	icon.offset_top = 0
+	icon.offset_right = 0
+	icon.offset_bottom = 0
+	stack.add_child(icon)
+	var count := Label.new()
+	count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	count.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	count.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if LogoFont != null:
+		count.add_theme_font_override("font", LogoFont)
+	count.add_theme_color_override("font_color", LIFE_COUNT_COLOR)
+	count.add_theme_color_override("font_outline_color", LIFE_COUNT_OUTLINE)
+	count.add_theme_constant_override("outline_size", 5)
+	count.set_anchors_preset(Control.PRESET_FULL_RECT)
+	count.offset_left = 0
+	count.offset_top = 2
+	count.offset_right = 0
+	count.offset_bottom = 2
+	stack.add_child(count)
+	return {"stack": stack, "icon": icon, "count": count}
+
+static func layout_life_heart_badge(
+	stack: Control,
+	count: Label,
+	size: float,
+	font_ratio: float = 0.36,
+	font_max: int = 38
+) -> void:
+	if stack != null:
+		stack.custom_minimum_size = Vector2(size, size)
+		stack.size = Vector2(size, size)
+	if count != null:
+		var inset := size * 0.16
+		count.offset_left = inset * 0.3
+		count.offset_right = -inset * 0.3
+		count.offset_top = inset
+		count.offset_bottom = -inset * 0.3
+		count.clip_text = true
+		count.add_theme_constant_override("outline_size", 4)
+		count.add_theme_font_size_override("font_size", int(clampf(size * font_ratio, 16.0, float(font_max))))
+
+static func create_resource_chip(icon_texture: Texture2D, with_icon_count: bool) -> Dictionary:
+	var root := Control.new()
+	root.mouse_filter = Control.MOUSE_FILTER_STOP
+	root.clip_contents = false
+
+	var shadow := Panel.new()
+	shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var shadow_style := StyleBoxFlat.new()
+	shadow_style.bg_color = RESOURCE_PILL_SHADOW
+	shadow_style.set_corner_radius_all(28)
+	shadow.add_theme_stylebox_override("panel", shadow_style)
+	root.add_child(shadow)
+
+	var pill := create_gradient_pill()
+	pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pill.clip_contents = true
+	root.add_child(pill)
+
+	var icon_wrap := Control.new()
+	icon_wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	icon_wrap.z_index = 2
+	root.add_child(icon_wrap)
+
+	var icon := TextureRect.new()
+	icon.texture = icon_texture
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	icon.set_anchors_preset(Control.PRESET_FULL_RECT)
+	icon.offset_left = 0
+	icon.offset_top = 0
+	icon.offset_right = 0
+	icon.offset_bottom = 0
+	icon_wrap.add_child(icon)
+
+	var count: Label = null
+	if with_icon_count:
+		count = Label.new()
+		count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		count.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		count.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		if LogoFont != null:
+			count.add_theme_font_override("font", LogoFont)
+		count.add_theme_color_override("font_color", LIFE_COUNT_COLOR)
+		count.add_theme_color_override("font_outline_color", LIFE_COUNT_OUTLINE)
+		count.add_theme_constant_override("outline_size", 6)
+		count.set_anchors_preset(Control.PRESET_FULL_RECT)
+		icon_wrap.add_child(count)
+
+	var value := Label.new()
+	value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	value.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	value.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if LogoFont != null:
+		value.add_theme_font_override("font", LogoFont)
+	value.add_theme_color_override("font_color", BTN_TEXT_COLOR)
+	value.add_theme_color_override("font_outline_color", BTN_TEXT_OUTLINE)
+	value.add_theme_constant_override("outline_size", 4)
+	value.z_index = 1
+	root.add_child(value)
+
+	var plus := Button.new()
+	plus.text = "+"
+	plus.focus_mode = Control.FOCUS_NONE
+	plus.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	plus.z_index = 3
+	plus.add_theme_color_override("font_color", Color.WHITE)
+	plus.add_theme_color_override("font_hover_color", Color.WHITE)
+	plus.add_theme_color_override("font_pressed_color", Color.WHITE)
+	root.add_child(plus)
+
+	return {
+		"root": root,
+		"shadow": shadow,
+		"pill": pill,
+		"icon": icon,
+		"heart": icon_wrap,
+		"count": count,
+		"label": value,
+		"plus": plus,
+		"panel": root,
+	}
+
+static func resource_chip_hang(
+	row_h: float,
+	pill_height_ratio: float = RESOURCE_PILL_HEIGHT_RATIO,
+	icon_height_ratio: float = RESOURCE_ICON_HEIGHT_RATIO
+) -> float:
+	return (row_h * pill_height_ratio * icon_height_ratio) * RESOURCE_ICON_HANG
+
+static func resource_chip_visual_width(
+	row_h: float,
+	pill_w: float,
+	pill_height_ratio: float = RESOURCE_PILL_HEIGHT_RATIO,
+	icon_height_ratio: float = RESOURCE_ICON_HEIGHT_RATIO
+) -> float:
+	return resource_chip_hang(row_h, pill_height_ratio, icon_height_ratio) + pill_w
+
+static func resource_chip_pair_gap(row_h: float, min_gap: float) -> float:
+	return maxf(min_gap, resource_chip_hang(row_h) + row_h * 0.22)
+
+static func layout_resource_chip(
+	chip: Dictionary,
+	pill_pos: Vector2,
+	pill_size: Vector2,
+	count_font_ratio: float = 0.36,
+	count_font_max: int = 38,
+	pill_height_ratio: float = RESOURCE_PILL_HEIGHT_RATIO,
+	icon_height_ratio: float = RESOURCE_ICON_HEIGHT_RATIO
+) -> void:
+	var root: Control = chip.get("root", chip.get("panel", null))
+	if root == null:
+		return
+	var pill_h: float = pill_size.y * pill_height_ratio
+	var pill_w: float = pill_size.x
+	var icon_h: float = pill_h * icon_height_ratio
+	var hang: float = icon_h * RESOURCE_ICON_HANG
+	var root_h: float = icon_h
+	var pill_draw := Vector2(pill_w, pill_h)
+	root.position = Vector2(pill_pos.x - hang, pill_pos.y + (pill_size.y - pill_h) * 0.5 - (root_h - pill_h) * 0.5)
+	root.size = Vector2(pill_w + hang, root_h)
+
+	var pill: Control = chip.get("pill", null)
+	var shadow: Panel = chip.get("shadow", null)
+	var icon_wrap: Control = chip.get("heart", null)
+	var plus: Button = chip.get("plus", null)
+	var value: Label = chip.get("label", null)
+	var count: Label = chip.get("count", null)
+
+	var pill_local := Vector2(hang, (root_h - pill_h) * 0.5)
+	var radius := int(pill_h * 0.5)
+	if shadow != null:
+		var shadow_off := Vector2(0.0, maxf(3.0, pill_h * 0.08))
+		shadow.position = pill_local + shadow_off
+		shadow.size = pill_draw
+		apply_shadow_corner_radius(shadow, radius)
+	if pill != null:
+		pill.position = pill_local
+		pill.size = pill_draw
+		apply_gradient_pill_style(pill, radius, pill_draw)
+
+	if icon_wrap != null:
+		icon_wrap.clip_contents = true
+		icon_wrap.position = Vector2(0.0, 0.0)
+		icon_wrap.size = Vector2(icon_h, icon_h)
+		layout_life_heart_badge(icon_wrap, count, icon_h, count_font_ratio, count_font_max)
+
+	if plus != null:
+		var plus_s: float = clampf(icon_h * 0.30, 18.0, 34.0)
+		plus.size = Vector2(plus_s, plus_s)
+		plus.position = Vector2(icon_h * 0.62, icon_h * 0.64)
+		var plus_r := int(clampf(plus_s * 0.22, 4.0, 8.0))
+		var plus_style := StyleBoxFlat.new()
+		plus_style.bg_color = RESOURCE_PLUS_BG
+		plus_style.border_color = RESOURCE_PLUS_BORDER
+		plus_style.set_border_width_all(1)
+		plus_style.set_corner_radius_all(plus_r)
+		plus.add_theme_stylebox_override("normal", plus_style)
+		var plus_hover := plus_style.duplicate() as StyleBoxFlat
+		plus_hover.bg_color = RESOURCE_PLUS_BG.lightened(0.08)
+		plus.add_theme_stylebox_override("hover", plus_hover)
+		var plus_pressed := plus_style.duplicate() as StyleBoxFlat
+		plus_pressed.bg_color = RESOURCE_PLUS_BG.darkened(0.08)
+		plus.add_theme_stylebox_override("pressed", plus_pressed)
+		plus.add_theme_font_size_override("font_size", int(plus_s * 0.72))
+
+	if value != null:
+		var text_left: float = icon_h * 0.86
+		var right_pad: float = maxf(pill_h * 0.38, 12.0)
+		var text_w: float = maxf(36.0, (hang + pill_w) - text_left - right_pad)
+		value.position = Vector2(text_left, pill_local.y)
+		value.size = Vector2(text_w, pill_h)
+		value.clip_text = true
+		value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		value.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		var desired_font := int(clampf(pill_h * 0.60, 18.0, 42.0))
+		value.set_meta("fit_max_w", text_w)
+		value.set_meta("fit_desired", desired_font)
+		fit_resource_value_label(value)
+
+
+static func fit_resource_value_label(label: Label) -> void:
+	if label == null:
+		return
+	label.clip_text = true
+	var max_w: float = float(label.get_meta("fit_max_w", label.size.x))
+	if max_w <= 1.0:
+		max_w = label.size.x
+	var desired: int = int(label.get_meta("fit_desired", 32))
+	var font: Font = label.get_theme_font("font")
+	if font == null:
+		label.add_theme_font_size_override("font_size", desired)
+		return
+	var sample := label.text
+	if sample.is_empty():
+		sample = "000.000"
+	var outline := float(label.get_theme_constant("outline_size"))
+	var font_size := desired
+	var min_size := 14
+	while font_size > min_size:
+		var measured := font.get_string_size(sample, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
+		if measured.x + outline * 2.0 + 2.0 <= max_w:
+			break
+		font_size -= 1
+	label.add_theme_font_size_override("font_size", font_size)
+
+
+static func set_resource_chip_value(chip: Dictionary, text: String) -> void:
+	var value: Label = chip.get("label", null)
+	if value == null:
+		return
+	value.text = text
+	fit_resource_value_label(value)
 
 static func create_button_label(text: String, font_size: int) -> Label:
 	var lbl := Label.new()

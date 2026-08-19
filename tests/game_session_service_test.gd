@@ -102,6 +102,8 @@ func _test_parse_save_payload_with_data() -> void:
 		"current_level": 4,
 		"max_value": 11,
 		"roll_value_floor": 10,
+		"cycle_checkpoint_origin": 20,
+		"cycle_rules_revision": 2,
 		"active_stacks": 7,
 		"next_free_slot_unlock_level": 12,
 		"temp_slot_actions_remaining": -3,
@@ -115,6 +117,12 @@ func _test_parse_save_payload_with_data() -> void:
 		return
 	if int(parsed.get("player_stars", 0)) != 1234:
 		_fail("parse_coins_alias", str(parsed))
+		return
+	if int(parsed.get("cycle_checkpoint_origin", 0)) != 20:
+		_fail("parse_cycle_origin", str(parsed))
+		return
+	if int(parsed.get("cycle_rules_revision", 0)) != 2:
+		_fail("parse_cycle_revision", str(parsed))
 		return
 	var rs: Dictionary = parsed.get("runtime_snapshot", {})
 	if int(rs.get("foo", 0)) != 1:
