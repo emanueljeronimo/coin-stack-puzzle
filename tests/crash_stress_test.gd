@@ -38,16 +38,14 @@ func _checkpoint_description(level: int) -> String:
 	var steps := level - 2
 	var v := CHECKPOINT_BASE_VALUE + int(steps / 2)
 	if steps % 2 == 0:
-		if steps == 0:
-			return "Creaste la pila %d" % v
-		return "Completaste la pila %d" % (v - 1)
-	return "Pila %d: más de la mitad" % v
+		return "Pila %d: mitad o más" % v
+	return "Completaste la pila %d" % v
 
 func _test_checkpoint_descriptions() -> void:
 	for level in range(1, 21):
 		var text := _checkpoint_description(level)
 		var combined := "Nivel %d\n%s" % [level, text]
-		if level == 3 and combined.find("Pila 5") < 0:
+		if level == 2 and combined.find("Pila 5") < 0:
 			_fail("checkpoint_desc_level_3", combined)
 			return
 	_ok("checkpoint_descriptions_1_to_20")
@@ -161,7 +159,7 @@ func _test_level_up_queue_logic() -> void:
 		return
 	var desc3 := _checkpoint_description(3)
 	var shown := "Nivel %d\n%s" % [3, desc3]
-	if shown.find("Pila 5") < 0:
+	if shown.findn("pila 5") < 0:
 		_fail("level3_text", shown)
 		return
 	_ok("level_up_queue_and_level3_text")

@@ -378,8 +378,10 @@ func _attach_moved_coin(moving_coin: Node2D, target_local: Vector2, value: int) 
 	if not _consume_pending_incoming_value(value):
 		if is_instance_valid(moving_coin):
 			moving_coin.queue_free()
+		_try_resolve_after_pending_settled()
 		return
 	if not is_instance_valid(moving_coin):
+		_try_resolve_after_pending_settled()
 		return
 	coins.append(value)
 	moving_coin.reparent(self)

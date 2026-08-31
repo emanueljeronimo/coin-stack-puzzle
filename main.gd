@@ -145,13 +145,13 @@ const TEMP_SLOT_BOARD_INDEX := 4
 ## Compra opcional al lado de la última pila habilitada (estrellas mock); precio se duplica en cada compra.
 const ADJACENT_EXTRA_SLOT_BASE_PRICE := 600
 const INITIAL_PERMANENT_STACKS := 5
-## Al reiniciar ciclo (fichas 15, 30, 45…) el tablero vuelve a esta cantidad de ranuras (GDD: 5).
+## Al reiniciar ciclo (fichas 15, 25, 35…) el tablero vuelve a esta cantidad de ranuras (GDD: 5).
 const CYCLE_RESET_STACKS := 5
-const ADJACENT_SLOT_FREE_FIRST_LEVEL := 4
+const ADJACENT_SLOT_FREE_FIRST_LEVEL := 2
 const ADJACENT_SLOT_FREE_LEVEL_INTERVAL := 2
 ## Máximo de pilas en las otras 14 celdas; la 15ª pila solo aparece con ranura temporal activa.
 const MAX_PERMANENT_STACKS := 14
-## Hitos de ficha (valor) que reinician el tablero: 15, 30, 45…
+## Hitos de ficha (valor) que reinician el tablero: 15, y después cada 10 (25, 35, 45…).
 const BOARD_CYCLE_LEVELS := 15
 const INITIAL_LIVES := 5
 ## Cartel "No hay movimientos": costo de comprar la recarga completa de vidas y cuántas otorga.
@@ -182,7 +182,7 @@ var checkpoint_snapshot: Dictionary = {}
 ## True cuando ya existe la primera ficha del objetivo actual (max_value).
 var fusion_target_bonus_unlocked: bool = false
 var max_value: int = 5
-## Piso del generador de fichas (ciclo 1: 1; tras ficha 15: 11; tras 30: 26; …).
+## Piso del generador de fichas (ciclo 1: 1; tras ficha 15: 11; tras 25: 21; …).
 var roll_value_floor: int = 1
 ## Ancla de checkpoints post-prestige si el nivel ya iba por delante del hito (0 = ciclo 1).
 var cycle_checkpoint_origin: int = 0
@@ -198,6 +198,7 @@ var _resolve_board_scheduled: bool = false
 var _temp_slot_timer_shown_sec: int = -1
 ## Cola de carteles de subida de nivel (si se saltan varios checkpoints de golpe).
 var _pending_level_up_alerts: Array = []
+var _slot_unlock_busy: bool = false
 ## Hito de ficha (15/30/45…) esperando transición de tablero tras el cartel.
 var _pending_cycle_reset_milestone: int = 0
 var _cycle_reset_transition_playing: bool = false
@@ -476,6 +477,21 @@ func create_stack_nodes(count: int) -> void:
 		stack.scale = Vector2.ONE * get_layout_scale()
 		stacks.append(stack)
 
+## Saca ranuras permanentes de más (deja la temporal al final si está activa).
+func _trim_permanent_stacks_to(count: int) -> void:
+	var target := maxi(1, count)
+	var temp_on := has_active_temp_stack()
+	while stacks.size() > (target + (1 if temp_on else 0)):
+		var remove_idx := stacks.size() - 2 if temp_on else stacks.size() - 1
+		if remove_idx < 0 or remove_idx >= stacks.size():
+			break
+		var s: Node = stacks[remove_idx]
+		stacks.remove_at(remove_idx)
+		if is_instance_valid(s):
+			_kill_stack_tweens(s)
+			s.queue_free()
+	board_revision += 1
+
 func fill_board_initial_random() -> void:
 	if active_stacks <= 1:
 		for _j in range(mini(STACK_CAPACITY, INITIAL_COINS_PER_STACK + INITIAL_EXTRA_COINS)):
@@ -686,6 +702,7 @@ func _migrate_legacy_cycle_roll_range() -> bool:
 		"roll_value_floor": roll_value_floor,
 		"cycle_checkpoint_origin": cycle_checkpoint_origin,
 		"cycle_rules_revision": cycle_rules_revision,
+		"highest_board_coin": highest_coin_value_on_board(),
 	}, CHECKPOINT_BASE_VALUE)
 	var progress_changed := bool(healed.get("changed", false))
 	if progress_changed:
@@ -709,15 +726,44 @@ func _migrate_legacy_cycle_roll_range() -> bool:
 		next_free_slot_unlock_level = int(
 			slot_heal.get("next_free_slot_unlock_level", next_free_slot_unlock_level)
 		)
-	if not progress_changed and not slots_changed:
+	var prestige_level := cycle_checkpoint_origin + 1 if cycle_checkpoint_origin > 0 else GameEngineScript.prestige_hold_checkpoint(
+		milestone, CHECKPOINT_BASE_VALUE
+	)
+	var start_heal := GameRulesScript.heal_prestige_start_desync({
+		"max_value": max_value,
+		"highest_board_coin": highest_coin_value_on_board(),
+		"checkpoint_level": checkpoint_level,
+		"active_stacks": active_stacks,
+		"next_free_slot_unlock_level": next_free_slot_unlock_level,
+		"prestige_level": prestige_level,
+		"milestone_level": milestone,
+		"cycle_reset_stacks": CYCLE_RESET_STACKS,
+		"adjacent_slot_next_price": adjacent_slot_next_price,
+		"adjacent_slot_base_price": ADJACENT_EXTRA_SLOT_BASE_PRICE,
+	})
+	var start_changed := bool(start_heal.get("changed", false))
+	if start_changed:
+		checkpoint_level = int(start_heal.get("checkpoint_level", checkpoint_level))
+		active_stacks = int(start_heal.get("active_stacks", active_stacks))
+		next_free_slot_unlock_level = int(
+			start_heal.get("next_free_slot_unlock_level", next_free_slot_unlock_level)
+		)
+		GameState.player_level = checkpoint_level
+		_pending_level_up_alerts.clear()
+	if not progress_changed and not slots_changed and not start_changed:
 		return false
-	var refill := bool(healed.get("refill", false)) or slots_changed
+	var refill := bool(healed.get("refill", false))
 	if refill:
 		if stacks.size() != active_stacks:
 			clear_board_stacks()
 			create_stack_nodes(active_stacks)
 		fill_board_initial_random()
 		refresh_fusion_target_bonus_unlock()
+		refresh_all_stack_layout()
+		_sync_slot_overlay_controls()
+		update_progress_bar(false)
+	elif slots_changed or start_changed:
+		_trim_permanent_stacks_to(active_stacks)
 		refresh_all_stack_layout()
 		_sync_slot_overlay_controls()
 		update_progress_bar(false)
@@ -814,6 +860,11 @@ func _restore_board_from_snapshot(snap: Dictionary) -> void:
 		_pending_level_up_alerts.clear()
 		_pending_level_up_alerts.append(checkpoint_level)
 		call_deferred("_show_next_level_up_alert")
+	elif get_reached_cycle_coin_milestone() > 0:
+		update_checkpoint_level()
+	_rewind_false_checkpoint_half_unlock()
+	if _pending_cycle_reset_milestone <= 0:
+		update_checkpoint_level()
 	queue_redraw()
 
 func try_undo_last_move() -> void:
@@ -1152,12 +1203,13 @@ func _consume_temp_slot_action() -> void:
 	if bool(step.get("should_close", false)):
 		close_temporary_slot()
 
-func resolve_board_after_action(expected_revision: int = -1) -> void:
+func resolve_board_after_action(expected_revision: int = -1, skip_fusions: bool = false) -> void:
 	if expected_revision >= 0 and expected_revision != board_revision:
 		return
 	if has_pending_incoming_coins():
 		return
-	resolve_fusions()
+	if not skip_fusions:
+		resolve_fusions()
 	check_level_up()
 	update_progress_bar(true)
 	var leveled_up := update_checkpoint_level()
@@ -1181,8 +1233,6 @@ func resolve_board_after_action(expected_revision: int = -1) -> void:
 func request_resolve_board_after_action(expected_revision: int = -1) -> void:
 	if expected_revision >= 0 and expected_revision != board_revision:
 		return
-	if has_pending_incoming_coins():
-		return
 	if _resolve_board_scheduled:
 		return
 	_resolve_board_scheduled = true
@@ -1191,8 +1241,20 @@ func request_resolve_board_after_action(expected_revision: int = -1) -> void:
 func _run_scheduled_resolve_board(expected_revision: int = -1) -> void:
 	_resolve_board_scheduled = false
 	if has_pending_incoming_coins():
-		return
+		# El último attach puede estar encolado; reintentar. Sin tween, no bloquear el cartel.
+		if _board_has_active_move_tweens():
+			_resolve_board_scheduled = true
+			call_deferred("_run_scheduled_resolve_board", expected_revision)
+			return
 	resolve_board_after_action(expected_revision)
+
+func _board_has_active_move_tweens() -> bool:
+	for stack in stacks:
+		if not is_instance_valid(stack):
+			continue
+		if stack.has_method("has_active_move_animations") and stack.has_active_move_animations():
+			return true
+	return false
 
 ## True si alguna pila tiene monedas en vuelo (animación de movimiento).
 func has_pending_coin_animations() -> bool:
@@ -1234,34 +1296,30 @@ func resolve_fusions() -> void:
 		GameRulesScript.ENABLE_FUSION_CREATE_BONUS,
 		fusion_target_bonus_unlocked
 	)
-	var changed := true
-	var guard := 0
+	# Una sola generación: 10 cuatros → 2 cincos, y listo. Encadenar 4→8 en el
+	# mismo resolve saltaba del nivel 1 al 8/9 (sobre todo en móvil con Mezclar).
+	var ready: Array = []
+	for stack in stacks:
+		if is_instance_valid(stack) and stack.is_ready_to_fuse():
+			ready.append(stack)
 	var fusion_anims := 0
-	while changed and guard < 200:
-		changed = false
-		guard += 1
-		for stack in stacks:
-			if not is_instance_valid(stack):
-				continue
-			if not stack.is_ready_to_fuse():
-				continue
-			var base_value = stack.top_value()
-			# Limitar animaciones de fusión en cadena (en móvil spamear tweens puede colgar/cerrar).
-			if fusion_anims < 3 and stack.has_method("play_fusion_animation"):
-				stack.play_fusion_animation()
-				fusion_anims += 1
-			var new_value = stack.remove_all_and_fuse()
-			if new_value < 0:
-				continue
-			var fusion_output := GameRulesScript.FUSION_OUTPUT_COUNT
-			for _i in range(fusion_output):
-				if not stack.push(new_value, false):
-					push_error("Fusion: no cupo ficha %d tras fusionar %dx10" % [new_value, base_value])
-					break
-			if try_grant_fusion_create_bonus(new_value, stack, bonus_eligible) > 0:
-				changed = true
-			print("Fusion: ", base_value, "x10 -> ", fusion_output, "x", new_value)
-			changed = true
+	for stack in ready:
+		if not is_instance_valid(stack) or not stack.is_ready_to_fuse():
+			continue
+		var base_value = stack.top_value()
+		if fusion_anims < 3 and stack.has_method("play_fusion_animation"):
+			stack.play_fusion_animation()
+			fusion_anims += 1
+		var new_value = stack.remove_all_and_fuse()
+		if new_value < 0:
+			continue
+		var fusion_output := GameRulesScript.FUSION_OUTPUT_COUNT
+		for _i in range(fusion_output):
+			if not stack.push(new_value, false):
+				push_error("Fusion: no cupo ficha %d tras fusionar %dx10" % [new_value, base_value])
+				break
+		try_grant_fusion_create_bonus(new_value, stack, bonus_eligible)
+		print("Fusion: ", base_value, "x10 -> ", fusion_output, "x", new_value)
 	refresh_fusion_target_bonus_unlock()
 
 func refresh_fusion_target_bonus_unlock() -> void:
@@ -1342,11 +1400,15 @@ func total_count_of_value(value: int) -> int:
 	return total
 
 func check_level_up() -> void:
-	var tops: Array = []
-	for stack in stacks:
-		tops.append(stack.top_value())
-	if GameBoardEngineScript.has_level_up(tops, max_value):
-		level_up()
+	var has_next := total_count_of_value(max_value + 1) > 0
+	var next_state := GameBoardEngineScript.catch_up_max_value(current_level, max_value, has_next)
+	if not bool(next_state.get("changed", false)):
+		return
+	current_level = int(next_state.get("current_level", current_level))
+	max_value = int(next_state.get("max_value", max_value))
+	print("Subiste al nivel ", current_level, ". Nuevo objetivo: ", max_value)
+	refresh_fusion_target_bonus_unlock()
+	_sync_slot_overlay_controls()
 
 func level_up() -> void:
 	var next_state := GameBoardEngineScript.apply_level_up(current_level, max_value)
@@ -1486,16 +1548,16 @@ func configure_process_for_temp_slot() -> void:
 	set_process(temp_slot_time_remaining > 0.001)
 
 ## Índice de ciclo del tablero según resets hechos (piso de tirada), no según el checkpoint UI.
-## 0 = aún no conseguiste la ficha 15; 1 = tras ficha 15; 2 = tras ficha 30; …
+## 0 = aún no conseguiste la ficha 15; 1 = tras ficha 15; 2 = tras ficha 25; …
 func get_cycle_index() -> int:
 	return GameEngineScript.cycle_index(roll_value_floor, CHECKPOINT_BASE_VALUE, BOARD_CYCLE_LEVELS)
 
-## Nivel base del ciclo actual (0, 15, 30, 45…).
+## Nivel base del ciclo actual (0, 15, 25, 35…).
 func get_cycle_base_level() -> int:
 	return GameEngineScript.cycle_base_level(roll_value_floor, CHECKPOINT_BASE_VALUE, BOARD_CYCLE_LEVELS)
 
 ## Offset de valor de ficha para mapear el ciclo actual al patrón del ciclo 1.
-## Ciclo 0: 0; tras ficha 15: 10; tras ficha 30: 25; …
+## Ciclo 0: 0; tras ficha 15: 10; tras ficha 25: 20; …
 func get_cycle_coin_offset() -> int:
 	return GameEngineScript.cycle_coin_offset(
 		roll_value_floor,
@@ -1503,7 +1565,7 @@ func get_cycle_coin_offset() -> int:
 		BOARD_CYCLE_LEVELS
 	)
 
-## Próximo valor de ficha que reinicia el tablero (15, 30, 45…).
+## Próximo valor de ficha que reinicia el tablero (15, 25, 35…).
 func get_next_cycle_coin_milestone() -> int:
 	return GameEngineScript.next_cycle_coin_milestone(
 		roll_value_floor,
@@ -1552,8 +1614,8 @@ func _apply_cycle_reset_meta(milestone_level: int, cycle_state: Dictionary) -> v
 	))
 	cycle_rules_revision = GameEngineScript.CYCLE_RULES_REVISION
 
-## Reinicia el tablero al conseguir la ficha hito (15, 30, 45…).
-## 5 ranuras; tiradas 11-14 / objetivo 15 (como 1-4 / 5). El 15 entra en la tirada al crear el 16.
+## Reinicia el tablero al conseguir la ficha hito (15, 25, 35…).
+## 5 ranuras; tiradas 11-14 / 21-24 / 31-34. El hito entra en la tirada al crear el siguiente.
 func reset_board_for_cycle_milestone(milestone_level: int) -> void:
 	var cycle_state := GameBoardEngineScript.build_cycle_reset_state(milestone_level, {
 		"board_cycle_levels": BOARD_CYCLE_LEVELS,
@@ -1682,6 +1744,20 @@ func highest_coin_value_on_board() -> int:
 				hv = int(c)
 	return hv
 
+## Valor de ficha más alto que cuenta para el checkpoint (rango del ciclo actual).
+func highest_coin_value_for_checkpoint() -> int:
+	var lo := get_roll_min_value()
+	var hi := maxi(lo, max_value)
+	var hv := 0
+	for stack in stacks:
+		for c in stack.coins:
+			var v := int(c)
+			if v < lo or v > hi:
+				continue
+			if v > hv:
+				hv = v
+	return hv
+
 ## Mayor cantidad de fichas de un valor dado dentro de una misma pila.
 func max_count_of_value(value: int) -> int:
 	var best := 0
@@ -1694,27 +1770,24 @@ func max_count_of_value(value: int) -> int:
 			best = cnt
 	return best
 
-## Calcula el nivel según el estado actual del tablero (sin tener en cuenta el máximo alcanzado).
-## N1=inicio (valores 1..4). Para V>=5: crear pila V y "pila V >50%" suman 2 niveles por valor;
-## "completar pila V" coincide con "crear pila V+1" (la fusión de 10 V genera un V+1).
-## En ciclos 2+ se mapean los valores restando el offset del ciclo (p.ej. 10→1 local).
+## Calcula el nivel según las pilas: ≥5 de un valor, y otra vez al completar (10 / crear el siguiente).
+## 1-4 no suben. Un 8 suelto no cuenta como haber pasado los 5/6/7.
 func evaluate_checkpoint_level() -> int:
-	var hv := highest_coin_value_on_board()
-	return GameEngineScript.evaluate_checkpoint_level(
-		hv,
-		max_count_of_value(hv),
+	return GameEngineScript.evaluate_checkpoint_from_piles(
+		Callable(self, "max_count_of_value"),
 		roll_value_floor,
 		CHECKPOINT_BASE_VALUE,
 		CHECKPOINT_HALF_THRESHOLD,
 		BOARD_CYCLE_LEVELS,
-		cycle_checkpoint_origin
+		cycle_checkpoint_origin,
+		checkpoint_level
 	)
 
 ## Progreso 0..1 hacia un nivel objetivo (según el estado actual del tablero).
 func get_progress_toward_checkpoint_level(target_level: int) -> float:
 	return GameEngineScript.progress_toward_checkpoint_level(
 		target_level,
-		highest_coin_value_on_board(),
+		highest_coin_value_for_checkpoint(),
 		Callable(self, "max_count_of_value"),
 		STACK_CAPACITY,
 		roll_value_floor,
@@ -1730,7 +1803,8 @@ func get_checkpoint_level_description(level: int) -> String:
 		level,
 		CHECKPOINT_BASE_VALUE,
 		BOARD_CYCLE_LEVELS,
-		cycle_checkpoint_origin
+		cycle_checkpoint_origin,
+		roll_value_floor
 	)
 
 ## Progreso hacia el siguiente checkpoint guardado (0..1).
@@ -1795,6 +1869,43 @@ func _style_progress_label(lbl: Label, font_size: int) -> void:
 		lbl.add_theme_font_override("font", UiFont)
 	lbl.add_theme_font_size_override("font_size", font_size)
 	lbl.add_theme_color_override("font_color", theme_progress_text)
+
+## El parche min_level subió 45→46 y abrió ranura con la pila de 27 a medias.
+func _rewind_false_checkpoint_half_unlock() -> void:
+	if checkpoint_level != 46:
+		return
+	if get_cycle_base_level() != 25:
+		return
+	var pile_27 := max_count_of_value(27)
+	if pile_27 >= STACK_CAPACITY or max_count_of_value(28) >= 1:
+		return
+	checkpoint_level = 45
+	GameState.player_level = checkpoint_level
+	_pending_level_up_alerts.clear()
+	if level_up_overlay != null:
+		level_up_overlay.visible = false
+	var slot_heal := GameRulesScript.heal_inflated_cycle_free_slots(
+		active_stacks,
+		next_free_slot_unlock_level,
+		checkpoint_level,
+		25,
+		CYCLE_RESET_STACKS
+	)
+	if bool(slot_heal.get("changed", false)):
+		active_stacks = int(slot_heal.get("active_stacks", active_stacks))
+		next_free_slot_unlock_level = int(
+			slot_heal.get("next_free_slot_unlock_level", next_free_slot_unlock_level)
+		)
+		_trim_permanent_stacks_to(active_stacks)
+	refresh_all_stack_layout()
+	_sync_slot_overlay_controls()
+	update_progress_bar(false)
+	_clear_undo_snapshot()
+	capture_checkpoint_snapshot()
+	GameState.checkpoint_snapshot = checkpoint_snapshot.duplicate(true)
+	save_game()
+	queue_redraw()
+	print("Checkpoint corregido: nivel 45 (pila 27 a medias, ranura extra revertida)")
 
 ## Actualiza el checkpoint de forma monótona (solo avanza). Devuelve true si subió.
 ## El reset de ciclo NO usa el número de checkpoint: se dispara al tener la ficha 15/30/45…
@@ -1926,6 +2037,11 @@ func restore_checkpoint() -> void:
 	update_progress_bar(false)
 	_grant_missing_cycle_floor_stacks()
 	_migrate_legacy_cycle_roll_range()
+	if _pending_cycle_reset_milestone <= 0 and get_reached_cycle_coin_milestone() > 0:
+		update_checkpoint_level()
+	_rewind_false_checkpoint_half_unlock()
+	if _pending_cycle_reset_milestone <= 0:
+		update_checkpoint_level()
 	queue_redraw()
 	print("Checkpoint restaurado: nivel ", checkpoint_level)
 
@@ -2329,17 +2445,53 @@ func _occupied_board_slot_index_set() -> Dictionary:
 
 
 func _reconcile_future_free_slot_unlock_cursor() -> void:
-	next_free_slot_unlock_level = GameRulesScript.advance_free_slot_unlock_past_level(
-		next_free_slot_unlock_level,
-		checkpoint_level
+	# Si el checkpoint ya pasó el hito (p.ej. 44 con cursor 43 o 45 sin ranura), otorgarla.
+	var milestone := get_cycle_base_level()
+	var prestige_level := (
+		cycle_checkpoint_origin + 1
+		if cycle_checkpoint_origin > 0
+		else 0
 	)
-	if checkpoint_snapshot is Dictionary and not checkpoint_snapshot.is_empty():
-		var snap_level := int(checkpoint_snapshot.get("checkpoint_level", checkpoint_level))
-		var snap_unlock := int(
-			checkpoint_snapshot.get("next_free_slot_unlock_level", next_free_slot_unlock_level)
+	if prestige_level <= 0 and milestone > 0:
+		prestige_level = GameEngineScript.prestige_hold_checkpoint(milestone, CHECKPOINT_BASE_VALUE)
+	var missed := GameRulesScript.missed_cycle_free_slot_grants(
+		active_stacks,
+		checkpoint_level,
+		milestone,
+		prestige_level,
+		CYCLE_RESET_STACKS
+	)
+	if bool(missed.get("changed", false)):
+		var grants := int(missed.get("missing", 0))
+		for _i in range(grants):
+			if find_adjacent_extra_slot_offer_board_index() < 0:
+				break
+			if active_stacks >= MAX_PERMANENT_STACKS:
+				break
+			add_new_stack_for_level_unlock()
+			active_stacks += 1
+		next_free_slot_unlock_level = int(
+			missed.get("next_free_slot_unlock_level", next_free_slot_unlock_level)
 		)
-		checkpoint_snapshot["next_free_slot_unlock_level"] = (
-			GameRulesScript.advance_free_slot_unlock_past_level(snap_unlock, snap_level)
+		_clear_undo_snapshot()
+		refresh_all_stack_layout()
+		capture_checkpoint_snapshot()
+		GameState.player_level = checkpoint_level
+		GameState.checkpoint_snapshot = checkpoint_snapshot.duplicate(true)
+		save_game()
+		print(
+			"Ranura extra recuperada (nivel %d, próxima gratis: %d)"
+			% [checkpoint_level, next_free_slot_unlock_level]
+		)
+		_sync_slot_overlay_controls()
+		queue_redraw()
+		return
+	if next_free_slot_unlock_level <= 0:
+		return
+	if checkpoint_level >= next_free_slot_unlock_level:
+		_unlock_adjacent_slots_for_level_range(
+			next_free_slot_unlock_level - 1,
+			checkpoint_level
 		)
 
 func get_adjacent_slot_free_unlock_level() -> int:
@@ -2354,6 +2506,9 @@ func try_unlock_adjacent_slots_by_level() -> void:
 	_unlock_adjacent_slots_for_level_range(checkpoint_level - 1, checkpoint_level)
 
 func _unlock_adjacent_slots_for_level_range(previous_level: int, new_level: int) -> void:
+	if _slot_unlock_busy:
+		return
+	_slot_unlock_busy = true
 	var unlocked := false
 	while active_stacks < MAX_PERMANENT_STACKS:
 		if find_adjacent_extra_slot_offer_board_index() < 0:
@@ -2369,6 +2524,7 @@ func _unlock_adjacent_slots_for_level_range(previous_level: int, new_level: int)
 		active_stacks += 1
 		next_free_slot_unlock_level = GameRulesScript.next_free_slot_unlock_level(unlock_level)
 		unlocked = true
+	_slot_unlock_busy = false
 	if unlocked:
 		_clear_undo_snapshot()
 		refresh_all_stack_layout()
@@ -3100,77 +3256,85 @@ func layout_mock_ui() -> void:
 	var chip_h: float = HUD_CHIP_HEIGHT * scale
 	# Home/tienda/ajustes: círculos del mismo alto que las pastillas de vidas/estrellas.
 	var corner_w: float = chip_h
-	var layout_w: float = viewport_size.x - edge_margin * 2.0
-	# Home, shop, vidas, estrellas, settings — anchos reales (el ícono cuelga a la izquierda).
+	var inner_gap: float = 10.0 * scale
+	var col_gap: float = HUD_CHIP_GAP * scale
 	var hang: float = HudTextureButtons.resource_chip_hang(
 		chip_h, HUD_RESOURCE_PILL_H_RATIO, HUD_RESOURCE_ICON_H_RATIO
 	)
 	var resource_w: float = HudTextureButtons.resource_chip_visual_width(
 		chip_h, stat_w, HUD_RESOURCE_PILL_H_RATIO, HUD_RESOURCE_ICON_H_RATIO
 	)
-	var chips_w: float = corner_w * 3.0 + resource_w * 2.0
-	var gaps_count: float = 4.0
-	var gap: float = (layout_w - chips_w) / gaps_count
-	if gap < 6.0 * scale:
-		var min_gap: float = 6.0 * scale
-		var shrink: float = clampf((layout_w - min_gap * gaps_count) / chips_w, 0.72, 1.0)
+	var pair_gap: float = HudTextureButtons.resource_chip_pair_gap(chip_h, inner_gap)
+	var left_w: float = corner_w * 2.0 + inner_gap
+	var center_w: float = resource_w * 2.0 + pair_gap
+	var right_w: float = corner_w
+	var required: float = edge_margin * 2.0 + left_w + center_w + right_w + col_gap * 2.0
+	if required > viewport_size.x and required > 0.0:
+		var shrink: float = clampf(viewport_size.x / required, 0.72, 1.0)
 		stat_w *= shrink
 		chip_h *= shrink
 		corner_w = chip_h
+		inner_gap *= shrink
+		col_gap *= shrink
 		hang = HudTextureButtons.resource_chip_hang(
 			chip_h, HUD_RESOURCE_PILL_H_RATIO, HUD_RESOURCE_ICON_H_RATIO
 		)
 		resource_w = HudTextureButtons.resource_chip_visual_width(
 			chip_h, stat_w, HUD_RESOURCE_PILL_H_RATIO, HUD_RESOURCE_ICON_H_RATIO
 		)
-		chips_w = corner_w * 3.0 + resource_w * 2.0
-		gap = (layout_w - chips_w) / gaps_count
+		pair_gap = HudTextureButtons.resource_chip_pair_gap(chip_h, inner_gap)
+		left_w = corner_w * 2.0 + inner_gap
+		center_w = resource_w * 2.0 + pair_gap
+		right_w = corner_w
 	var corner_size := Vector2(corner_w, chip_h)
 	var stat_size := Vector2(stat_w, chip_h)
 	var pill_radius := int(chip_h * 0.5)
 	var icon_corner: float = chip_h * HUD_BOARD_ROUND_ICON_RATIO
 
-	var chip_x: float = edge_margin
-	layout_hud_pill_pair(home_chip_shadow, home_chip, Vector2(chip_x, chip_y), corner_size, scale)
+	# Tres columnas: home+shop | vidas+estrellas | settings.
+	var left_x: float = edge_margin
+	layout_hud_pill_pair(home_chip_shadow, home_chip, Vector2(left_x, chip_y), corner_size, scale)
 	_apply_hud_chip_styles(home_chip_shadow, home_chip, pill_radius, corner_size)
 	if home_chip_icon != null:
 		home_chip_icon.custom_minimum_size = Vector2(icon_corner, icon_corner)
-	chip_x += corner_size.x + gap
 
-	layout_hud_pill_pair(shop_chip_shadow, shop_chip, Vector2(chip_x, chip_y), corner_size, scale)
+	var shop_x: float = left_x + corner_w + inner_gap
+	layout_hud_pill_pair(shop_chip_shadow, shop_chip, Vector2(shop_x, chip_y), corner_size, scale)
 	_apply_hud_chip_styles(shop_chip_shadow, shop_chip, pill_radius, corner_size)
 	if shop_chip_icon != null:
 		shop_chip_icon.custom_minimum_size = Vector2(icon_corner, icon_corner)
-	chip_x += corner_size.x + gap
+
+	var settings_x: float = viewport_size.x - edge_margin - right_w
+	layout_hud_pill_pair(settings_chip_shadow, settings_chip, Vector2(settings_x, chip_y), corner_size, scale)
+	_apply_hud_chip_styles(settings_chip_shadow, settings_chip, pill_radius, corner_size)
+	if settings_chip_icon != null:
+		settings_chip_icon.custom_minimum_size = Vector2(icon_corner, icon_corner)
+
+	var center_x: float = (viewport_size.x - center_w) * 0.5
+	var min_center: float = left_x + left_w + col_gap
+	var max_center: float = settings_x - col_gap - center_w
+	center_x = clampf(center_x, min_center, maxf(min_center, max_center))
 
 	# pill_pos es el borde izquierdo del pill; el ícono cuelga `hang` hacia la izquierda.
 	HudTextureButtons.layout_resource_chip(
 		life_chip_parts,
-		Vector2(chip_x + hang, chip_y),
+		Vector2(center_x + hang, chip_y),
 		stat_size,
 		0.36,
 		38,
 		HUD_RESOURCE_PILL_H_RATIO,
 		HUD_RESOURCE_ICON_H_RATIO
 	)
-	chip_x += resource_w + gap
-
 	if not stars_chip_parts.is_empty():
 		HudTextureButtons.layout_resource_chip(
 			stars_chip_parts,
-			Vector2(chip_x + hang, chip_y),
+			Vector2(center_x + resource_w + pair_gap + hang, chip_y),
 			stat_size,
 			0.36,
 			38,
 			HUD_RESOURCE_PILL_H_RATIO,
 			HUD_RESOURCE_ICON_H_RATIO
 		)
-	chip_x += resource_w + gap
-
-	layout_hud_pill_pair(settings_chip_shadow, settings_chip, Vector2(chip_x, chip_y), corner_size, scale)
-	_apply_hud_chip_styles(settings_chip_shadow, settings_chip, pill_radius, corner_size)
-	if settings_chip_icon != null:
-		settings_chip_icon.custom_minimum_size = Vector2(icon_corner, icon_corner)
 
 	var progress_w = viewport_size.x * 0.78
 	var progress_h = 54 * scale
@@ -3367,9 +3531,11 @@ func perform_mix_action() -> void:
 		% [all_values.size(), spaces, stacks.size(), STACK_CAPACITY]
 	)
 
-	# 3) Plan homogéneo (con fusiones virtuales de 10) y recolocar.
+	# 3) Colapsar una generación (10 iguales → siguiente) y recolocar por número.
+	# Sin colapso, 12 cincos quedan 10+2 y al fusionar in situ no se juntan los 6.
+	# skip_fusions: 50 cuatros → 10 cincos; fusionar después encadenaba 4→6.
 	var plan: Array = GameRulesScript.build_mix_stack_plan(
-		all_values, stacks.size(), STACK_CAPACITY
+		all_values, stacks.size(), STACK_CAPACITY, true
 	)
 	var placed_count := 0
 	for si in range(stacks.size()):
@@ -3397,8 +3563,7 @@ func perform_mix_action() -> void:
 	refresh_all_stack_layout()
 	queue_redraw()
 	print("Mezclar: reordenado → %d fichas en %d ranuras." % [placed_count, stacks.size()])
-	resolve_fusions()
-	resolve_board_after_action()
+	resolve_board_after_action(-1, true)
 
 func perform_hammer_action() -> void:
 	if board_locked:
@@ -4320,5 +4485,8 @@ func hide_wildcard_unlock_panel() -> void:
 
 func _on_wildcard_unlock_continue_pressed() -> void:
 	hide_wildcard_unlock_panel()
+	if not _pending_level_up_alerts.is_empty():
+		_show_next_level_up_alert()
+		return
 	try_show_wildcard_unlock_panel()
 	check_blocked_state()

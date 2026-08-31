@@ -47,22 +47,26 @@ func _test_temp_action_close_sequence() -> void:
 	_ok("temp_action_close_sequence")
 
 func _test_unlock_cursor() -> void:
-	var keep := GameSlotServiceScript.ensure_unlock_cursor(7, 15, 4)
-	if keep != 7:
+	var keep := GameSlotServiceScript.ensure_unlock_cursor(7, 15, 2)
+	if keep != 8:
 		_fail("unlock_cursor_keep", str(keep))
 		return
-	var init := GameSlotServiceScript.ensure_unlock_cursor(0, 15, 4)
-	if init != 19:
+	var init := GameSlotServiceScript.ensure_unlock_cursor(0, 15, 2)
+	if init != 18:
 		_fail("unlock_cursor_init", str(init))
 		return
 	_ok("unlock_cursor")
 
 func _test_unlock_decision() -> void:
-	if not GameSlotServiceScript.is_stale_unlock(10, 10):
-		_fail("stale_equal")
+	if GameSlotServiceScript.is_stale_unlock(10, 10):
+		_fail("equal_is_not_stale")
 		return
-	if GameSlotServiceScript.can_grant_free_unlock(10, 11, 10):
-		_fail("grant_rejected_stale")
+	if not GameSlotServiceScript.is_stale_unlock(11, 10):
+		_fail("past_is_stale")
+		return
+	# 43→44 con cursor en 43: hay que otorgar la ranura, no saltar a 45.
+	if not GameSlotServiceScript.can_grant_free_unlock(43, 44, 43):
+		_fail("grant_missed_unlock_on_next_level")
 		return
 	if not GameSlotServiceScript.can_grant_free_unlock(10, 12, 12):
 		_fail("grant_exact_level")

@@ -341,10 +341,10 @@ func _build_ui() -> void:
 
 	preview_avatar = TextureRect.new()
 	preview_avatar.set_anchors_preset(Control.PRESET_FULL_RECT)
-	preview_avatar.offset_left = 10
-	preview_avatar.offset_top = 10
-	preview_avatar.offset_right = -10
-	preview_avatar.offset_bottom = -10
+	preview_avatar.offset_left = 5
+	preview_avatar.offset_top = 5
+	preview_avatar.offset_right = -5
+	preview_avatar.offset_bottom = -5
 	preview_avatar.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	preview_avatar.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	preview_avatar.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -942,7 +942,7 @@ func _apply_preview_frame_style(side: float = -1.0) -> void:
 		return
 	if side <= 0.0:
 		side = preview_frame.custom_minimum_size.x
-	var border_w := int(clampf(side * 0.12, 8.0, 18.0))
+	var border_w := int(clampf(side * 0.06, 4.0, 8.0))
 	var radius := int(side * 0.38)
 	var border_col := _pending_border_color()
 	preview_frame.add_theme_stylebox_override(

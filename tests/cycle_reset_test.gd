@@ -1,7 +1,9 @@
 extends SceneTree
 
-## Verifica la lógica de ciclo de tablero (reset al conseguir ficha 15/30/45 + rangos de tirada).
+## Verifica la lógica de ciclo de tablero (reset al conseguir ficha 15/25/35 + rangos de tirada).
 ## godot --headless --path . --script res://tests/cycle_reset_test.gd
+
+const GameEngineScript = preload("res://game_engine.gd")
 
 var _failed := 0
 var _passed := 0
@@ -47,66 +49,55 @@ func _floor_for_milestone(milestone: int) -> int:
 	return milestone - CHECKPOINT_BASE_VALUE + 1
 
 func _next_milestone(roll_value_floor: int) -> int:
-	return (_cycle_index_from_floor(roll_value_floor) + 1) * BOARD_CYCLE_LEVELS
+	return GameEngineScript.next_cycle_coin_milestone(
+		roll_value_floor, CHECKPOINT_BASE_VALUE, BOARD_CYCLE_LEVELS
+	)
 
 func _reached_milestone(hv: int, roll_value_floor: int) -> int:
-	var found := 0
-	var next_m := _next_milestone(roll_value_floor)
-	while next_m > 0 and next_m <= hv:
-		found = next_m
-		next_m += BOARD_CYCLE_LEVELS
-	return found
+	return GameEngineScript.reached_cycle_coin_milestone(
+		hv, roll_value_floor, CHECKPOINT_BASE_VALUE, BOARD_CYCLE_LEVELS
+	)
 
 func _test_milestones() -> void:
-	for m in [15, 30, 45, 60]:
-		if m % BOARD_CYCLE_LEVELS != 0:
+	for m in [15, 25, 35, 45]:
+		if not GameEngineScript.is_cycle_coin_milestone(m, BOARD_CYCLE_LEVELS):
 			_fail("milestone_%d" % m)
 			return
-		if _floor_for_milestone(m) != m - 4:
+		if GameEngineScript.cycle_reset_roll_value_floor(m, CHECKPOINT_BASE_VALUE) != m - 4:
 			_fail("floor_%d" % m)
 			return
-	_ok("milestones_15_30_45_60")
+	if GameEngineScript.is_cycle_coin_milestone(30, BOARD_CYCLE_LEVELS):
+		_fail("30_is_not_milestone")
+		return
+	_ok("milestones_15_25_35_45")
 
 func _test_roll_ranges() -> void:
-	# Tras reset @15: piso 11, techo 14 (objetivo 15)
-	if not (_floor_for_milestone(15) == 11):
+	if GameEngineScript.cycle_reset_roll_value_floor(15, CHECKPOINT_BASE_VALUE) != 11:
 		_fail("range_15_floor")
 		return
-	if not (_floor_for_milestone(30) == 26):
-		_fail("range_30_floor")
+	if GameEngineScript.cycle_reset_roll_value_floor(25, CHECKPOINT_BASE_VALUE) != 21:
+		_fail("range_25_floor")
 		return
-	if not (_floor_for_milestone(45) == 41):
-		_fail("range_45_floor")
+	if GameEngineScript.cycle_reset_roll_value_floor(35, CHECKPOINT_BASE_VALUE) != 31:
+		_fail("range_35_floor")
 		return
 	_ok("roll_ranges_post_reset")
 
-func _evaluate(hv: int, roll_value_floor: int, has_half: bool) -> int:
-	var offset := _coin_offset_from_floor(roll_value_floor)
-	var local_hv := hv - offset
-	var cycle_base := _cycle_base_from_floor(roll_value_floor)
-	if local_hv < CHECKPOINT_BASE_VALUE:
-		return 1 if cycle_base == 0 else cycle_base
-	var local_level := 2 * (local_hv - CHECKPOINT_BASE_VALUE) + 2 + (1 if has_half else 0)
-	if cycle_base == 0:
-		return local_level
-	return cycle_base + local_level - 1
-
 func _test_evaluate_mapping() -> void:
-	# Ciclo 0: crear 5 → nivel 2
-	if _evaluate(5, 1, false) != 2:
-		_fail("c1_create5", str(_evaluate(5, 1, false)))
+	# Ciclo 1: 5 cincos → nivel 2; un 5 suelto no cuenta.
+	if GameEngineScript.evaluate_checkpoint_level(5, 1, 1, CHECKPOINT_BASE_VALUE, 5, BOARD_CYCLE_LEVELS) != 1:
+		_fail("c1_one5", str(GameEngineScript.evaluate_checkpoint_level(5, 1, 1, CHECKPOINT_BASE_VALUE, 5, BOARD_CYCLE_LEVELS)))
 		return
-	# Ciclo 0: half de 11 → checkpoint 15, PERO no debe resetear (sin ficha 15)
-	if _evaluate(11, 1, true) != 15:
-		_fail("c1_half11", str(_evaluate(11, 1, true)))
+	if GameEngineScript.evaluate_checkpoint_level(5, 5, 1, CHECKPOINT_BASE_VALUE, 5, BOARD_CYCLE_LEVELS) != 2:
+		_fail("c1_half5")
 		return
-	# Tras reset @15 (floor 11), fichas 11-14 no deben saltar checkpoint
-	if _evaluate(14, 11, false) != 15:
-		_fail("c2_stay15", str(_evaluate(14, 11, false)))
+	# Tras reset @15 (floor 11), fichas 11-14 se quedan en el hito.
+	var origin15 := GameEngineScript.cycle_checkpoint_origin(15, 15)
+	if GameEngineScript.evaluate_checkpoint_level(14, 1, 11, CHECKPOINT_BASE_VALUE, 5, BOARD_CYCLE_LEVELS, origin15) != 15:
+		_fail("c2_stay15", str(GameEngineScript.evaluate_checkpoint_level(14, 1, 11, CHECKPOINT_BASE_VALUE, 5, BOARD_CYCLE_LEVELS, origin15)))
 		return
-	# Tener 15 con floor 11 (local 5) → nivel 16; no hay que volver a crearla
-	if _evaluate(15, 11, false) != 16:
-		_fail("c2_has15", str(_evaluate(15, 11, false)))
+	if GameEngineScript.evaluate_checkpoint_level(15, 1, 11, CHECKPOINT_BASE_VALUE, 5, BOARD_CYCLE_LEVELS, origin15) != 15:
+		_fail("c2_one15_stays")
 		return
 	_ok("evaluate_cycle_mapping")
 
@@ -124,9 +115,9 @@ func _test_reset_trigger_is_coin_not_level() -> void:
 	if _reached_milestone(15, 1) != 15:
 		_fail("coin15_reset", str(_reached_milestone(15, 1)))
 		return
-	# Tras ciclo 1, crear 30 → reset a 30
-	if _reached_milestone(30, 11) != 30:
-		_fail("coin30_reset", str(_reached_milestone(30, 11)))
+	# Tras ciclo 1, crear 25 → reset a 25
+	if _reached_milestone(25, 11) != 25:
+		_fail("coin25_reset", str(_reached_milestone(25, 11)))
 		return
 	# Tras ciclo 1, ficha 15 no vuelve a resetear
 	if _reached_milestone(15, 11) != 0:

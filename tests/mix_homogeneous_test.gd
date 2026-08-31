@@ -16,10 +16,13 @@ func _run() -> void:
 	_test_partial_groups_fit()
 	_test_large_group_split()
 	_test_collapse_tens_before_place()
+	_test_collapse_one_generation_only()
 	_test_overflow_keeps_largest_pure()
 	_test_plan_places_every_coin()
 	_test_no_mix_when_chunks_fit()
 	_test_opening_deal_skips_fusion()
+	_test_overflow_uses_empty_stacks_by_number()
+	_test_regroups_fused_remainder()
 	print("=== RESULT: %d passed, %d failed ===" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -127,6 +130,23 @@ func _test_collapse_tens_before_place() -> void:
 		return
 	_ok("collapse_tens")
 
+func _test_collapse_one_generation_only() -> void:
+	# 50 × 4 → 10 × 5. La cascada vieja seguía a 2 × 6 y saltaba al nivel 4/9.
+	var values: Array = []
+	for _i in range(50):
+		values.append(4)
+	var plan: Array = GameRules.build_mix_stack_plan(values, 5, STACK_CAPACITY, true)
+	if _count_value(plan, 6) != 0:
+		_fail("collapse_no_sixes", "6s=%d" % _count_value(plan, 6))
+		return
+	if _count_value(plan, 5) != 10:
+		_fail("collapse_ten_fives", "5s=%d" % _count_value(plan, 5))
+		return
+	if _count_value(plan, 4) != 0:
+		_fail("collapse_no_fours", "4s=%d" % _count_value(plan, 4))
+		return
+	_ok("collapse_one_generation")
+
 func _test_overflow_keeps_largest_pure() -> void:
 	# Más colores que ranuras → inevitablemente alguna pila mixta,
 	# pero los grupos grandes quedan puros.
@@ -226,3 +246,64 @@ func _test_opening_deal_skips_fusion() -> void:
 	if not _assert_all_homogeneous(plan, "opening_homogeneous"):
 		return
 	_ok("opening_deal_skips_fusion")
+
+func _test_overflow_uses_empty_stacks_by_number() -> void:
+	# 6 grupos en 5 ranuras: el resto no debe ir todo a una pila dejando otra vacía.
+	var values: Array = []
+	for _i in range(9):
+		values.append(5)
+	for _i in range(8):
+		values.append(1)
+	for _i in range(7):
+		values.append(6)
+	for _i in range(6):
+		values.append(8)
+	for _i in range(6):
+		values.append(4)
+	for _i in range(5):
+		values.append(3)
+	var plan := _plan(values, 5)
+	if _total_planned(plan) != values.size():
+		_fail("overflow_empty_count", "%d vs %d" % [_total_planned(plan), values.size()])
+		return
+	var used := 0
+	for segment in plan:
+		if not (segment as Array).is_empty():
+			used += 1
+	if used < 5:
+		_fail("overflow_uses_all_stacks", "used=%d plan=%s" % [used, str(plan)])
+		return
+	var pure_big := 0
+	for segment in plan:
+		if segment.is_empty():
+			continue
+		var first := int(segment[0])
+		var homogeneous := true
+		for raw in segment:
+			if int(raw) != first:
+				homogeneous = false
+				break
+		if homogeneous and segment.size() >= 6:
+			pure_big += 1
+	if pure_big < 2:
+		_fail("overflow_keeps_groups_by_number", "pure_big=%d plan=%s" % [pure_big, str(plan)])
+		return
+	_ok("overflow_uses_empty_stacks_by_number")
+
+func _test_regroups_fused_remainder() -> void:
+	# 12 × 5 + 3 × 6 → colapsa a 2×6 + 2×5 + 3×6 = 2 cincos y 5 seises, homogéneo.
+	var values: Array = []
+	for _i in range(12):
+		values.append(5)
+	for _i in range(3):
+		values.append(6)
+	var plan := _plan(values, 4)
+	if not _assert_all_homogeneous(plan, "regroup_fused_homogeneous"):
+		return
+	if _count_value(plan, 5) != 2:
+		_fail("regroup_leftover_fives", "5s=%d" % _count_value(plan, 5))
+		return
+	if _count_value(plan, 6) != 5:
+		_fail("regroup_all_sixes", "6s=%d" % _count_value(plan, 6))
+		return
+	_ok("regroups_fused_remainder")

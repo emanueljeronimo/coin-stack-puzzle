@@ -18,6 +18,23 @@ static func apply_level_up(current_level: int, max_value: int) -> Dictionary:
 		"max_value": max_value + 1,
 	}
 
+## El objetivo avanza de a 1 solo si ya existe la ficha siguiente (max+1).
+## Ochos residuales con max=5 no cuentan como nivel 8/9 en el mismo turno.
+static func catch_up_max_value(current_level: int, max_value: int, has_next_value: bool) -> Dictionary:
+	if not has_next_value:
+		return {
+			"current_level": current_level,
+			"max_value": max_value,
+			"changed": false,
+			"steps": 0,
+		}
+	return {
+		"current_level": current_level + 1,
+		"max_value": max_value + 1,
+		"changed": true,
+		"steps": 1,
+	}
+
 static func decide_checkpoint_update(
 	previous_checkpoint: int,
 	evaluated_checkpoint: int,
@@ -26,13 +43,14 @@ static func decide_checkpoint_update(
 	if cycle_milestone > 0:
 		return {
 			"changed": true,
-			"checkpoint_level": maxi(previous_checkpoint, cycle_milestone),
+			"checkpoint_level": maxi(previous_checkpoint, maxi(evaluated_checkpoint, cycle_milestone)),
 			"did_cycle_reset": true,
 		}
 	if evaluated_checkpoint > previous_checkpoint:
 		return {
 			"changed": true,
-			"checkpoint_level": evaluated_checkpoint,
+			# Como mucho mitad + completar en la misma jugada (1→3). Nunca 1→9.
+			"checkpoint_level": mini(evaluated_checkpoint, previous_checkpoint + 2),
 			"did_cycle_reset": false,
 		}
 	return {
@@ -43,7 +61,10 @@ static func decide_checkpoint_update(
 
 static func build_cycle_reset_state(milestone_level: int, config: Dictionary) -> Dictionary:
 	var board_cycle_levels := int(config.get("board_cycle_levels", 15))
-	if milestone_level < board_cycle_levels or milestone_level % board_cycle_levels != 0:
+	if milestone_level < board_cycle_levels or not GameEngineScript.is_cycle_coin_milestone(
+		milestone_level,
+		board_cycle_levels
+	):
 		return {"valid": false}
 	var checkpoint_base_value := int(config.get("checkpoint_base_value", 5))
 	var prestige_checkpoint := int(config.get("checkpoint_level", milestone_level))

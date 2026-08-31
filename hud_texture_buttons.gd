@@ -27,6 +27,9 @@ const LONG_CHIP_ICON_SIZE_RATIO := 0.52
 const LIFE_HEART_ICON_SIZE_RATIO := 1.12
 const LIFE_COUNT_COLOR := Color(0.98, 0.97, 0.94)
 const LIFE_COUNT_OUTLINE := Color(0.28, 0.10, 0.14, 0.92)
+## El PNG deja el cuerpo del corazón ~43% desde arriba (hay vacío abajo del pico).
+const LIFE_COUNT_TOP_RATIO := 0.02
+const LIFE_COUNT_BOTTOM_RATIO := 0.18
 const RESOURCE_PILL_BG := Color(0.97, 0.94, 0.88, 0.98)
 const RESOURCE_PILL_SHADOW := Color(0.18, 0.12, 0.10, 0.22)
 const RESOURCE_TEXT := Color(0.16, 0.20, 0.34)
@@ -209,7 +212,7 @@ static func _texture_to_image(texture: Texture2D) -> Image:
 	return img
 
 
-## Botón de perfil: avatar con borde grueso redondeado tomado del marco del avatar.
+## Botón de perfil: avatar con borde fino redondeado.
 static func create_avatar_chip(texture: Texture2D, path: String = "") -> Dictionary:
 	var shadow := Panel.new()
 	shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -227,16 +230,16 @@ static func create_avatar_chip(texture: Texture2D, path: String = "") -> Diction
 	var border_style := StyleBoxFlat.new()
 	border_style.bg_color = border_col
 	border_style.border_color = border_col
-	border_style.set_border_width_all(12)
+	border_style.set_border_width_all(5)
 	border_style.set_corner_radius_all(22)
 	panel.add_theme_stylebox_override("panel", border_style)
 
 	var avatar := TextureRect.new()
 	avatar.set_anchors_preset(Control.PRESET_FULL_RECT)
-	avatar.offset_left = 12
-	avatar.offset_top = 12
-	avatar.offset_right = -12
-	avatar.offset_bottom = -12
+	avatar.offset_left = 5
+	avatar.offset_top = 5
+	avatar.offset_right = -5
+	avatar.offset_bottom = -5
 	avatar.texture = texture
 	avatar.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	avatar.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
@@ -250,7 +253,7 @@ static func apply_avatar_chip_style(shadow: Panel, panel: Control, avatar: Textu
 		return
 	var side := mini(size.x, size.y)
 	var radius := int(side * 0.36)
-	var border_w := int(clampf(side * 0.14, 10.0, 24.0))
+	var border_w := int(clampf(side * 0.06, 4.0, 8.0))
 	apply_shadow_corner_radius(shadow, radius)
 	if panel == null:
 		return
@@ -355,9 +358,9 @@ static func create_life_heart_badge(icon_texture: Texture2D) -> Dictionary:
 	count.add_theme_constant_override("outline_size", 5)
 	count.set_anchors_preset(Control.PRESET_FULL_RECT)
 	count.offset_left = 0
-	count.offset_top = 2
+	count.offset_top = 0
 	count.offset_right = 0
-	count.offset_bottom = 2
+	count.offset_bottom = 0
 	stack.add_child(count)
 	return {"stack": stack, "icon": icon, "count": count}
 
@@ -372,12 +375,13 @@ static func layout_life_heart_badge(
 		stack.custom_minimum_size = Vector2(size, size)
 		stack.size = Vector2(size, size)
 	if count != null:
-		var inset := size * 0.16
-		count.offset_left = inset * 0.3
-		count.offset_right = -inset * 0.3
-		count.offset_top = inset
-		count.offset_bottom = -inset * 0.3
-		count.clip_text = true
+		count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		count.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		count.offset_left = 0.0
+		count.offset_right = 0.0
+		count.offset_top = size * LIFE_COUNT_TOP_RATIO
+		count.offset_bottom = -size * LIFE_COUNT_BOTTOM_RATIO
+		count.clip_text = false
 		count.add_theme_constant_override("outline_size", 4)
 		count.add_theme_font_size_override("font_size", int(clampf(size * font_ratio, 16.0, float(font_max))))
 
