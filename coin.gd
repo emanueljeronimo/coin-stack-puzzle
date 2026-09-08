@@ -1,5 +1,7 @@
 extends Area2D
 
+const CoinVolumeShader = preload("res://coin_volume.gdshader")
+
 var value: int = 1
 var number_visible: bool = true
 
@@ -28,9 +30,11 @@ const VALUE_COLORS := [
 	Color(0.92, 0.92, 0.95), # 15 gris claro
 ]
 
-const PASTEL_SOFTEN := 0.14
-## Aclarado mínimo al aplicar color (la textura gris ya oscurece un poco).
-const COIN_TINT_LIGHTEN := 0.04
+const PASTEL_SOFTEN := 0.28
+const COIN_SATURATION := 0.80
+## Aclara el tinte para que el centro de la ficha quede pastel, no apagado.
+const COIN_TINT_LIGHTEN := 0.16
+const COIN_VALUE_LIFT := 0.16
 const SHADOW_ALPHA := 0.09
 const HIGHLIGHT_ALPHA := 0.14
 const COIN_RADIUS := 24.0
@@ -41,6 +45,7 @@ func _ready() -> void:
 	monitoring = false
 	monitorable = false
 	configure_sprite_scale()
+	_ensure_volume_material()
 	if label:
 		label.z_index = 5
 		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -71,7 +76,10 @@ func get_color_for_value(v: int) -> Color:
 	if v <= 0:
 		return Color.WHITE
 	var idx := (v - 1) % VALUE_COLORS.size()
-	return VALUE_COLORS[idx].lerp(Color.WHITE, PASTEL_SOFTEN)
+	var c: Color = VALUE_COLORS[idx]
+	c.s *= COIN_SATURATION
+	c.v = clampf(c.v * (1.0 - COIN_VALUE_LIFT) + COIN_VALUE_LIFT, 0.0, 1.0)
+	return c.lerp(Color.WHITE, PASTEL_SOFTEN)
 
 func get_sprite_tint(base: Color) -> Color:
 	return base.lightened(COIN_TINT_LIGHTEN)
@@ -81,9 +89,20 @@ func get_shadow_tint(base: Color) -> Color:
 	tinted.a = SHADOW_ALPHA
 	return tinted
 
+func _ensure_volume_material() -> void:
+	if sprite == null:
+		return
+	var mat := sprite.material as ShaderMaterial
+	if mat != null and mat.shader == CoinVolumeShader:
+		return
+	mat = ShaderMaterial.new()
+	mat.shader = CoinVolumeShader
+	sprite.material = mat
+
 func apply_color_by_value() -> void:
 	coin_color = get_color_for_value(value)
 	if sprite:
+		_ensure_volume_material()
 		sprite.self_modulate = get_sprite_tint(coin_color)
 	if shadow_sprite:
 		shadow_sprite.self_modulate = get_shadow_tint(coin_color)
