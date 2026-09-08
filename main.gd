@@ -80,10 +80,9 @@ const HUD_CORNER_SIZE = 70.0
 const HUD_CHIP_STAT_W = 118.0
 ## Pastillas de vidas/estrellas a la misma altura que casa/tienda/ajustes.
 const HUD_RESOURCE_PILL_H_RATIO := 1.0
-const HUD_RESOURCE_ICON_H_RATIO := 1.48
+const HUD_RESOURCE_ICON_H_RATIO := 1.05
 const HUD_BOARD_STAT_FONT_SIZE = 30
 const HUD_BOARD_LONG_ICON_RATIO = 0.56
-const HUD_BOARD_ROUND_ICON_RATIO = 0.74
 const HUD_CHIP_GAP = 26.0
 const HUD_CHIP_TO_PROGRESS_GAP = 26.0
 const HUD_EDGE_MARGIN = 14.0
@@ -213,6 +212,7 @@ var glove_mode_active: bool = false
 var background_sprite: Sprite2D = null
 var hud_layer: CanvasLayer = null
 var settings_layer: CanvasLayer = null
+var shop_layer: CanvasLayer = null
 var hud_root: Control = null
 var home_chip_shadow: Panel = null
 var home_chip: Control = null
@@ -231,6 +231,7 @@ var settings_chip_shadow: Panel = null
 var settings_chip: Control = null
 var settings_chip_icon: TextureRect = null
 var settings_ui: SettingsOverlay = null
+var shop_ui: ShopOverlay = null
 var progress_container: Panel = null
 var progress_fill: TextureRect = null
 var progress_knob: Panel = null
@@ -260,10 +261,8 @@ var cta_label: Label = null
 var undo_shadow: Panel = null
 var undo_button: Control = null
 var undo_icon: Label = null
-var action_shadows: Array = []
 var action_pills: Array = []
 var action_icons: Array = []
-var action_labels: Array = []
 var action_count_badges: Array = []
 var action_count_labels: Array = []
 var wildcard_counts := {
@@ -972,6 +971,8 @@ func apply_save_dict(data: Dictionary) -> void:
 func _input(event: InputEvent) -> void:
 	if settings_ui != null and settings_ui.is_open():
 		return
+	if shop_ui != null and shop_ui.is_open():
+		return
 	# Evitar click-through: si el cartel de subida de nivel está abierto, no procesar input del tablero.
 	if level_up_overlay != null and level_up_overlay.visible:
 		return
@@ -985,10 +986,16 @@ func _input(event: InputEvent) -> void:
 		return
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		if is_control_clicked(home_chip, event.position):
-			go_to_home()
 			return
+		# No abrir acá: el overlay recibiría este mismo click y se cerraría.
+		# El carrito abre por gui_input, igual que Ajustes.
 		if is_control_clicked(shop_chip, event.position):
-			_on_shop_pressed()
+			return
+		if is_control_clicked(settings_chip, event.position):
+			return
+		if is_control_clicked(life_chip, event.position):
+			return
+		if is_control_clicked(stars_chip, event.position):
 			return
 	if board_locked:
 		return
@@ -1019,13 +1026,10 @@ func _input(event: InputEvent) -> void:
 			handle_glove_click(event.position)
 			return
 		if action_pills.size() > 0 and is_control_clicked(action_pills[0], event.position):
-			try_use_wildcard("mix")
 			return
 		if action_pills.size() > 1 and is_control_clicked(action_pills[1], event.position):
-			try_use_wildcard("hammer")
 			return
 		if action_pills.size() > 2 and is_control_clicked(action_pills[2], event.position):
-			try_use_wildcard("glove")
 			return
 		handle_click(event.position)
 
@@ -2996,8 +3000,22 @@ func _open_settings() -> void:
 	if settings_ui != null:
 		settings_ui.open()
 
+func _ensure_shop_ui() -> void:
+	if shop_ui != null:
+		return
+	if shop_layer == null:
+		shop_layer = CanvasLayer.new()
+		shop_layer.layer = 105
+		add_child(shop_layer)
+	shop_ui = ShopOverlay.new()
+	shop_layer.add_child(shop_ui)
+
 func _on_shop_pressed() -> void:
-	print("Tienda — próximamente")
+	if shop_ui == null:
+		_ensure_shop_ui()
+	if shop_ui != null:
+		shop_ui.open()
+		shop_ui.layout_for_viewport(get_viewport_rect().size)
 
 func _on_settings_restart_confirmed() -> void:
 	if not GameState.spend_life():
@@ -3010,6 +3028,23 @@ func _on_settings_restart_confirmed() -> void:
 	# Volver al último checkpoint guardado y salir al home.
 	restore_checkpoint()
 	go_to_home()
+
+func _build_icon_only_chip(icon_texture: Texture2D) -> Dictionary:
+	var panel := Control.new()
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	panel.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	var icon := TextureRect.new()
+	icon.texture = icon_texture
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	icon.set_anchors_preset(Control.PRESET_FULL_RECT)
+	icon.offset_left = 0
+	icon.offset_top = 0
+	icon.offset_right = 0
+	icon.offset_bottom = 0
+	panel.add_child(icon)
+	return {"shadow": null, "panel": panel, "icon": icon}
 
 func _build_hud_icon_chip(icon_texture: Texture2D) -> Dictionary:
 	var radius := HUD_PILL_RADIUS
@@ -3107,14 +3142,16 @@ func build_mock_ui() -> void:
 	hud_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hud_layer.add_child(hud_root)
 
-	var home_parts := _build_hud_icon_chip(HomeIconTexture)
+	var home_parts := _build_icon_only_chip(HomeIconTexture)
 	home_chip_shadow = home_parts.shadow
 	home_chip = home_parts.panel
 	home_chip_icon = home_parts.icon
-	var shop_parts := _build_hud_icon_chip(CartIconTexture)
+	_bind_hud_chip_click(home_chip, go_to_home)
+	var shop_parts := _build_icon_only_chip(CartIconTexture)
 	shop_chip_shadow = shop_parts.shadow
 	shop_chip = shop_parts.panel
 	shop_chip_icon = shop_parts.icon
+	_bind_hud_chip_click(shop_chip, _on_shop_pressed)
 	var life_parts := HudTextureButtons.create_resource_chip(LifeIconTexture, true)
 	life_chip_parts = life_parts
 	life_chip = life_parts.panel
@@ -3133,18 +3170,15 @@ func build_mock_ui() -> void:
 	_bind_hud_chip_click(stars_chip, _on_shop_pressed)
 	if stars_parts.plus != null:
 		(stars_parts.plus as Button).pressed.connect(_on_shop_pressed)
-	var settings_parts := _build_hud_icon_chip(SettingsIconTexture)
+	var settings_parts := _build_icon_only_chip(SettingsIconTexture)
 	settings_chip_shadow = settings_parts.shadow
 	settings_chip = settings_parts.panel
 	settings_chip_icon = settings_parts.icon
 	_bind_hud_chip_click(settings_chip, _open_settings)
-	hud_root.add_child(home_chip_shadow)
 	hud_root.add_child(home_chip)
-	hud_root.add_child(shop_chip_shadow)
 	hud_root.add_child(shop_chip)
 	hud_root.add_child(life_chip)
 	hud_root.add_child(stars_chip)
-	hud_root.add_child(settings_chip_shadow)
 	hud_root.add_child(settings_chip)
 
 	progress_container = create_panel(PROGRESS_TRACK_BG, PROGRESS_TRACK_BORDER, 24)
@@ -3179,26 +3213,21 @@ func build_mock_ui() -> void:
 	_update_undo_button_state()
 
 	var action_index := 0
-	for action_text in ["Mezclar", "Martillo", "Guante"]:
-		var action_shadow = create_shadow_panel(40)
-		var action = HudTextureButtons.create_gradient_pill()
+	for _action_text in ["Mezclar", "Martillo", "Guante"]:
 		var wildcard_type: String = WILDCARD_TYPES[action_index]
-		var icon = create_wildcard_icon_texture_rect(get_wildcard_icon_texture(wildcard_type))
-		var lbl = create_label(action_text, 24, Color(0.29, 0.45, 0.29))
-		hud_root.add_child(action_shadow)
+		var action_parts := _build_icon_only_chip(get_wildcard_icon_texture(wildcard_type))
+		var action: Control = action_parts.panel
+		var icon: TextureRect = action_parts.icon
+		_bind_hud_chip_click(action, try_use_wildcard.bind(wildcard_type))
 		hud_root.add_child(action)
-		hud_root.add_child(icon)
-		hud_root.add_child(lbl)
 		var count_badge = create_panel(Color(0.99, 0.99, 0.95, 0.98), Color(0.80, 0.86, 0.72, 0.92), 18)
 		var count_label = create_label("", 24, Color(0.27, 0.43, 0.24))
 		count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		count_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		count_badge.add_child(count_label)
 		hud_root.add_child(count_badge)
-		action_shadows.append(action_shadow)
 		action_pills.append(action)
 		action_icons.append(icon)
-		action_labels.append(lbl)
 		action_count_badges.append(count_badge)
 		action_count_labels.append(count_label)
 		action_index += 1
@@ -3229,6 +3258,8 @@ func build_mock_ui() -> void:
 	settings_layer.add_child(settings_ui)
 	settings_ui.set_restart_available(true)
 	settings_ui.restart_level_confirmed.connect(_on_settings_restart_confirmed)
+
+	_ensure_shop_ui()
 
 	adjacent_slot_star_error_label = Label.new()
 	adjacent_slot_star_error_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -3289,26 +3320,16 @@ func layout_mock_ui() -> void:
 	var corner_size := Vector2(corner_w, chip_h)
 	var stat_size := Vector2(stat_w, chip_h)
 	var pill_radius := int(chip_h * 0.5)
-	var icon_corner: float = chip_h * HUD_BOARD_ROUND_ICON_RATIO
 
 	# Tres columnas: home+shop | vidas+estrellas | settings.
 	var left_x: float = edge_margin
-	layout_hud_pill_pair(home_chip_shadow, home_chip, Vector2(left_x, chip_y), corner_size, scale)
-	_apply_hud_chip_styles(home_chip_shadow, home_chip, pill_radius, corner_size)
-	if home_chip_icon != null:
-		home_chip_icon.custom_minimum_size = Vector2(icon_corner, icon_corner)
+	layout_hud_pill_pair(null, home_chip, Vector2(left_x, chip_y), corner_size, scale)
 
 	var shop_x: float = left_x + corner_w + inner_gap
-	layout_hud_pill_pair(shop_chip_shadow, shop_chip, Vector2(shop_x, chip_y), corner_size, scale)
-	_apply_hud_chip_styles(shop_chip_shadow, shop_chip, pill_radius, corner_size)
-	if shop_chip_icon != null:
-		shop_chip_icon.custom_minimum_size = Vector2(icon_corner, icon_corner)
+	layout_hud_pill_pair(null, shop_chip, Vector2(shop_x, chip_y), corner_size, scale)
 
 	var settings_x: float = viewport_size.x - edge_margin - right_w
-	layout_hud_pill_pair(settings_chip_shadow, settings_chip, Vector2(settings_x, chip_y), corner_size, scale)
-	_apply_hud_chip_styles(settings_chip_shadow, settings_chip, pill_radius, corner_size)
-	if settings_chip_icon != null:
-		settings_chip_icon.custom_minimum_size = Vector2(icon_corner, icon_corner)
+	layout_hud_pill_pair(null, settings_chip, Vector2(settings_x, chip_y), corner_size, scale)
 
 	var center_x: float = (viewport_size.x - center_w) * 0.5
 	var min_center: float = left_x + left_w + col_gap
@@ -3376,7 +3397,6 @@ func layout_mock_ui() -> void:
 	undo_button.size = Vector2(undo_size, undo_size)
 	undo_shadow.position = undo_button.position + Vector2(0, 4.0 * scale)
 	undo_shadow.size = undo_button.size
-	var icon_btn_radius := int(38.0 * scale)
 	_apply_hud_chip_styles(undo_shadow, undo_button, int(undo_size * 0.45), undo_button.size)
 	if undo_icon != null:
 		undo_icon.add_theme_font_size_override("font_size", int(UNDO_ICON_FONT_SIZE * scale * (undo_size / icon_btn_size)))
@@ -3391,20 +3411,8 @@ func layout_mock_ui() -> void:
 	var badge_font = int(22.0 * scale)
 	for i in range(action_pills.size()):
 		var x = actions_start_x + i * (action_size + action_gap)
-		action_shadows[i].position = Vector2(x, action_y + 4.0 * scale)
-		action_shadows[i].size = Vector2(action_size, action_size)
 		action_pills[i].position = Vector2(x, action_y)
 		action_pills[i].size = Vector2(action_size, action_size)
-		_apply_hud_chip_styles(
-			action_shadows[i], action_pills[i], icon_btn_radius, Vector2(action_size, action_size)
-		)
-		var icon_size = action_size * 0.62
-		action_icons[i].position = Vector2(
-			x + (action_size - icon_size) * 0.5,
-			action_y + (action_size - icon_size) * 0.5
-		)
-		action_icons[i].size = Vector2(icon_size, icon_size)
-		action_labels[i].visible = false
 		action_count_badges[i].position = Vector2(x + action_size - badge_w * 0.72, action_y - 8.0 * scale)
 		action_count_badges[i].size = Vector2(badge_w, badge_h)
 		action_count_labels[i].position = Vector2.ZERO
@@ -3415,6 +3423,8 @@ func layout_mock_ui() -> void:
 
 	if settings_ui != null:
 		settings_ui.layout_for_viewport(viewport_size)
+	if shop_ui != null:
+		shop_ui.layout_for_viewport(viewport_size)
 
 func update_life_display() -> void:
 	lives = GameState.lives
@@ -3690,10 +3700,6 @@ func update_wildcard_badges() -> void:
 		var modulate_color := Color.WHITE if unlocked else WILDCARD_LOCKED_MODULATE
 		if i < action_pills.size():
 			action_pills[i].modulate = modulate_color
-		if i < action_shadows.size():
-			action_shadows[i].modulate = modulate_color
-		if i < action_icons.size():
-			action_icons[i].modulate = modulate_color
 		if i < action_count_badges.size():
 			action_count_badges[i].visible = true
 		if i < action_count_labels.size():

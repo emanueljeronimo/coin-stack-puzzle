@@ -27,17 +27,17 @@ const LONG_CHIP_ICON_SIZE_RATIO := 0.52
 const LIFE_HEART_ICON_SIZE_RATIO := 1.12
 const LIFE_COUNT_COLOR := Color(0.98, 0.97, 0.94)
 const LIFE_COUNT_OUTLINE := Color(0.28, 0.10, 0.14, 0.92)
-## El PNG deja el cuerpo del corazón ~43% desde arriba (hay vacío abajo del pico).
-const LIFE_COUNT_TOP_RATIO := 0.02
-const LIFE_COUNT_BOTTOM_RATIO := 0.18
+## El PNG llena el recuadro: el número va al centro del corazón.
+const LIFE_COUNT_TOP_RATIO := 0.18
+const LIFE_COUNT_BOTTOM_RATIO := 0.22
 const RESOURCE_PILL_BG := Color(0.97, 0.94, 0.88, 0.98)
 const RESOURCE_PILL_SHADOW := Color(0.18, 0.12, 0.10, 0.22)
 const RESOURCE_TEXT := Color(0.16, 0.20, 0.34)
 const RESOURCE_PLUS_BG := Color(0.40, 0.78, 0.30, 1.0)
 const RESOURCE_PLUS_BORDER := Color(0.28, 0.58, 0.20, 1.0)
-## El pill es más bajo que la fila HUD; el ícono queda claramente más grande.
+## Ícono un poco más grande que el pill, sin taparlo.
 const RESOURCE_PILL_HEIGHT_RATIO := 0.66
-const RESOURCE_ICON_HEIGHT_RATIO := 2.15
+const RESOURCE_ICON_HEIGHT_RATIO := 1.18
 const RESOURCE_ICON_HANG := 0.40
 
 static func get_button_size(texture: Texture2D, width: float) -> Vector2:

@@ -6,6 +6,7 @@ const StarIconTexture = preload("res://Imagenes/icono-estrella.png")
 const CartIconTexture = preload("res://Imagenes/icono-cart.png")
 const SettingsIconTexture = preload("res://Imagenes/icono-settings.png")
 const CoinScene = preload("res://coin.tscn")
+const ShopScene = preload("res://Shop.tscn")
 const LogoFont = preload("res://Fonts/Chewy-Regular.ttf")
 const GameScenePath := "res://Main.tscn"
 
@@ -24,7 +25,6 @@ const LOBBY_STAT_FONT_SIZE := 48
 const HUD_PILL_TEXT := Color(0.95, 0.98, 0.92)
 const HUD_PILL_RADIUS := 34
 const LOBBY_CHIP_HEIGHT_RATIO := 0.76
-const LOBBY_CORNER_ICON_RATIO := 0.68
 const LOBBY_STAT_ICON_RATIO := 0.56
 
 const PLAY_WIDTH_RATIO := 0.46
@@ -61,6 +61,8 @@ var showcase_coin: Node2D = null
 var play_button: TextureButton = null
 var settings_layer: CanvasLayer = null
 var settings_ui: SettingsOverlay = null
+var shop_layer: CanvasLayer = null
+var shop_ui: ShopOverlay = null
 var profile_layer: CanvasLayer = null
 var profile_ui: ProfileOverlay = null
 
@@ -119,7 +121,7 @@ func build_ui() -> void:
 	profile_avatar = profile_parts.avatar
 	_bind_chip_click(profile_button, _open_profile)
 
-	var shop_parts := _build_hud_icon_chip(CartIconTexture)
+	var shop_parts := _build_icon_only_chip(CartIconTexture)
 	shop_button_shadow = shop_parts.shadow
 	shop_button = shop_parts.panel
 	shop_button_icon = shop_parts.icon
@@ -143,7 +145,7 @@ func build_ui() -> void:
 	_bind_chip_click(stars_button, _on_shop_pressed)
 	if stars_parts.plus != null:
 		(stars_parts.plus as Button).pressed.connect(_on_shop_pressed)
-	var settings_parts := _build_hud_icon_chip(SettingsIconTexture)
+	var settings_parts := _build_icon_only_chip(SettingsIconTexture)
 	settings_button_shadow = settings_parts.shadow
 	settings_button = settings_parts.panel
 	settings_button_icon = settings_parts.icon
@@ -153,9 +155,7 @@ func build_ui() -> void:
 	hud_root.add_child(profile_button)
 	hud_root.add_child(life_button)
 	hud_root.add_child(stars_button)
-	hud_root.add_child(settings_button_shadow)
 	hud_root.add_child(settings_button)
-	hud_root.add_child(shop_button_shadow)
 	hud_root.add_child(shop_button)
 
 	level_label = Label.new()
@@ -177,6 +177,7 @@ func build_ui() -> void:
 		showcase_coin.set_value(SaveManager.get_max_unlocked_coin_value())
 
 	build_settings_dialog()
+	build_shop_dialog()
 	build_profile_editor()
 
 	play_button = HudTextureButtons.create_play()
@@ -196,6 +197,13 @@ func build_settings_dialog() -> void:
 	add_child(settings_layer)
 	settings_ui = SettingsOverlay.new()
 	settings_layer.add_child(settings_ui)
+
+func build_shop_dialog() -> void:
+	shop_layer = CanvasLayer.new()
+	shop_layer.layer = 105
+	add_child(shop_layer)
+	shop_ui = ShopScene.instantiate()
+	shop_layer.add_child(shop_ui)
 
 func build_profile_editor() -> void:
 	profile_layer = CanvasLayer.new()
@@ -264,6 +272,23 @@ func layout_hud_pill_pair(shadow: Panel, panel: Control, pos: Vector2, size: Vec
 	if shadow != null:
 		shadow.position = pos + Vector2(0, 6.0 * scale)
 		shadow.size = size
+
+func _build_icon_only_chip(icon_texture: Texture2D) -> Dictionary:
+	var panel := Control.new()
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	panel.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	var icon := TextureRect.new()
+	icon.texture = icon_texture
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	icon.set_anchors_preset(Control.PRESET_FULL_RECT)
+	icon.offset_left = 0
+	icon.offset_top = 0
+	icon.offset_right = 0
+	icon.offset_bottom = 0
+	panel.add_child(icon)
+	return {"shadow": null, "panel": panel, "icon": icon}
 
 func _build_hud_icon_chip(icon_texture: Texture2D) -> Dictionary:
 	var radius := HUD_PILL_RADIUS
@@ -384,7 +409,6 @@ func layout_ui() -> void:
 	var min_center_x := edge_margin + avatar_side + 4.0
 	var max_center_x := viewport_size.x - edge_margin - corner_w - total_center_w - 4.0
 	center_x = clampf(center_x, min_center_x, maxf(min_center_x, max_center_x))
-	var icon_corner := chip_h * LOBBY_CORNER_ICON_RATIO
 
 	# Perfil arriba a la izquierda (un poco más grande que el resto de chips).
 	var avatar_size := Vector2(avatar_side, avatar_side)
@@ -408,14 +432,12 @@ func layout_ui() -> void:
 	)
 
 	layout_hud_pill_pair(
-		settings_button_shadow,
+		null,
 		settings_button,
 		Vector2(viewport_size.x - edge_margin - corner_size.x, row_y),
 		corner_size,
 		scale
 	)
-	_apply_hud_chip_styles(settings_button_shadow, settings_button, pill_radius, corner_size)
-	settings_button_icon.custom_minimum_size = Vector2(icon_corner, icon_corner)
 
 	if level_label != null:
 		var level_w := cover.size.x * 0.72
@@ -449,12 +471,12 @@ func layout_ui() -> void:
 	var shop_y := play_pos.y + (play_size.y - shop_size.y) * 0.5
 	if play_button == null:
 		shop_y = viewport_size.y - shop_size.y - edge_margin * 2.0
-	layout_hud_pill_pair(shop_button_shadow, shop_button, Vector2(shop_x, shop_y), shop_size, scale)
-	_apply_hud_chip_styles(shop_button_shadow, shop_button, pill_radius, shop_size)
-	shop_button_icon.custom_minimum_size = Vector2(icon_corner, icon_corner)
+	layout_hud_pill_pair(null, shop_button, Vector2(shop_x, shop_y), shop_size, scale)
 
 	if settings_ui != null:
 		settings_ui.layout_for_viewport(viewport_size)
+	if shop_ui != null:
+		shop_ui.layout_for_viewport(viewport_size)
 	if profile_ui != null:
 		profile_ui.layout_for_viewport(viewport_size)
 
@@ -470,7 +492,9 @@ func _on_play_pressed() -> void:
 	SceneLoader.go_to(GameScenePath)
 
 func _on_shop_pressed() -> void:
-	print("Tienda — próximamente")
+	if shop_ui != null:
+		shop_ui.open()
+		shop_ui.layout_for_viewport(get_viewport_rect().size)
 
 func _open_settings() -> void:
 	if settings_ui != null:
