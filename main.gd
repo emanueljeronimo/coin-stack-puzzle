@@ -77,10 +77,12 @@ const BOARD_SLOT_INSET := 3.0
 const HUD_SIZE_MULTIPLIER = 1.0
 const HUD_CHIP_HEIGHT = 50.0
 const HUD_CORNER_SIZE = 70.0
-const HUD_CHIP_STAT_W = 118.0
-## Pastillas de vidas/estrellas a la misma altura que casa/tienda/ajustes.
-const HUD_RESOURCE_PILL_H_RATIO := 1.0
-const HUD_RESOURCE_ICON_H_RATIO := 1.05
+const HUD_CHIP_STAT_W = 136.0
+## Pastillas de vidas/estrellas: cápsula baja, más larga que alta.
+const HUD_RESOURCE_PILL_H_RATIO := 0.62
+const HUD_LIFE_ICON_H_RATIO := 1.38
+const HUD_MONEY_ICON_H_RATIO := 1.48
+const HUD_MONEY_ICON_W_RATIO := 1.16
 const HUD_BOARD_STAT_FONT_SIZE = 30
 const HUD_BOARD_LONG_ICON_RATIO = 0.56
 const HUD_CHIP_GAP = 26.0
@@ -113,6 +115,11 @@ const CTA_WIDTH_RATIO = 0.40
 const CTA_FOOTER_BTN_GAP = 12.0
 const CTA_HEIGHT = 70.0
 const CTA_FONT_SIZE = 40.0
+## Cian saturado + trazo oscuro, como el icono Mezclar.
+const CTA_ICON_FILL := Color(0.20, 0.76, 0.96, 1.0)
+const CTA_ICON_BORDER := Color(0.08, 0.16, 0.38, 1.0)
+const CTA_ICON_TEXT := Color(0.98, 0.98, 0.96, 1.0)
+const CTA_ICON_TEXT_OUTLINE := Color(0.08, 0.14, 0.32, 0.92)
 ## Mismo tamaño cuadrado para deshacer y comodines.
 const FOOTER_ICON_BUTTON_SIZE = 86.0
 const UNDO_ICON_FONT_SIZE = 40.0
@@ -197,6 +204,10 @@ var _resolve_board_scheduled: bool = false
 var _temp_slot_timer_shown_sec: int = -1
 ## Cola de carteles de subida de nivel (si se saltan varios checkpoints de golpe).
 var _pending_level_up_alerts: Array = []
+## Último nivel cuyo cartel el jugador cerró con Continuar.
+var _last_acked_checkpoint_level: int = 1
+var _visible_level_up_alert: int = 0
+var _level_up_opened_at_msec: int = 0
 var _slot_unlock_busy: bool = false
 ## Hito de ficha (15/30/45…) esperando transición de tablero tras el cartel.
 var _pending_cycle_reset_milestone: int = 0
@@ -211,6 +222,7 @@ var hammer_mode_active: bool = false
 var glove_mode_active: bool = false
 var background_sprite: Sprite2D = null
 var hud_layer: CanvasLayer = null
+var dialog_layer: CanvasLayer = null
 var settings_layer: CanvasLayer = null
 var shop_layer: CanvasLayer = null
 var hud_root: Control = null
@@ -531,6 +543,8 @@ func fill_board_initial_random() -> void:
 func setup_board() -> void:
 	board_locked = false
 	_pending_level_up_alerts.clear()
+	_last_acked_checkpoint_level = 1
+	_visible_level_up_alert = 0
 	_pending_cycle_reset_milestone = 0
 	_cycle_reset_transition_playing = false
 	temp_slot_bonus_active = false
@@ -582,6 +596,8 @@ func capture_board_snapshot() -> Dictionary:
 		"temp_slot_time_remaining": temp_slot_time_remaining if has_active_temp_stack() else 0.0,
 		"temp_slot_actions_remaining": temp_slot_actions_remaining,
 		"pending_cycle_reset_milestone": _pending_cycle_reset_milestone,
+		"pending_level_up_alerts": _pending_level_up_alerts.duplicate(),
+		"last_acknowledged_checkpoint_level": _last_acked_checkpoint_level,
 		"wildcard_counts": wildcard_counts,
 		"wildcard_unlock_granted": wildcard_unlock_granted,
 		"all_rows": _capture_stack_data(),
@@ -617,12 +633,10 @@ func _update_undo_button_state() -> void:
 	var tint := Color.WHITE if enabled else UNDO_DISABLED_MODULATE
 	undo_button.modulate = tint
 	if undo_shadow != null:
-		undo_shadow.modulate = tint
+		undo_shadow.visible = false
 	if undo_icon != null:
 		undo_icon.modulate = Color.WHITE
 	undo_button.visible = true
-	if undo_shadow != null:
-		undo_shadow.visible = true
 
 func _kill_stack_tweens(stack: Node) -> void:
 	if stack == null or not is_instance_valid(stack):
@@ -704,6 +718,7 @@ func _migrate_legacy_cycle_roll_range() -> bool:
 		"highest_board_coin": highest_coin_value_on_board(),
 	}, CHECKPOINT_BASE_VALUE)
 	var progress_changed := bool(healed.get("changed", false))
+	var prev_checkpoint := checkpoint_level
 	if progress_changed:
 		checkpoint_level = int(healed.get("checkpoint_level", checkpoint_level))
 		current_level = int(healed.get("current_level", current_level))
@@ -711,7 +726,10 @@ func _migrate_legacy_cycle_roll_range() -> bool:
 		roll_value_floor = int(healed.get("roll_value_floor", roll_value_floor))
 		cycle_checkpoint_origin = int(healed.get("cycle_checkpoint_origin", cycle_checkpoint_origin))
 		cycle_rules_revision = int(healed.get("cycle_rules_revision", cycle_rules_revision))
-		_pending_level_up_alerts.clear()
+		if checkpoint_level < prev_checkpoint:
+			_pending_level_up_alerts.clear()
+			if _last_acked_checkpoint_level > checkpoint_level:
+				_last_acked_checkpoint_level = checkpoint_level
 	var slot_heal := GameRulesScript.heal_inflated_cycle_free_slots(
 		active_stacks,
 		next_free_slot_unlock_level,
@@ -742,13 +760,17 @@ func _migrate_legacy_cycle_roll_range() -> bool:
 	})
 	var start_changed := bool(start_heal.get("changed", false))
 	if start_changed:
+		var start_prev := checkpoint_level
 		checkpoint_level = int(start_heal.get("checkpoint_level", checkpoint_level))
 		active_stacks = int(start_heal.get("active_stacks", active_stacks))
 		next_free_slot_unlock_level = int(
 			start_heal.get("next_free_slot_unlock_level", next_free_slot_unlock_level)
 		)
 		GameState.player_level = checkpoint_level
-		_pending_level_up_alerts.clear()
+		if checkpoint_level < start_prev:
+			_pending_level_up_alerts.clear()
+			if _last_acked_checkpoint_level > checkpoint_level:
+				_last_acked_checkpoint_level = checkpoint_level
 	if not progress_changed and not slots_changed and not start_changed:
 		return false
 	var refill := bool(healed.get("refill", false))
@@ -805,6 +827,14 @@ func _restore_board_from_snapshot(snap: Dictionary) -> void:
 	active_stacks = maxi(1, int(snap.get("active_stacks", active_stacks)))
 	_pending_cycle_reset_milestone = maxi(0, int(snap.get("pending_cycle_reset_milestone", 0)))
 	_cycle_reset_transition_playing = false
+	_last_acked_checkpoint_level = GameSessionServiceScript.migrated_last_acknowledged_checkpoint(
+		snap.has("last_acknowledged_checkpoint_level"),
+		int(snap.get("last_acknowledged_checkpoint_level", 0)),
+		checkpoint_level
+	)
+	_pending_level_up_alerts = GameSessionServiceScript.normalize_int_list(
+		snap.get("pending_level_up_alerts", [])
+	)
 	var wc_counts: Variant = snap.get("wildcard_counts", null) if snap.has("wildcard_counts") else null
 	var wc_granted: Variant = snap.get("wildcard_unlock_granted", null) if snap.has("wildcard_unlock_granted") else null
 	# Saves viejos: comodines solo vivían en el checkpoint.
@@ -821,7 +851,6 @@ func _restore_board_from_snapshot(snap: Dictionary) -> void:
 			)
 		)
 	)
-	_reconcile_future_free_slot_unlock_cursor()
 	temp_slot_actions_remaining = maxi(0, int(snap.get("temp_slot_actions_remaining", temp_slot_actions_remaining)))
 	var normalized_temp := GameRulesScript.normalize_temp_state(
 		bool(snap.get("temp_slot_bonus_active", false)),
@@ -864,6 +893,8 @@ func _restore_board_from_snapshot(snap: Dictionary) -> void:
 	_rewind_false_checkpoint_half_unlock()
 	if _pending_cycle_reset_milestone <= 0:
 		update_checkpoint_level()
+	_reconcile_future_free_slot_unlock_cursor()
+	_sync_level_up_alerts_after_restore()
 	queue_redraw()
 
 func try_undo_last_move() -> void:
@@ -955,7 +986,6 @@ func apply_save_dict(data: Dictionary) -> void:
 	cycle_rules_revision = int(parsed.get("cycle_rules_revision", cycle_rules_revision))
 	active_stacks = int(parsed.get("active_stacks", active_stacks))
 	next_free_slot_unlock_level = int(parsed.get("next_free_slot_unlock_level", next_free_slot_unlock_level))
-	_reconcile_future_free_slot_unlock_cursor()
 	temp_slot_actions_remaining = int(parsed.get("temp_slot_actions_remaining", temp_slot_actions_remaining))
 	lives = GameState.lives
 	gems = int(parsed.get("gems", gems))
@@ -1886,6 +1916,8 @@ func _rewind_false_checkpoint_half_unlock() -> void:
 	checkpoint_level = 45
 	GameState.player_level = checkpoint_level
 	_pending_level_up_alerts.clear()
+	_last_acked_checkpoint_level = 45
+	_visible_level_up_alert = 0
 	if level_up_overlay != null:
 		level_up_overlay.visible = false
 	var slot_heal := GameRulesScript.heal_inflated_cycle_free_slots(
@@ -1939,6 +1971,7 @@ func update_checkpoint_level() -> bool:
 	# Tras un reset de ciclo no hay desbloqueo retroactivo de ranuras.
 	if not did_cycle_reset:
 		_unlock_adjacent_slots_for_level_range(previous, checkpoint_level)
+		_reconcile_future_free_slot_unlock_cursor()
 	# Guardar checkpoint DESPUES de aplicar desbloqueos de ranura gratis.
 	# Si se guarda antes, al restaurar se pierde la ranura otorgada por nivel.
 	capture_checkpoint_snapshot()
@@ -1947,7 +1980,8 @@ func update_checkpoint_level() -> bool:
 	print("Checkpoint alcanzado: nivel ", checkpoint_level, " (tablero guardado)")
 	# Encolar cada nivel saltado para no perder carteles (ej. 1→3 muestra 2 y 3).
 	for alert_lvl in range(previous + 1, checkpoint_level + 1):
-		_pending_level_up_alerts.append(alert_lvl)
+		if not _pending_level_up_alerts.has(alert_lvl):
+			_pending_level_up_alerts.append(alert_lvl)
 	# Prestige: el checkpoint a veces ya era el hito (ej. mitad de 11 → niv. 15)
 	# sin ficha 15; igual hay que mostrar cartel antes de renovar el tablero.
 	if _pending_cycle_reset_milestone > 0 and _pending_level_up_alerts.is_empty():
@@ -1955,6 +1989,17 @@ func update_checkpoint_level() -> bool:
 	call_deferred("_show_next_level_up_alert")
 	save_game()
 	return true
+
+func _sync_level_up_alerts_after_restore() -> void:
+	if _pending_cycle_reset_milestone > 0:
+		return
+	_pending_level_up_alerts = GameSessionServiceScript.queued_unacked_level_up_alerts(
+		_pending_level_up_alerts,
+		_last_acked_checkpoint_level,
+		checkpoint_level
+	)
+	if not _pending_level_up_alerts.is_empty():
+		call_deferred("_show_next_level_up_alert")
 
 func _show_next_level_up_alert() -> void:
 	if _pending_level_up_alerts.is_empty():
@@ -1967,6 +2012,12 @@ func _show_next_level_up_alert() -> void:
 	if level_up_overlay != null and level_up_overlay.visible:
 		layout_level_up_dialog_controls()
 		return
+	if level_up_overlay == null:
+		return
+	if shop_ui != null and shop_ui.is_open():
+		shop_ui.close()
+	if settings_ui != null and settings_ui.is_open():
+		settings_ui.close()
 	var alert_level: int = int(_pending_level_up_alerts.pop_front())
 	show_level_up_panel(alert_level)
 
@@ -1997,6 +2048,7 @@ func restore_checkpoint() -> void:
 	clear_selection()
 	board_locked = false
 	_pending_level_up_alerts.clear()
+	_visible_level_up_alert = 0
 	_pending_cycle_reset_milestone = 0
 	_cycle_reset_transition_playing = false
 	temp_slot_bonus_active = false
@@ -2017,7 +2069,7 @@ func restore_checkpoint() -> void:
 			GameRulesScript.initial_free_slot_unlock_level(get_cycle_base_level())
 		)
 	)
-	_reconcile_future_free_slot_unlock_cursor()
+	_last_acked_checkpoint_level = checkpoint_level
 	adjacent_slot_next_price = int(checkpoint_snapshot.get(
 		"adjacent_slot_next_price", ADJACENT_EXTRA_SLOT_BASE_PRICE
 	))
@@ -2046,6 +2098,7 @@ func restore_checkpoint() -> void:
 	_rewind_false_checkpoint_half_unlock()
 	if _pending_cycle_reset_milestone <= 0:
 		update_checkpoint_level()
+	_reconcile_future_free_slot_unlock_cursor()
 	queue_redraw()
 	print("Checkpoint restaurado: nivel ", checkpoint_level)
 
@@ -2450,6 +2503,8 @@ func _occupied_board_slot_index_set() -> Dictionary:
 
 func _reconcile_future_free_slot_unlock_cursor() -> void:
 	# Si el checkpoint ya pasó el hito (p.ej. 44 con cursor 43 o 45 sin ranura), otorgarla.
+	if stacks.is_empty():
+		return
 	var milestone := get_cycle_base_level()
 	var prestige_level := (
 		cycle_checkpoint_origin + 1
@@ -2467,6 +2522,7 @@ func _reconcile_future_free_slot_unlock_cursor() -> void:
 	)
 	if bool(missed.get("changed", false)):
 		var grants := int(missed.get("missing", 0))
+		var granted := 0
 		for _i in range(grants):
 			if find_adjacent_extra_slot_offer_board_index() < 0:
 				break
@@ -2474,9 +2530,18 @@ func _reconcile_future_free_slot_unlock_cursor() -> void:
 				break
 			add_new_stack_for_level_unlock()
 			active_stacks += 1
-		next_free_slot_unlock_level = int(
-			missed.get("next_free_slot_unlock_level", next_free_slot_unlock_level)
-		)
+			granted += 1
+		if granted <= 0:
+			return
+		if granted >= grants:
+			next_free_slot_unlock_level = int(
+				missed.get("next_free_slot_unlock_level", next_free_slot_unlock_level)
+			)
+		else:
+			for _j in range(granted):
+				next_free_slot_unlock_level = GameRulesScript.next_free_slot_unlock_level(
+					next_free_slot_unlock_level
+				)
 		_clear_undo_snapshot()
 		refresh_all_stack_layout()
 		capture_checkpoint_snapshot()
@@ -2974,6 +3039,20 @@ func _apply_hud_chip_styles(shadow: Panel, pill: Control, radius: int, pill_size
 	HudTextureButtons.apply_shadow_corner_radius(shadow, radius)
 	HudTextureButtons.apply_gradient_pill_style(pill, radius, pill_size)
 
+## Relleno saturado del tema + borde fino oscuro del mismo tono.
+func _theme_candy_button_colors() -> Dictionary:
+	return HudTextureButtons.theme_candy_button_colors()
+
+func _apply_candy_hud_button_style(btn: Control, btn_size: Vector2, scale: float) -> void:
+	HudTextureButtons.apply_candy_button_style(btn, btn_size, scale)
+
+func _style_candy_hud_label(lbl: Label, scale: float) -> void:
+	HudTextureButtons.style_candy_label(lbl, scale)
+
+func _apply_repartir_button_style(btn_size: Vector2, scale: float) -> void:
+	_apply_candy_hud_button_style(cta_button, btn_size, scale)
+	_style_candy_hud_label(cta_label, scale)
+
 func create_hud_text_label(text: String, font_size: int) -> Label:
 	var lbl := create_label(text, font_size, HUD_PILL_TEXT)
 	if UiFont != null:
@@ -3063,8 +3142,9 @@ func _build_hud_icon_chip(icon_texture: Texture2D) -> Dictionary:
 	return {"shadow": shadow, "panel": panel, "icon": icon}
 
 func _build_undo_button() -> Dictionary:
-	var shadow := create_shadow_panel(24)
-	var panel := HudTextureButtons.create_gradient_pill()
+	var panel := Panel.new()
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	panel.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -3076,9 +3156,9 @@ func _build_undo_button() -> Dictionary:
 	icon.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	icon.add_theme_font_size_override("font_size", int(UNDO_ICON_FONT_SIZE))
-	icon.add_theme_color_override("font_color", HUD_PILL_TEXT)
+	icon.add_theme_color_override("font_color", CTA_ICON_TEXT)
 	center.add_child(icon)
-	return {"shadow": shadow, "panel": panel, "icon": icon}
+	return {"shadow": null, "panel": panel, "icon": icon}
 
 func _build_hud_stat_chip(icon_texture: Texture2D, text: String) -> Dictionary:
 	var radius := HUD_PILL_RADIUS
@@ -3136,6 +3216,9 @@ func build_mock_ui() -> void:
 	hud_layer = CanvasLayer.new()
 	hud_layer.layer = 10
 	add_child(hud_layer)
+	dialog_layer = CanvasLayer.new()
+	dialog_layer.layer = 200
+	add_child(dialog_layer)
 
 	hud_root = Control.new()
 	hud_root.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -3197,10 +3280,17 @@ func build_mock_ui() -> void:
 	hud_root.add_child(progress_container)
 
 	cta_shadow = create_shadow_panel(36)
+	cta_shadow.visible = false
 	hud_root.add_child(cta_shadow)
-	cta_button = HudTextureButtons.create_gradient_pill()
+	cta_button = Panel.new()
+	cta_button.mouse_filter = Control.MOUSE_FILTER_STOP
+	cta_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	cta_label = create_hud_text_label("Repartir", int(CTA_FONT_SIZE))
 	cta_label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	cta_label.offset_left = 0
+	cta_label.offset_top = 0
+	cta_label.offset_right = 0
+	cta_label.offset_bottom = 0
 	cta_button.add_child(cta_label)
 	hud_root.add_child(cta_button)
 
@@ -3208,7 +3298,6 @@ func build_mock_ui() -> void:
 	undo_shadow = undo_parts.shadow
 	undo_button = undo_parts.panel
 	undo_icon = undo_parts.icon
-	hud_root.add_child(undo_shadow)
 	hud_root.add_child(undo_button)
 	_update_undo_button_state()
 
@@ -3289,15 +3378,21 @@ func layout_mock_ui() -> void:
 	var corner_w: float = chip_h
 	var inner_gap: float = 10.0 * scale
 	var col_gap: float = HUD_CHIP_GAP * scale
-	var hang: float = HudTextureButtons.resource_chip_hang(
-		chip_h, HUD_RESOURCE_PILL_H_RATIO, HUD_RESOURCE_ICON_H_RATIO
+	var life_hang: float = HudTextureButtons.resource_chip_hang(
+		chip_h, HUD_RESOURCE_PILL_H_RATIO, HUD_LIFE_ICON_H_RATIO
 	)
-	var resource_w: float = HudTextureButtons.resource_chip_visual_width(
-		chip_h, stat_w, HUD_RESOURCE_PILL_H_RATIO, HUD_RESOURCE_ICON_H_RATIO
+	var money_hang: float = HudTextureButtons.resource_chip_hang(
+		chip_h, HUD_RESOURCE_PILL_H_RATIO, HUD_MONEY_ICON_H_RATIO, HUD_MONEY_ICON_W_RATIO
 	)
-	var pair_gap: float = HudTextureButtons.resource_chip_pair_gap(chip_h, inner_gap)
+	var life_w: float = HudTextureButtons.resource_chip_visual_width(
+		chip_h, stat_w, HUD_RESOURCE_PILL_H_RATIO, HUD_LIFE_ICON_H_RATIO
+	)
+	var money_w: float = HudTextureButtons.resource_chip_visual_width(
+		chip_h, stat_w, HUD_RESOURCE_PILL_H_RATIO, HUD_MONEY_ICON_H_RATIO, HUD_MONEY_ICON_W_RATIO
+	)
+	var pair_gap: float = HudTextureButtons.resource_chip_pair_gap(chip_h, inner_gap, money_hang)
 	var left_w: float = corner_w * 2.0 + inner_gap
-	var center_w: float = resource_w * 2.0 + pair_gap
+	var center_w: float = life_w + pair_gap + money_w
 	var right_w: float = corner_w
 	var required: float = edge_margin * 2.0 + left_w + center_w + right_w + col_gap * 2.0
 	if required > viewport_size.x and required > 0.0:
@@ -3307,15 +3402,21 @@ func layout_mock_ui() -> void:
 		corner_w = chip_h
 		inner_gap *= shrink
 		col_gap *= shrink
-		hang = HudTextureButtons.resource_chip_hang(
-			chip_h, HUD_RESOURCE_PILL_H_RATIO, HUD_RESOURCE_ICON_H_RATIO
+		life_hang = HudTextureButtons.resource_chip_hang(
+			chip_h, HUD_RESOURCE_PILL_H_RATIO, HUD_LIFE_ICON_H_RATIO
 		)
-		resource_w = HudTextureButtons.resource_chip_visual_width(
-			chip_h, stat_w, HUD_RESOURCE_PILL_H_RATIO, HUD_RESOURCE_ICON_H_RATIO
+		money_hang = HudTextureButtons.resource_chip_hang(
+			chip_h, HUD_RESOURCE_PILL_H_RATIO, HUD_MONEY_ICON_H_RATIO, HUD_MONEY_ICON_W_RATIO
 		)
-		pair_gap = HudTextureButtons.resource_chip_pair_gap(chip_h, inner_gap)
+		life_w = HudTextureButtons.resource_chip_visual_width(
+			chip_h, stat_w, HUD_RESOURCE_PILL_H_RATIO, HUD_LIFE_ICON_H_RATIO
+		)
+		money_w = HudTextureButtons.resource_chip_visual_width(
+			chip_h, stat_w, HUD_RESOURCE_PILL_H_RATIO, HUD_MONEY_ICON_H_RATIO, HUD_MONEY_ICON_W_RATIO
+		)
+		pair_gap = HudTextureButtons.resource_chip_pair_gap(chip_h, inner_gap, money_hang)
 		left_w = corner_w * 2.0 + inner_gap
-		center_w = resource_w * 2.0 + pair_gap
+		center_w = life_w + pair_gap + money_w
 		right_w = corner_w
 	var corner_size := Vector2(corner_w, chip_h)
 	var stat_size := Vector2(stat_w, chip_h)
@@ -3336,25 +3437,26 @@ func layout_mock_ui() -> void:
 	var max_center: float = settings_x - col_gap - center_w
 	center_x = clampf(center_x, min_center, maxf(min_center, max_center))
 
-	# pill_pos es el borde izquierdo del pill; el ícono cuelga `hang` hacia la izquierda.
+	# pill_pos es el borde izquierdo del pill; el ícono cuelga hacia la izquierda.
 	HudTextureButtons.layout_resource_chip(
 		life_chip_parts,
-		Vector2(center_x + hang, chip_y),
+		Vector2(center_x + life_hang, chip_y),
 		stat_size,
 		0.36,
 		38,
 		HUD_RESOURCE_PILL_H_RATIO,
-		HUD_RESOURCE_ICON_H_RATIO
+		HUD_LIFE_ICON_H_RATIO
 	)
 	if not stars_chip_parts.is_empty():
 		HudTextureButtons.layout_resource_chip(
 			stars_chip_parts,
-			Vector2(center_x + resource_w + pair_gap + hang, chip_y),
+			Vector2(center_x + life_w + pair_gap + money_hang, chip_y),
 			stat_size,
 			0.36,
 			38,
 			HUD_RESOURCE_PILL_H_RATIO,
-			HUD_RESOURCE_ICON_H_RATIO
+			HUD_MONEY_ICON_H_RATIO,
+			HUD_MONEY_ICON_W_RATIO
 		)
 
 	var progress_w = viewport_size.x * 0.78
@@ -3383,9 +3485,9 @@ func layout_mock_ui() -> void:
 
 	cta_button.position = Vector2((viewport_size.x - cta_w) * 0.5, footer_y)
 	cta_button.size = Vector2(cta_w, cta_h)
-	cta_shadow.position = cta_button.position + Vector2(0, 6 * scale)
-	cta_shadow.size = cta_button.size
-	_apply_hud_chip_styles(cta_shadow, cta_button, pill_radius, cta_button.size)
+	if cta_shadow != null:
+		cta_shadow.visible = false
+	_apply_repartir_button_style(cta_button.size, scale)
 	if cta_label != null:
 		cta_label.add_theme_font_size_override("font_size", int(CTA_FONT_SIZE * scale))
 
@@ -3395,9 +3497,8 @@ func layout_mock_ui() -> void:
 	undo_x = minf(undo_x, viewport_size.x - undo_size - 10.0 * scale)
 	undo_button.position = Vector2(undo_x, footer_y)
 	undo_button.size = Vector2(undo_size, undo_size)
-	undo_shadow.position = undo_button.position + Vector2(0, 4.0 * scale)
-	undo_shadow.size = undo_button.size
-	_apply_hud_chip_styles(undo_shadow, undo_button, int(undo_size * 0.45), undo_button.size)
+	_apply_candy_hud_button_style(undo_button, undo_button.size, scale)
+	_style_candy_hud_label(undo_icon, scale)
 	if undo_icon != null:
 		undo_icon.add_theme_font_size_override("font_size", int(UNDO_ICON_FONT_SIZE * scale * (undo_size / icon_btn_size)))
 
@@ -4256,7 +4357,7 @@ func build_level_up_dialog() -> void:
 	level_up_overlay.visible = false
 	level_up_overlay.z_as_relative = false
 	level_up_overlay.z_index = 310
-	hud_layer.add_child(level_up_overlay)
+	dialog_layer.add_child(level_up_overlay)
 
 	level_up_card = _create_dialog_card(false)
 	level_up_card.clip_contents = false
@@ -4339,23 +4440,31 @@ func show_level_up_panel(level: int) -> void:
 	if level_up_subtitle_label != null:
 		level_up_subtitle_label.text = "Nivel %d" % level
 	_force_progress_bar_display(1.0)
+	_visible_level_up_alert = level
+	_level_up_opened_at_msec = Time.get_ticks_msec()
 	level_up_overlay.visible = true
 	level_up_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	level_up_overlay.move_to_front()
-	if hud_layer != null:
-		hud_layer.move_child(level_up_overlay, hud_layer.get_child_count() - 1)
+	if dialog_layer != null:
+		dialog_layer.move_child(level_up_overlay, dialog_layer.get_child_count() - 1)
 	layout_level_up_dialog_controls()
 	print("Cartel de nivel mostrado: ", level)
 
 func hide_level_up_panel() -> void:
 	if level_up_overlay != null:
 		level_up_overlay.visible = false
+	_visible_level_up_alert = 0
 	if not _cycle_reset_transition_playing:
 		board_locked = false
 	update_progress_bar(false)
 
 func _on_level_up_continue_pressed() -> void:
+	if Time.get_ticks_msec() - _level_up_opened_at_msec < 250:
+		return
+	if _visible_level_up_alert > 0:
+		_last_acked_checkpoint_level = maxi(_last_acked_checkpoint_level, _visible_level_up_alert)
 	hide_level_up_panel()
+	save_game()
 	# Si saltó varios niveles, mostrar el siguiente cartel antes de comodines/bloqueo.
 	if not _pending_level_up_alerts.is_empty():
 		_show_next_level_up_alert()
@@ -4374,7 +4483,7 @@ func build_wildcard_unlock_dialog() -> void:
 	wildcard_unlock_overlay.visible = false
 	wildcard_unlock_overlay.z_as_relative = false
 	wildcard_unlock_overlay.z_index = 315
-	hud_layer.add_child(wildcard_unlock_overlay)
+	dialog_layer.add_child(wildcard_unlock_overlay)
 
 	wildcard_unlock_card = _create_dialog_card(false)
 	wildcard_unlock_card.z_as_relative = false

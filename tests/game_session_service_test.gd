@@ -14,6 +14,7 @@ func _run() -> void:
 	_test_runtime_snapshot_padding()
 	_test_parse_save_payload_fallbacks()
 	_test_parse_save_payload_with_data()
+	_test_level_up_alert_persistence()
 	print("=== RESULT: %d passed, %d failed ===" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -126,6 +127,41 @@ func _test_parse_save_payload_with_data() -> void:
 		return
 	var rs: Dictionary = parsed.get("runtime_snapshot", {})
 	if int(rs.get("foo", 0)) != 1:
-		_fail("parse_runtime_snapshot", str(parsed))
+		_fail("parse_runtime_snapshot", str(rs))
 		return
 	_ok("parse_payload_with_data")
+
+func _test_level_up_alert_persistence() -> void:
+	var snap := GameSessionServiceScript.build_runtime_snapshot({
+		"checkpoint_level": 47,
+		"active_stacks": 8,
+		"pending_level_up_alerts": [47],
+		"last_acknowledged_checkpoint_level": 46,
+		"all_rows": [[1], [2], [3], [4], [5], [6], [7], [8]],
+	})
+	var pending: Array = snap.get("pending_level_up_alerts", [])
+	if pending != [47]:
+		_fail("runtime_keeps_pending_alerts", str(pending))
+		return
+	if int(snap.get("last_acknowledged_checkpoint_level", 0)) != 46:
+		_fail("runtime_keeps_last_ack", str(snap.get("last_acknowledged_checkpoint_level", 0)))
+		return
+	if GameSessionServiceScript.migrated_last_acknowledged_checkpoint(false, 0, 47) != 47:
+		_fail("old_save_acks_current", str(GameSessionServiceScript.migrated_last_acknowledged_checkpoint(false, 0, 47)))
+		return
+	if GameSessionServiceScript.migrated_last_acknowledged_checkpoint(true, 46, 47) != 46:
+		_fail("new_save_keeps_ack", str(GameSessionServiceScript.migrated_last_acknowledged_checkpoint(true, 46, 47)))
+		return
+	var recovered := GameSessionServiceScript.queued_unacked_level_up_alerts([], 46, 47)
+	if recovered != [47]:
+		_fail("recover_popped_banner", str(recovered))
+		return
+	var merged := GameSessionServiceScript.queued_unacked_level_up_alerts([47], 45, 47)
+	if merged != [46, 47]:
+		_fail("fill_skipped_banner_gap", str(merged))
+		return
+	var none := GameSessionServiceScript.queued_unacked_level_up_alerts([47], 47, 47)
+	if not none.is_empty():
+		_fail("acked_banner_not_replayed", str(none))
+		return
+	_ok("level_up_alert_persistence")

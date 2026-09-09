@@ -20,7 +20,7 @@ const PEDESTAL_COIN_Y_RATIO := 0.505
 const PEDESTAL_COIN_SCALE := 3.6
 const BTN_GAP := 16.0
 const CORNER_BTN_WIDTH_RATIO := 0.12
-const STAT_BTN_WIDTH_RATIO := 0.16
+const STAT_BTN_WIDTH_RATIO := 0.19
 const LOBBY_STAT_FONT_SIZE := 48
 const HUD_PILL_TEXT := Color(0.95, 0.98, 0.92)
 const HUD_PILL_RADIUS := 34
@@ -402,8 +402,14 @@ func layout_ui() -> void:
 	var corner_size := Vector2(corner_w, chip_h)
 	var stat_size := Vector2(stat_w, chip_h)
 	var pill_radius := _hud_pill_radius(scale)
-	var resource_gap := HudTextureButtons.resource_chip_pair_gap(chip_h, gap)
-	var total_center_w := stat_size.x + resource_gap + stat_size.x
+	var resource_gap := HudTextureButtons.resource_chip_pair_gap(
+		chip_h,
+		gap,
+		HudTextureButtons.resource_chip_hang(chip_h, 0.62, 1.48, 1.16)
+	)
+	var life_w := HudTextureButtons.resource_chip_visual_width(chip_h, stat_size.x, 0.62, 1.38)
+	var money_w := HudTextureButtons.resource_chip_visual_width(chip_h, stat_size.x, 0.62, 1.48, 1.16)
+	var total_center_w := life_w + resource_gap + money_w
 	var center_x := (viewport_size.x - total_center_w) * 0.5
 	var avatar_side := chip_h * 1.35
 	var min_center_x := edge_margin + avatar_side + 4.0
@@ -421,14 +427,26 @@ func layout_ui() -> void:
 		avatar_size
 	)
 
-	HudTextureButtons.layout_resource_chip(life_chip_parts, Vector2(center_x, row_y), stat_size, 0.40, 48)
-
+	var life_hang := HudTextureButtons.resource_chip_hang(chip_h, 0.62, 1.38)
+	var money_hang := HudTextureButtons.resource_chip_hang(chip_h, 0.62, 1.48, 1.16)
+	HudTextureButtons.layout_resource_chip(
+		life_chip_parts,
+		Vector2(center_x + life_hang, row_y),
+		stat_size,
+		0.40,
+		48,
+		0.62,
+		1.38
+	)
 	HudTextureButtons.layout_resource_chip(
 		stars_chip_parts,
-		Vector2(center_x + stat_size.x + resource_gap, row_y),
+		Vector2(center_x + life_w + resource_gap + money_hang, row_y),
 		stat_size,
 		0.38,
-		42
+		42,
+		0.62,
+		1.48,
+		1.16
 	)
 
 	layout_hud_pill_pair(

@@ -26,6 +26,8 @@ static func build_runtime_snapshot(state: Dictionary) -> Dictionary:
 		"temp_slot_time_remaining": float(state.get("temp_slot_time_remaining", 0.0)),
 		"temp_slot_actions_remaining": int(state.get("temp_slot_actions_remaining", 0)),
 		"pending_cycle_reset_milestone": int(state.get("pending_cycle_reset_milestone", 0)),
+		"pending_level_up_alerts": normalize_int_list(state.get("pending_level_up_alerts", [])),
+		"last_acknowledged_checkpoint_level": int(state.get("last_acknowledged_checkpoint_level", 0)),
 		"wildcard_counts": (state.get("wildcard_counts", {}) as Dictionary).duplicate(true),
 		"wildcard_unlock_granted": (state.get("wildcard_unlock_granted", {}) as Dictionary).duplicate(true),
 		"stacks": rows,
@@ -90,3 +92,35 @@ static func parse_save_payload(data: Dictionary, defaults: Dictionary) -> Dictio
 	else:
 		parsed["runtime_snapshot"] = {}
 	return parsed
+
+static func normalize_int_list(raw: Variant) -> Array:
+	var out: Array = []
+	if not raw is Array:
+		return out
+	for v in raw:
+		out.append(int(v))
+	return out
+
+## Saves viejos no tienen acuse: no re-mostrar todos los niveles 1..N.
+static func migrated_last_acknowledged_checkpoint(has_saved_ack: bool, saved_ack: int, checkpoint_level: int) -> int:
+	if not has_saved_ack or saved_ack <= 0:
+		return maxi(1, checkpoint_level)
+	return saved_ack
+
+## Completa huecos (p.ej. cartel poppeado pero sin Continuar) y evita duplicados.
+static func queued_unacked_level_up_alerts(pending: Array, last_acked: int, checkpoint_level: int) -> Array:
+	var out: Array = []
+	var seen := {}
+	if last_acked > 0:
+		for lvl in range(last_acked + 1, checkpoint_level + 1):
+			seen[lvl] = true
+			out.append(lvl)
+	for v in pending:
+		var lvl := int(v)
+		if last_acked > 0 and lvl <= last_acked:
+			continue
+		if seen.has(lvl):
+			continue
+		seen[lvl] = true
+		out.append(lvl)
+	return out

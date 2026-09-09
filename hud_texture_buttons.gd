@@ -38,7 +38,10 @@ const RESOURCE_PLUS_BORDER := Color(0.28, 0.58, 0.20, 1.0)
 ## Ícono un poco más grande que el pill, sin taparlo.
 const RESOURCE_PILL_HEIGHT_RATIO := 0.66
 const RESOURCE_ICON_HEIGHT_RATIO := 1.18
-const RESOURCE_ICON_HANG := 0.40
+const RESOURCE_ICON_WIDTH_RATIO := 1.0
+const RESOURCE_ICON_HANG := 0.68
+const CANDY_TEXT := Color(0.98, 0.98, 0.96, 1.0)
+const CANDY_FILL_FALLBACK := Color(0.20, 0.76, 0.96, 1.0)
 
 static func get_button_size(texture: Texture2D, width: float) -> Vector2:
 	var tex_size := texture.get_size()
@@ -308,6 +311,42 @@ static func apply_gradient_pill_style(pill: Control, radius: int, pill_size: Vec
 			pill_size
 		)
 
+static func theme_candy_button_colors() -> Dictionary:
+	var palette: Dictionary = GameState.get_ui_palette()
+	var fill: Color = palette.get("settings_btn_on", CANDY_FILL_FALLBACK)
+	fill.s = minf(1.0, fill.s * 1.40 + 0.10)
+	fill.v = clampf(fill.v * 0.92, 0.58, 0.86)
+	fill.a = 1.0
+	var border := Color.from_hsv(fill.h, minf(1.0, fill.s + 0.12), clampf(fill.v * 0.34, 0.14, 0.28), 1.0)
+	return {"fill": fill, "border": border}
+
+static func make_candy_style(bg: Color, border: Color, radius: int, border_width: int) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = bg
+	style.border_color = border
+	style.set_border_width_all(border_width)
+	style.set_corner_radius_all(radius)
+	return style
+
+static func apply_candy_button_style(btn: Control, btn_size: Vector2, scale: float = 1.0) -> void:
+	if btn == null:
+		return
+	var colors: Dictionary = theme_candy_button_colors()
+	var radius := int(minf(btn_size.x, btn_size.y) * 0.50)
+	var border_w := int(clampf(round(2.0 * scale), 2.0, 3.0))
+	btn.add_theme_stylebox_override(
+		"panel",
+		make_candy_style(colors.fill, colors.border, radius, border_w)
+	)
+
+static func style_candy_label(lbl: Label, scale: float = 1.0) -> void:
+	if lbl == null:
+		return
+	var colors: Dictionary = theme_candy_button_colors()
+	lbl.add_theme_color_override("font_color", CANDY_TEXT)
+	lbl.add_theme_color_override("font_outline_color", colors.border)
+	lbl.add_theme_constant_override("outline_size", int(clampf(round(4.0 * scale), 3.0, 6.0)))
+
 static func apply_shadow_corner_radius(shadow: Panel, radius: int) -> void:
 	if shadow == null:
 		return
@@ -396,9 +435,10 @@ static func create_resource_chip(icon_texture: Texture2D, with_icon_count: bool)
 	shadow_style.bg_color = RESOURCE_PILL_SHADOW
 	shadow_style.set_corner_radius_all(28)
 	shadow.add_theme_stylebox_override("panel", shadow_style)
+	shadow.visible = false
 	root.add_child(shadow)
 
-	var pill := create_gradient_pill()
+	var pill := Panel.new()
 	pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	pill.clip_contents = true
 	root.add_child(pill)
@@ -471,20 +511,30 @@ static func create_resource_chip(icon_texture: Texture2D, with_icon_count: bool)
 static func resource_chip_hang(
 	row_h: float,
 	pill_height_ratio: float = RESOURCE_PILL_HEIGHT_RATIO,
-	icon_height_ratio: float = RESOURCE_ICON_HEIGHT_RATIO
+	icon_height_ratio: float = RESOURCE_ICON_HEIGHT_RATIO,
+	icon_width_ratio: float = RESOURCE_ICON_WIDTH_RATIO
 ) -> float:
-	return (row_h * pill_height_ratio * icon_height_ratio) * RESOURCE_ICON_HANG
+	var icon_h: float = row_h * pill_height_ratio * icon_height_ratio
+	return icon_h * icon_width_ratio * RESOURCE_ICON_HANG
 
 static func resource_chip_visual_width(
 	row_h: float,
 	pill_w: float,
 	pill_height_ratio: float = RESOURCE_PILL_HEIGHT_RATIO,
-	icon_height_ratio: float = RESOURCE_ICON_HEIGHT_RATIO
+	icon_height_ratio: float = RESOURCE_ICON_HEIGHT_RATIO,
+	icon_width_ratio: float = RESOURCE_ICON_WIDTH_RATIO
 ) -> float:
-	return resource_chip_hang(row_h, pill_height_ratio, icon_height_ratio) + pill_w
+	return resource_chip_hang(row_h, pill_height_ratio, icon_height_ratio, icon_width_ratio) + pill_w
 
-static func resource_chip_pair_gap(row_h: float, min_gap: float) -> float:
-	return maxf(min_gap, resource_chip_hang(row_h) + row_h * 0.22)
+static func resource_chip_pair_gap(
+	row_h: float,
+	min_gap: float,
+	next_icon_hang: float = -1.0
+) -> float:
+	var hang := next_icon_hang
+	if hang < 0.0:
+		hang = resource_chip_hang(row_h)
+	return maxf(min_gap, hang + row_h * 0.18)
 
 static func layout_resource_chip(
 	chip: Dictionary,
@@ -493,7 +543,8 @@ static func layout_resource_chip(
 	count_font_ratio: float = 0.36,
 	count_font_max: int = 38,
 	pill_height_ratio: float = RESOURCE_PILL_HEIGHT_RATIO,
-	icon_height_ratio: float = RESOURCE_ICON_HEIGHT_RATIO
+	icon_height_ratio: float = RESOURCE_ICON_HEIGHT_RATIO,
+	icon_width_ratio: float = RESOURCE_ICON_WIDTH_RATIO
 ) -> void:
 	var root: Control = chip.get("root", chip.get("panel", null))
 	if root == null:
@@ -501,10 +552,11 @@ static func layout_resource_chip(
 	var pill_h: float = pill_size.y * pill_height_ratio
 	var pill_w: float = pill_size.x
 	var icon_h: float = pill_h * icon_height_ratio
-	var hang: float = icon_h * RESOURCE_ICON_HANG
-	var root_h: float = icon_h
+	var icon_w: float = icon_h * icon_width_ratio
+	var hang: float = icon_w * RESOURCE_ICON_HANG
+	var root_h: float = maxf(icon_h, pill_h)
 	var pill_draw := Vector2(pill_w, pill_h)
-	root.position = Vector2(pill_pos.x - hang, pill_pos.y + (pill_size.y - pill_h) * 0.5 - (root_h - pill_h) * 0.5)
+	root.position = Vector2(pill_pos.x - hang, pill_pos.y + (pill_size.y - root_h) * 0.5)
 	root.size = Vector2(pill_w + hang, root_h)
 
 	var pill: Control = chip.get("pill", null)
@@ -515,27 +567,29 @@ static func layout_resource_chip(
 	var count: Label = chip.get("count", null)
 
 	var pill_local := Vector2(hang, (root_h - pill_h) * 0.5)
-	var radius := int(pill_h * 0.5)
+	var ui_scale := clampf(pill_h / 50.0, 0.75, 1.4)
 	if shadow != null:
-		var shadow_off := Vector2(0.0, maxf(3.0, pill_h * 0.08))
-		shadow.position = pill_local + shadow_off
-		shadow.size = pill_draw
-		apply_shadow_corner_radius(shadow, radius)
+		shadow.visible = false
 	if pill != null:
 		pill.position = pill_local
 		pill.size = pill_draw
-		apply_gradient_pill_style(pill, radius, pill_draw)
+		apply_candy_button_style(pill, pill_draw, ui_scale)
 
 	if icon_wrap != null:
-		icon_wrap.clip_contents = true
-		icon_wrap.position = Vector2(0.0, 0.0)
-		icon_wrap.size = Vector2(icon_h, icon_h)
-		layout_life_heart_badge(icon_wrap, count, icon_h, count_font_ratio, count_font_max)
+		icon_wrap.clip_contents = false
+		icon_wrap.position = Vector2(0.0, (root_h - icon_h) * 0.5)
+		icon_wrap.size = Vector2(icon_w, icon_h)
+		if count != null:
+			layout_life_heart_badge(icon_wrap, count, icon_h, count_font_ratio, count_font_max)
+			icon_wrap.size = Vector2(icon_w, icon_h)
 
 	if plus != null:
-		var plus_s: float = clampf(icon_h * 0.30, 18.0, 34.0)
+		var plus_s: float = clampf(icon_h * 0.28, 18.0, 34.0)
 		plus.size = Vector2(plus_s, plus_s)
-		plus.position = Vector2(icon_h * 0.62, icon_h * 0.64)
+		plus.position = Vector2(
+			icon_w - plus_s * 0.55,
+			(root_h - icon_h) * 0.5 + icon_h - plus_s * 0.55
+		)
 		var plus_r := int(clampf(plus_s * 0.22, 4.0, 8.0))
 		var plus_style := StyleBoxFlat.new()
 		plus_style.bg_color = RESOURCE_PLUS_BG
@@ -552,14 +606,16 @@ static func layout_resource_chip(
 		plus.add_theme_font_size_override("font_size", int(plus_s * 0.72))
 
 	if value != null:
-		var text_left: float = icon_h * 0.86
-		var right_pad: float = maxf(pill_h * 0.38, 12.0)
-		var text_w: float = maxf(36.0, (hang + pill_w) - text_left - right_pad)
+		var overlap := maxf(icon_w - hang, 0.0)
+		var text_left: float = hang + overlap + maxf(pill_h * 0.06, 4.0)
+		var right_pad: float = maxf(pill_h * 0.22, 8.0)
+		var text_w: float = maxf(28.0, (hang + pill_w) - text_left - right_pad)
 		value.position = Vector2(text_left, pill_local.y)
 		value.size = Vector2(text_w, pill_h)
 		value.clip_text = true
 		value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		value.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		style_candy_label(value, ui_scale)
 		var desired_font := int(clampf(pill_h * 0.60, 18.0, 42.0))
 		value.set_meta("fit_max_w", text_w)
 		value.set_meta("fit_desired", desired_font)

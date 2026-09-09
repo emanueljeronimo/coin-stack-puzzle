@@ -30,11 +30,11 @@ const VALUE_COLORS := [
 	Color(0.92, 0.92, 0.95), # 15 gris claro
 ]
 
-const PASTEL_SOFTEN := 0.28
-const COIN_SATURATION := 0.80
-## Aclara el tinte para que el centro de la ficha quede pastel, no apagado.
-const COIN_TINT_LIGHTEN := 0.16
-const COIN_VALUE_LIFT := 0.16
+const PASTEL_SOFTEN := 0.10
+const COIN_SATURATION := 0.96
+## Un aclarado chico: el shader ya sube el centro, sin lavar el color.
+const COIN_TINT_LIGHTEN := 0.06
+const COIN_VALUE_LIFT := 0.04
 const SHADOW_ALPHA := 0.09
 const HIGHLIGHT_ALPHA := 0.14
 const COIN_RADIUS := 24.0
