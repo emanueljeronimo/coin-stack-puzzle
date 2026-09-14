@@ -19,6 +19,23 @@ static func compute_roll_count(pool_size: int, total_free_slots: int, keep_one_f
 		roll_count = total_free_slots - 1
 	return maxi(0, roll_count)
 
+static func apply_round_wildcard(
+	values: Array,
+	dealt_count: int,
+	chance: float,
+	roll01: Callable,
+	pick_index: Callable
+) -> Array:
+	var n := mini(dealt_count, values.size())
+	if n <= 0:
+		return values
+	if float(roll01.call()) >= chance:
+		return values
+	var idx := int(pick_index.call(n))
+	idx = clampi(idx, 0, n - 1)
+	values[idx] = GameRules.COIN_WILDCARD_VALUE
+	return values
+
 static func pick_balanced_index(
 	candidate_count: int,
 	assigned_count_for_candidate: Callable,

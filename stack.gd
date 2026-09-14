@@ -73,7 +73,7 @@ func is_homogeneous() -> bool:
 
 func is_ready_to_fuse() -> bool:
 	# Solo fusionar con monedas efectivamente adjuntas a la pila.
-	return coins.size() >= MAX_CAPACITY and is_homogeneous()
+	return coins.size() >= MAX_CAPACITY and is_homogeneous() and top_value() > 0
 
 func free_slots() -> int:
 	return MAX_CAPACITY - _total_occupied_slots()
@@ -81,6 +81,8 @@ func free_slots() -> int:
 func can_receive_value(value: int) -> bool:
 	if is_full():
 		return false
+	if GameRules.is_coin_wildcard_value(value):
+		return true
 	return _effective_top_value_for_receive() in [-1, value]
 
 func set_selected(selected: bool, animated: bool = true) -> void:
@@ -122,7 +124,10 @@ func push(value: int, play_spawn: bool = true) -> bool:
 	
 	# Crear la moneda visualmente
 	var coin_node = CoinScene.instantiate()
-	coin_node.set_value(value)
+	if GameRules.is_coin_wildcard_value(value) and coin_node.has_method("make_wildcard"):
+		coin_node.make_wildcard(get_row_value())
+	else:
+		coin_node.set_value(value)
 	coin_node.position = get_coin_local_position(coins.size())
 	add_child(coin_node)
 	coin_nodes.append(coin_node)
@@ -297,6 +302,37 @@ func refresh_visible_numbers() -> void:
 			# Mostrar numero solo en la ficha del tope para evitar solapados visuales.
 			coin_node.set_number_visible(i == coin_nodes.size() - 1)
 
+func get_row_value() -> int:
+	var board := get_parent()
+	if board == null or not is_instance_valid(board) or not board.has_method("get_stack_board_row"):
+		return -1
+	var list: Variant = board.get("stacks")
+	if not list is Array:
+		return -1
+	var idx: int = (list as Array).find(self)
+	if idx < 0:
+		return -1
+	return GameRules.coin_value_from_board_row(int(board.call("get_stack_board_row", idx)))
+
+func _resolve_attached_wildcard(moving_coin: Node) -> void:
+	if moving_coin == null or not is_instance_valid(moving_coin):
+		return
+	if not moving_coin.has_method("is_wildcard_coin") or not moving_coin.is_wildcard_coin():
+		return
+	var dest_row := get_row_value()
+	var origin_row := int(moving_coin.get("wildcard_original_row"))
+	if dest_row < 1 or origin_row < 1 or dest_row == origin_row:
+		return
+	# El número es el de las fichas de la pila destino (p.ej. 28), no el índice de fila (1-3).
+	if coins.size() < 2:
+		return
+	var dest_value := int(coins[coins.size() - 2])
+	if dest_value < 1:
+		return
+	coins[-1] = dest_value
+	if moving_coin.has_method("transform_wildcard"):
+		moving_coin.transform_wildcard(dest_value)
+
 func get_coin_local_position(stack_count: int) -> Vector2:
 	# Apila desde arriba hacia abajo.
 	return Vector2(0, COIN_TOP_OFFSET + ((stack_count - 1) * COIN_STEP_Y))
@@ -389,6 +425,7 @@ func _attach_moved_coin(moving_coin: Node2D, target_local: Vector2, value: int) 
 	moving_coin.scale = get_coin_local_scale()
 	moving_coin.z_index = 0
 	coin_nodes.append(moving_coin)
+	_resolve_attached_wildcard(moving_coin)
 	refresh_visible_numbers()
 	update_coin_positions(false)
 	queue_redraw()

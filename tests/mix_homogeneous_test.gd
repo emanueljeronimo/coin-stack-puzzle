@@ -1,6 +1,6 @@
 extends SceneTree
 
-## Regresión: Mezclar desarma, colapsa fusiones de 10 y recoloca homogéneo.
+## Regresión: Mezclar desarma, recoloca homogéneo y deja pilas de 10 para fusionar.
 ## godot --headless --path . --script res://tests/mix_homogeneous_test.gd
 
 const STACK_CAPACITY := 10
@@ -23,6 +23,13 @@ func _run() -> void:
 	_test_opening_deal_skips_fusion()
 	_test_overflow_uses_empty_stacks_by_number()
 	_test_regroups_fused_remainder()
+	_test_ten_without_collapse_ready_to_fuse()
+	_test_fifty_fours_without_collapse()
+	_test_leftover_does_not_complete_nine()
+	_test_same_value_not_split_when_it_fits()
+	_test_overflow_keeps_nines_together()
+	_test_wildcard_mix_joins_fused()
+	_test_wildcard_mix_does_not_chain()
 	print("=== RESULT: %d passed, %d failed ===" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -307,3 +314,179 @@ func _test_regroups_fused_remainder() -> void:
 		_fail("regroup_all_sixes", "6s=%d" % _count_value(plan, 6))
 		return
 	_ok("regroups_fused_remainder")
+
+func _segment_is_value(segment: Array, value: int) -> bool:
+	if segment.is_empty():
+		return false
+	for raw in segment:
+		if int(raw) != value:
+			return false
+	return true
+
+func _test_ten_without_collapse_ready_to_fuse() -> void:
+	# Mezclar recoloca; resolve fusiona la pila de 10. Colapsar acá dejaba el 10 crudo.
+	var values: Array = []
+	for _i in range(10):
+		values.append(5)
+	for _i in range(3):
+		values.append(7)
+	var plan: Array = GameRules.build_mix_stack_plan(values, 4, STACK_CAPACITY, false)
+	if _count_value(plan, 5) != 10 or _count_value(plan, 6) != 0:
+		_fail("ten_no_collapse", "5s=%d 6s=%d" % [_count_value(plan, 5), _count_value(plan, 6)])
+		return
+	var found_ten := false
+	for segment in plan:
+		if (segment as Array).size() == 10 and _segment_is_value(segment, 5):
+			found_ten = true
+			break
+	if not found_ten:
+		_fail("ten_ready_to_fuse", str(plan))
+		return
+	_ok("ten_without_collapse_ready_to_fuse")
+
+func _test_fifty_fours_without_collapse() -> void:
+	# 50 cuatros → 5 pilas de 10. Collapse+skip dejaba 10 cincos sin fusionar.
+	var values: Array = []
+	for _i in range(50):
+		values.append(4)
+	var plan: Array = GameRules.build_mix_stack_plan(values, 5, STACK_CAPACITY, false)
+	if _count_value(plan, 4) != 50:
+		_fail("fifty_keeps_fours", "4s=%d" % _count_value(plan, 4))
+		return
+	if _count_value(plan, 5) != 0:
+		_fail("fifty_no_fives_yet", "5s=%d" % _count_value(plan, 5))
+		return
+	var tens := 0
+	for segment in plan:
+		if (segment as Array).size() == 10 and _segment_is_value(segment, 4):
+			tens += 1
+	if tens != 5:
+		_fail("fifty_five_tens", "tens=%d plan=%s" % [tens, str(plan)])
+		return
+	_ok("fifty_fours_without_collapse")
+
+func _test_leftover_does_not_complete_nine() -> void:
+	# 9 cincos + 4 seises + 3 ochos en 2 ranuras: no rellenar los 9 con otro número.
+	var plan: Array = [[], []]
+	var overflow: Array = []
+	for _i in range(9):
+		overflow.append(5)
+	for _i in range(4):
+		overflow.append(6)
+	for _i in range(3):
+		overflow.append(8)
+	GameRules._mix_fill_overflow_by_value(plan, overflow, 0, 2, STACK_CAPACITY)
+	var found_nine_fives := false
+	var mixed_ten_fives := false
+	for segment in plan:
+		if _segment_is_value(segment, 5) and (segment as Array).size() == 9:
+			found_nine_fives = true
+		if (segment as Array).size() == 10 and int(segment[0]) == 5 and not _segment_is_value(segment, 5):
+			mixed_ten_fives = true
+	if not found_nine_fives:
+		_fail("leftover_keeps_nine_fives", str(plan))
+		return
+	if mixed_ten_fives:
+		_fail("leftover_fake_ten", str(plan))
+		return
+	_ok("leftover_does_not_complete_nine")
+
+func _count_pure_stacks_of(plan: Array, value: int) -> int:
+	var n := 0
+	for segment in plan:
+		if _segment_is_value(segment, value):
+			n += 1
+	return n
+
+func _test_same_value_not_split_when_it_fits() -> void:
+	# 10 de un número + el resto caben: no partir los 22 ni mezclarlos.
+	var values: Array = []
+	for _i in range(10):
+		values.append(22)
+	for _i in range(10):
+		values.append(26)
+	for _i in range(8):
+		values.append(28)
+	for _i in range(6):
+		values.append(27)
+	for _i in range(6):
+		values.append(23)
+	for _i in range(6):
+		values.append(24)
+	for _i in range(4):
+		values.append(30)
+	for _i in range(3):
+		values.append(25)
+	var plan: Array = GameRules.build_mix_stack_plan(values, 10, STACK_CAPACITY, false)
+	if not _assert_all_homogeneous(plan, "same_value_not_split"):
+		return
+	if _count_pure_stacks_of(plan, 22) != 1 or _count_value(plan, 22) != 10:
+		_fail("twenty_twos_one_stack", str(plan))
+		return
+	if _count_pure_stacks_of(plan, 26) != 1 or _count_value(plan, 26) != 10:
+		_fail("twenty_sixes_one_stack", str(plan))
+		return
+	_ok("same_value_not_split_when_it_fits")
+
+func _test_overflow_keeps_nines_together() -> void:
+	# 11 números, 10 ranuras: los 9 veinti-dós quedan en una sola pila pura.
+	var values: Array = []
+	for _i in range(9):
+		values.append(22)
+	for v in range(23, 30):
+		for _i in range(5):
+			values.append(v)
+	for v in range(30, 33):
+		for _i in range(2):
+			values.append(v)
+	var plan: Array = GameRules.build_mix_stack_plan(values, 10, STACK_CAPACITY, false)
+	if _total_planned(plan) != values.size():
+		_fail("overflow_nines_count", "%d vs %d" % [_total_planned(plan), values.size()])
+		return
+	if _count_pure_stacks_of(plan, 22) != 1 or _count_value(plan, 22) != 9:
+		_fail("overflow_nines_together", str(plan))
+		return
+	_ok("overflow_keeps_nines_together")
+
+func _test_wildcard_mix_joins_fused() -> void:
+	# 10×22 + 3×23 → fusiona a 2×23 y los junta: 5 veintitres en una pila.
+	var values: Array = []
+	for _i in range(10):
+		values.append(22)
+	for _i in range(3):
+		values.append(23)
+	var plan: Array = GameRules.build_wildcard_mix_plan(values, 5, STACK_CAPACITY)
+	if _count_value(plan, 22) != 0:
+		_fail("wildcard_fused_22", "22s=%d" % _count_value(plan, 22))
+		return
+	if _count_value(plan, 23) != 5:
+		_fail("wildcard_joined_23", "23s=%d" % _count_value(plan, 23))
+		return
+	if _count_pure_stacks_of(plan, 23) != 1:
+		_fail("wildcard_one_23_stack", str(plan))
+		return
+	if not _assert_all_homogeneous(plan, "wildcard_mix_joins"):
+		return
+	_ok("wildcard_mix_joins_fused")
+
+func _test_wildcard_mix_does_not_chain() -> void:
+	# 50×4 → pila de 10 cincos → se convierte a 2 seises. No sigue a sietes.
+	var values: Array = []
+	for _i in range(50):
+		values.append(4)
+	var plan: Array = GameRules.build_wildcard_mix_plan(values, 5, STACK_CAPACITY)
+	if _count_value(plan, 4) != 0:
+		_fail("wildcard_no_fours", "4s=%d" % _count_value(plan, 4))
+		return
+	if _count_value(plan, 7) != 0:
+		_fail("wildcard_no_chain_sevens", "7s=%d" % _count_value(plan, 7))
+		return
+	if _count_value(plan, 6) != 2 or _count_value(plan, 5) != 0:
+		_fail("wildcard_two_sixes", "6s=%d 5s=%d" % [
+			_count_value(plan, 6), _count_value(plan, 5)
+		])
+		return
+	if _count_pure_stacks_of(plan, 6) != 1:
+		_fail("wildcard_sixes_together", str(plan))
+		return
+	_ok("wildcard_mix_converts_completed_stack")

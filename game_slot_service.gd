@@ -19,12 +19,13 @@ static func consume_temp_action(temp_active: bool, actions_remaining: int) -> Di
 	}
 
 static func ensure_unlock_cursor(current_level: int, cycle_base_level: int, first_level_in_cycle: int) -> int:
+	const INTERVAL_3_FROM := 50
 	if current_level > 0:
-		if current_level % 2 != 0:
+		if current_level < INTERVAL_3_FROM and current_level % 2 != 0:
 			return current_level + 1
 		return current_level
 	var fallback := cycle_base_level + first_level_in_cycle
-	if fallback % 2 != 0:
+	if fallback < INTERVAL_3_FROM and fallback % 2 != 0:
 		fallback += 1
 	return fallback
 

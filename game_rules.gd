@@ -7,30 +7,70 @@ const TEMP_SLOT_CLOSE_BY_ACTIONS := false
 const ENABLE_FUSION_CREATE_BONUS := false
 ## Al completar 10 iguales, se crean esta cantidad de fichas del valor siguiente.
 const FUSION_OUTPUT_COUNT := 2
+## Una sola tirada por repartida: 10% de chance de incluir exactamente 1 comodín.
+const WILDCARD_ROUND_CHANCE := 0.10
+const COIN_WILDCARD_VALUE := 0
 
 const ADJACENT_SLOT_FREE_FIRST_LEVEL := 2
 const ADJACENT_SLOT_FREE_LEVEL_INTERVAL := 2
+## Desde este nivel (inclusive) el gratis pasa a cada 3; desde 100, cada 4.
+const ADJACENT_SLOT_INTERVAL_3_FROM_LEVEL := 50
+const ADJACENT_SLOT_INTERVAL_4_FROM_LEVEL := 100
+const ADJACENT_SLOT_FREE_INTERVAL_MID := 3
+const ADJACENT_SLOT_FREE_INTERVAL_LATE := 4
+const _UNLOCK_WALK_GUARD := 128
+
+static func is_coin_wildcard_value(value: int) -> bool:
+	return int(value) == COIN_WILDCARD_VALUE
+
+static func coin_value_from_board_row(board_row_index: int) -> int:
+	return maxi(1, int(board_row_index) + 1)
 
 static func even_free_slot_unlock_level(level: int) -> int:
+	return normalize_free_slot_unlock_level(level)
+
+static func normalize_free_slot_unlock_level(level: int) -> int:
 	var v := maxi(level, ADJACENT_SLOT_FREE_FIRST_LEVEL)
-	if v % 2 != 0:
+	if v < ADJACENT_SLOT_INTERVAL_3_FROM_LEVEL and v % 2 != 0:
 		v += 1
 	return v
 
+static func free_slot_unlock_interval_after(unlock_level: int) -> int:
+	if unlock_level >= ADJACENT_SLOT_INTERVAL_4_FROM_LEVEL:
+		return ADJACENT_SLOT_FREE_INTERVAL_LATE
+	if unlock_level >= ADJACENT_SLOT_INTERVAL_3_FROM_LEVEL:
+		return ADJACENT_SLOT_FREE_INTERVAL_MID
+	return ADJACENT_SLOT_FREE_LEVEL_INTERVAL
+
 static func initial_free_slot_unlock_level(cycle_base_level: int) -> int:
-	return even_free_slot_unlock_level(cycle_base_level + ADJACENT_SLOT_FREE_FIRST_LEVEL)
+	return normalize_free_slot_unlock_level(cycle_base_level + ADJACENT_SLOT_FREE_FIRST_LEVEL)
 
 static func next_free_slot_unlock_level(current_unlock_level: int) -> int:
-	var even := even_free_slot_unlock_level(current_unlock_level)
-	if current_unlock_level % 2 != 0:
-		return even
-	return even + ADJACENT_SLOT_FREE_LEVEL_INTERVAL
+	var base := normalize_free_slot_unlock_level(current_unlock_level)
+	if current_unlock_level < ADJACENT_SLOT_INTERVAL_3_FROM_LEVEL and current_unlock_level % 2 != 0:
+		return base
+	var nxt := base + free_slot_unlock_interval_after(base)
+	if base < ADJACENT_SLOT_INTERVAL_4_FROM_LEVEL and nxt > ADJACENT_SLOT_INTERVAL_4_FROM_LEVEL:
+		return ADJACENT_SLOT_INTERVAL_4_FROM_LEVEL
+	return nxt
+
+static func previous_free_slot_unlock_level(unlock_level: int) -> int:
+	var n := normalize_free_slot_unlock_level(unlock_level)
+	if n <= ADJACENT_SLOT_FREE_FIRST_LEVEL:
+		return n
+	if n > ADJACENT_SLOT_INTERVAL_4_FROM_LEVEL:
+		return n - ADJACENT_SLOT_FREE_INTERVAL_LATE
+	if n == ADJACENT_SLOT_INTERVAL_4_FROM_LEVEL:
+		return n - 2
+	if n > ADJACENT_SLOT_INTERVAL_3_FROM_LEVEL:
+		return n - ADJACENT_SLOT_FREE_INTERVAL_MID
+	return n - ADJACENT_SLOT_FREE_LEVEL_INTERVAL
 
 ## Próximo hito gratis estrictamente posterior a reached_level (sin desbloqueo retroactivo).
 static func advance_free_slot_unlock_past_level(current_unlock_level: int, reached_level: int) -> int:
-	var unlock := even_free_slot_unlock_level(current_unlock_level)
+	var unlock := normalize_free_slot_unlock_level(current_unlock_level)
 	var guard := 0
-	while unlock <= reached_level and guard < 64:
+	while unlock <= reached_level and guard < _UNLOCK_WALK_GUARD:
 		unlock = next_free_slot_unlock_level(unlock)
 		guard += 1
 	return unlock
@@ -55,7 +95,7 @@ static func earned_cycle_free_slot_count(
 	var earned := 0
 	var unlock := first
 	var guard := 0
-	while unlock <= checkpoint_level and guard < 64:
+	while unlock <= checkpoint_level and guard < _UNLOCK_WALK_GUARD:
 		earned += 1
 		unlock = next_free_slot_unlock_level(unlock)
 		guard += 1
@@ -97,10 +137,10 @@ static func heal_inflated_cycle_free_slots(
 	var changed := false
 	while stacks > cycle_reset_stacks and unlock > expected_unlock:
 		stacks -= 1
-		unlock -= ADJACENT_SLOT_FREE_LEVEL_INTERVAL
+		unlock = previous_free_slot_unlock_level(unlock)
 		changed = true
-	if changed and unlock % 2 != 0:
-		unlock -= 1
+	if changed and unlock != expected_unlock:
+		unlock = expected_unlock
 	return {
 		"changed": changed,
 		"active_stacks": stacks,
@@ -208,52 +248,123 @@ static func build_mix_stack_plan(
 			% [total_coins, total_spaces, stack_count, capacity]
 		)
 
-	var chunks: Array = _mix_build_chunks(counts, capacity)
-	if chunks.is_empty():
-		return plan
-
-	# Camino perfecto: un chunk = una pila homogénea.
-	if chunks.size() <= stack_count:
-		for i in range(chunks.size()):
-			plan[i] = chunks[i]
+	var leftover_counts := counts.duplicate()
+	var remaining_stacks := stack_count
+	var exclusive_coins: Dictionary = {}
+	var values_by_count: Array = leftover_counts.keys()
+	values_by_count.sort_custom(func(a, b):
+		var ca := int(leftover_counts[a])
+		var cb := int(leftover_counts[b])
+		if ca != cb:
+			return ca > cb
+		return int(a) < int(b)
+	)
+	var stacks_needed := 0
+	for v in leftover_counts.keys():
+		stacks_needed += _mix_ceil_div(int(leftover_counts[v]), capacity)
+	# Camino simple: cada número cabe en sus propias pilas. Cero mezclas.
+	if stacks_needed <= stack_count:
+		var ordered: Array = leftover_counts.keys()
+		ordered.sort_custom(func(a, b): return int(a) < int(b))
+		var pi := 0
+		for v in ordered:
+			var left := int(leftover_counts[v])
+			while left > 0 and pi < stack_count:
+				var put := mini(left, capacity)
+				for _j in range(put):
+					(plan[pi] as Array).append(int(v))
+				left -= put
+				pi += 1
 		_mix_sort_plan_stacks(plan)
 		return plan
+	# Un número por pila(s). No rechazar un grupo porque "desperdicia" huecos:
+	# 7 iguales en una ranura de 10 es correcto; mezclarlos no.
+	for v in values_by_count:
+		var n := int(leftover_counts.get(v, 0))
+		if n <= 0 or remaining_stacks <= 0:
+			continue
+		var need := _mix_ceil_div(n, capacity)
+		if need <= 0:
+			continue
+		var take := mini(need, remaining_stacks)
+		var placed_n := mini(n, take * capacity)
+		exclusive_coins[int(v)] = int(exclusive_coins.get(int(v), 0)) + placed_n
+		leftover_counts[v] = n - placed_n
+		remaining_stacks -= take
 
-	# Ordenar chunks grandes primero.
-	chunks.sort_custom(func(a, b):
-		var sa := (a as Array).size()
-		var sb := (b as Array).size()
-		if sa != sb:
-			return sa > sb
-		return int((a as Array)[0]) < int((b as Array)[0])
-	)
-
-	# Guardar chunks puros mientras el resto siga cabiendo en las ranuras restantes.
 	var si := 0
-	var coins_left := total_coins
-	var stacks_left := stack_count
-	var overflow: Array = []
-	for chunk in chunks:
-		var chunk_arr: Array = chunk
-		var chunk_size := chunk_arr.size()
-		var rest := coins_left - chunk_size
-		var stacks_after := stacks_left - 1
-		if (
-			si < stack_count
-			and stacks_after >= 0
-			and rest <= stacks_after * capacity
-		):
-			plan[si] = chunk_arr.duplicate()
-			si += 1
-			stacks_left -= 1
-			coins_left -= chunk_size
-		else:
-			for raw in chunk_arr:
-				overflow.append(int(raw))
+	var exclusive_values: Array = exclusive_coins.keys()
+	exclusive_values.sort()
+	for v in exclusive_values:
+		var left := int(exclusive_coins[v])
+		while left > 0 and si < stack_count:
+			var room := capacity - (plan[si] as Array).size()
+			if room <= 0:
+				si += 1
+				continue
+			var put := mini(room, left)
+			for _j in range(put):
+				(plan[si] as Array).append(int(v))
+			left -= put
+			if (plan[si] as Array).size() >= capacity:
+				si += 1
 
+	var overflow: Array = []
+	var overflow_keys: Array = leftover_counts.keys()
+	overflow_keys.sort_custom(func(a, b):
+		var ca := int(leftover_counts[a])
+		var cb := int(leftover_counts[b])
+		if ca != cb:
+			return ca > cb
+		return int(a) < int(b)
+	)
+	for v in overflow_keys:
+		for _j in range(int(leftover_counts[v])):
+			overflow.append(int(v))
 	_mix_fill_overflow_by_value(plan, overflow, si, stack_count, capacity)
+	for i in range(plan.size()):
+		plan[i] = _mix_clustered_stack(plan[i])
 	_mix_sort_plan_stacks(plan)
 	return plan
+
+## Mezclar del comodín: agrupa por número y convierte cada pila de 10.
+## Después de juntar los fusionados, si vuelve a haber 10 iguales, también se
+## convierten. No sigue después de eso (evita 4→8 en un solo uso).
+static func build_wildcard_mix_plan(
+	all_values: Array,
+	stack_count: int,
+	capacity: int = 10
+) -> Array:
+	var plan: Array = build_mix_stack_plan(all_values, stack_count, capacity, false)
+	plan = _mix_fuse_full_stacks(plan, capacity)
+	plan = build_mix_stack_plan(_mix_flatten_plan(plan), stack_count, capacity, false)
+	plan = _mix_fuse_full_stacks(plan, capacity)
+	return build_mix_stack_plan(_mix_flatten_plan(plan), stack_count, capacity, false)
+
+static func _mix_flatten_plan(plan: Array) -> Array:
+	var all_values: Array = []
+	for segment in plan:
+		for raw in segment:
+			all_values.append(int(raw))
+	return all_values
+
+static func _mix_fuse_full_stacks(plan: Array, capacity: int) -> Array:
+	var out: Array = []
+	for segment in plan:
+		var arr: Array = (segment as Array).duplicate()
+		if (
+			arr.size() >= capacity
+			and not _mix_stack_is_mixed(arr)
+			and int(arr[0]) > 0
+		):
+			var nxt := int(arr[0]) + 1
+			var fused: Array = []
+			for _i in range(FUSION_OUTPUT_COUNT):
+				fused.append(nxt)
+			out.append(fused)
+		else:
+			out.append(arr)
+	return out
 
 static func _mix_count_values(all_values: Array) -> Dictionary:
 	var counts: Dictionary = {}
@@ -262,7 +373,33 @@ static func _mix_count_values(all_values: Array) -> Dictionary:
 		counts[v] = int(counts.get(v, 0)) + 1
 	return counts
 
-## Sobrantes por valor: una pila por número si hay ranuras vacías. Mezclar solo si no alcanzan.
+static func _mix_ceil_div(n: int, d: int) -> int:
+	if d <= 0:
+		return 0
+	return int((maxi(0, n) + d - 1) / d)
+
+static func _mix_append_value(slot: Array, value: int, amount: int) -> void:
+	for _j in range(maxi(0, amount)):
+		slot.append(int(value))
+
+static func _mix_stack_is_mixed(slot: Array) -> bool:
+	if slot.size() <= 1:
+		return false
+	var first := int(slot[0])
+	for raw in slot:
+		if int(raw) != first:
+			return true
+	return false
+
+static func _mix_stack_is_pure_value(slot: Array, value: int) -> bool:
+	if slot.is_empty():
+		return false
+	for raw in slot:
+		if int(raw) != int(value):
+			return false
+	return true
+
+## Sobrantes por valor: completar pilas de ese número, luego ranuras vacías. Mezclar al final.
 static func _mix_fill_overflow_by_value(
 	plan: Array,
 	overflow: Array,
@@ -270,9 +407,10 @@ static func _mix_fill_overflow_by_value(
 	stack_count: int,
 	capacity: int
 ) -> void:
-	if overflow.is_empty() or start_index >= stack_count:
-		if not overflow.is_empty():
-			push_error("Mix: sobraron %d fichas sin colocar" % overflow.size())
+	if overflow.is_empty():
+		return
+	if start_index >= stack_count:
+		_mix_dump_remainders(plan, overflow, 0, stack_count, capacity)
 		return
 	var groups := _mix_count_values(overflow)
 	var values: Array = groups.keys()
@@ -283,61 +421,115 @@ static func _mix_fill_overflow_by_value(
 			return ca > cb
 		return int(a) < int(b)
 	)
-	var si := start_index
 	var leftover: Dictionary = {}
 	for v in values:
 		var left := int(groups[v])
-		while left > 0 and si < stack_count:
-			var slot: Array = plan[si]
+		for di in range(start_index, stack_count):
+			if left <= 0:
+				break
+			var slot: Array = plan[di]
 			var room := capacity - slot.size()
 			if room <= 0:
-				si += 1
 				continue
-			if not slot.is_empty() and int(slot[0]) != int(v):
-				si += 1
+			if not _mix_stack_is_pure_value(slot, int(v)):
 				continue
 			var put := mini(room, left)
-			for _j in range(put):
-				(plan[si] as Array).append(int(v))
+			_mix_append_value(plan[di], int(v), put)
 			left -= put
-			if (plan[si] as Array).size() >= capacity:
-				si += 1
+		for di in range(start_index, stack_count):
+			if left <= 0:
+				break
+			var slot: Array = plan[di]
+			if not slot.is_empty():
+				continue
+			var put := mini(capacity, left)
+			_mix_append_value(plan[di], int(v), put)
+			left -= put
 		if left > 0:
 			leftover[int(v)] = left
 	if leftover.is_empty():
 		return
 	var rem: Array = []
-	var rem_keys: Array = leftover.keys()
-	rem_keys.sort()
-	for v in rem_keys:
+	var leftover_keys: Array = leftover.keys()
+	leftover_keys.sort()
+	for v in leftover_keys:
 		for _j in range(int(leftover[v])):
 			rem.append(int(v))
+	_mix_dump_remainders(plan, rem, 0, stack_count, capacity)
+
+static func _mix_dump_remainders(
+	plan: Array,
+	remainders: Array,
+	start_index: int,
+	stack_count: int,
+	capacity: int
+) -> void:
 	var oi := 0
-	var di := start_index
-	while oi < rem.size() and di < stack_count:
-		var slot: Array = plan[di]
-		var room := capacity - slot.size()
-		if room <= 0:
-			di += 1
-			continue
-		var put := mini(room, rem.size() - oi)
-		for _j in range(put):
-			(plan[di] as Array).append(int(rem[oi]))
-			oi += 1
-		if (plan[di] as Array).size() >= capacity:
-			di += 1
-	if oi < rem.size():
-		push_error("Mix: sobraron %d fichas sin colocar" % (rem.size() - oi))
+	while oi < remainders.size():
+		var best_i := -1
+		var best_score := 1 << 30
+		for di in range(start_index, stack_count):
+			var slot: Array = plan[di]
+			if slot.size() >= capacity:
+				continue
+			var score := _mix_remainder_slot_score(slot, int(remainders[oi]))
+			if score < best_score:
+				best_score = score
+				best_i = di
+		if best_i < 0:
+			push_error("Mix: sobraron %d fichas sin colocar" % (remainders.size() - oi))
+			return
+		(plan[best_i] as Array).append(int(remainders[oi]))
+		oi += 1
+
+
+## Menor score = mejor destino. No completar una pila pura con otro número si hay alternativa.
+static func _mix_remainder_slot_score(slot: Array, value: int) -> int:
+	if slot.is_empty():
+		return 500
+	if _mix_stack_is_pure_value(slot, value):
+		return 100 + slot.size()
+	if _mix_stack_is_mixed(slot):
+		return slot.size()
+	return 10000 + slot.size()
+
+## En pilas mixtas, agrupa por número y deja el bloque más grande arriba (se puede mover).
+static func _mix_clustered_stack(slot: Array) -> Array:
+	if slot.size() <= 1 or not _mix_stack_is_mixed(slot):
+		return slot
+	var counts := _mix_count_values(slot)
+	var keys: Array = counts.keys()
+	keys.sort_custom(func(a, b):
+		var ca := int(counts[a])
+		var cb := int(counts[b])
+		if ca != cb:
+			return ca < cb
+		return int(a) < int(b)
+	)
+	var out: Array = []
+	for v in keys:
+		_mix_append_value(out, int(v), int(counts[v]))
+	return out
 
 static func _mix_sort_plan_stacks(plan: Array) -> void:
 	plan.sort_custom(func(a, b):
 		var aa := a as Array
 		var bb := b as Array
-		if aa.is_empty() != bb.is_empty():
-			return bb.is_empty()
-		if aa.is_empty():
+		var a_empty := aa.is_empty()
+		var b_empty := bb.is_empty()
+		if a_empty != b_empty:
+			return b_empty
+		if a_empty:
 			return false
-		return int(aa[0]) < int(bb[0])
+		var a_mix := _mix_stack_is_mixed(aa)
+		var b_mix := _mix_stack_is_mixed(bb)
+		if a_mix != b_mix:
+			return b_mix
+		var a_key := int(aa[aa.size() - 1])
+		var b_key := int(bb[bb.size() - 1])
+		if a_key != b_key:
+			return a_key < b_key
+		return aa.size() > bb.size()
 	)
 
 ## 10 del valor V → FUSION_OUTPUT_COUNT del valor V+1. Solo los grupos que ya
@@ -347,6 +539,8 @@ static func _mix_collapse_fusions(counts: Dictionary, capacity: int = 10) -> Dic
 	var keys: Array = counts.keys()
 	keys.sort()
 	for v in keys:
+		if is_coin_wildcard_value(int(v)):
+			continue
 		var c := int(counts.get(v, 0))
 		if c < capacity:
 			continue

@@ -55,6 +55,10 @@ func _test_unlock_cursor() -> void:
 	if init != 18:
 		_fail("unlock_cursor_init", str(init))
 		return
+	var mid := GameSlotServiceScript.ensure_unlock_cursor(53, 15, 2)
+	if mid != 53:
+		_fail("unlock_cursor_keeps_odd_after_50", str(mid))
+		return
 	_ok("unlock_cursor")
 
 func _test_unlock_decision() -> void:

@@ -67,6 +67,27 @@ func _test_unlock_levels() -> void:
 	if GameRulesScript.next_free_slot_unlock_level(45) != 46:
 		_fail("odd_cursor_snaps_even", str(GameRulesScript.next_free_slot_unlock_level(45)))
 		return
+	if GameRulesScript.next_free_slot_unlock_level(48) != 50:
+		_fail("next_48_is_50", str(GameRulesScript.next_free_slot_unlock_level(48)))
+		return
+	if GameRulesScript.next_free_slot_unlock_level(50) != 53:
+		_fail("next_50_is_53", str(GameRulesScript.next_free_slot_unlock_level(50)))
+		return
+	if GameRulesScript.next_free_slot_unlock_level(53) != 56:
+		_fail("next_53_is_56", str(GameRulesScript.next_free_slot_unlock_level(53)))
+		return
+	if GameRulesScript.next_free_slot_unlock_level(98) != 100:
+		_fail("next_98_is_100", str(GameRulesScript.next_free_slot_unlock_level(98)))
+		return
+	if GameRulesScript.next_free_slot_unlock_level(100) != 104:
+		_fail("next_100_is_104", str(GameRulesScript.next_free_slot_unlock_level(100)))
+		return
+	if GameRulesScript.first_future_free_slot_unlock_level(0, 50) != 53:
+		_fail("future_after_50", str(GameRulesScript.first_future_free_slot_unlock_level(0, 50)))
+		return
+	if GameRulesScript.first_future_free_slot_unlock_level(0, 100) != 104:
+		_fail("future_after_100", str(GameRulesScript.first_future_free_slot_unlock_level(0, 100)))
+		return
 	var false_23 := GameRulesScript.heal_inflated_cycle_free_slots(6, 25, 21, 15, 5)
 	if not bool(false_23.get("changed", false)):
 		_fail("heal_slots_detects_false_23", str(false_23))

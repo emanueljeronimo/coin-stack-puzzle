@@ -576,7 +576,10 @@ func _capture_stack_data() -> Array:
 	for stack in stacks:
 		var row: Array = []
 		for c in stack.coins:
-			row.append(int(c))
+			var coin_v := int(c)
+			if coin_v > 0 and coin_v < roll_value_floor:
+				continue
+			row.append(coin_v)
 		stack_data.append(row)
 	return stack_data
 
@@ -876,7 +879,10 @@ func _restore_board_from_snapshot(snap: Dictionary) -> void:
 	for i in range(mini(stacks.size(), stack_data.size())):
 		if stack_data[i] is Array:
 			for v in stack_data[i]:
-				stacks[i].push(int(v), false)
+				var coin_v := int(v)
+				if coin_v > 0 and coin_v < roll_value_floor:
+					continue
+				stacks[i].push(coin_v, false)
 	refresh_all_stack_layout()
 	refresh_fusion_target_bonus_unlock()
 	update_progress_bar(false)
@@ -1196,6 +1202,15 @@ func perform_roll() -> bool:
 
 	values_to_roll.shuffle()
 	var roll_count := GameTurnEngineScript.compute_roll_count(values_to_roll.size(), total_free_slots, true)
+	values_to_roll = GameTurnEngineScript.apply_round_wildcard(
+		values_to_roll,
+		roll_count,
+		GameRulesScript.WILDCARD_ROUND_CHANCE,
+		func() -> float:
+			return randf(),
+		func(n: int) -> int:
+			return randi() % maxi(1, n)
+	)
 	var roll_assigned_by_stack: Dictionary = {}
 	for stack in target_stacks:
 		roll_assigned_by_stack[stack.get_instance_id()] = 0
@@ -2086,7 +2101,10 @@ func restore_checkpoint() -> void:
 	for i in range(mini(stacks.size(), stack_data.size())):
 		if stack_data[i] is Array:
 			for v in stack_data[i]:
-				stacks[i].push(int(v))
+				var coin_v := int(v)
+				if coin_v > 0 and coin_v < roll_value_floor:
+					continue
+				stacks[i].push(coin_v)
 	_restore_wildcard_state_from_snapshot()
 	refresh_fusion_target_bonus_unlock()
 	_sync_slot_overlay_controls()
@@ -3642,11 +3660,10 @@ func perform_mix_action() -> void:
 		% [all_values.size(), spaces, stacks.size(), STACK_CAPACITY]
 	)
 
-	# 3) Colapsar una generación (10 iguales → siguiente) y recolocar por número.
-	# Sin colapso, 12 cincos quedan 10+2 y al fusionar in situ no se juntan los 6.
-	# skip_fusions: 50 cuatros → 10 cincos; fusionar después encadenaba 4→6.
-	var plan: Array = GameRulesScript.build_mix_stack_plan(
-		all_values, stacks.size(), STACK_CAPACITY, true
+	# 3) Agrupar por número, fusionar pilas de 10 una vez y volver a agrupar
+	# para que los fusionados no queden en pilas sueltas de 2.
+	var plan: Array = GameRulesScript.build_wildcard_mix_plan(
+		all_values, stacks.size(), STACK_CAPACITY
 	)
 	var placed_count := 0
 	for si in range(stacks.size()):
@@ -3674,7 +3691,7 @@ func perform_mix_action() -> void:
 	refresh_all_stack_layout()
 	queue_redraw()
 	print("Mezclar: reordenado → %d fichas en %d ranuras." % [placed_count, stacks.size()])
-	resolve_board_after_action(-1, true)
+	resolve_board_after_action()
 
 func perform_hammer_action() -> void:
 	if board_locked:

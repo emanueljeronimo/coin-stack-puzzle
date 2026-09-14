@@ -13,6 +13,7 @@ func _run() -> void:
 	_test_roll_value_pool()
 	_test_roll_count_policy()
 	_test_balanced_pick_policy()
+	_test_round_wildcard_once()
 	print("=== RESULT: %d passed, %d failed ===" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -67,3 +68,36 @@ func _test_balanced_pick_policy() -> void:
 		_fail("balanced_pick_distribution", str(assigned))
 		return
 	_ok("balanced_pick_policy")
+
+func _test_round_wildcard_once() -> void:
+	var none := GameTurnEngineScript.apply_round_wildcard(
+		[1, 2, 3, 4],
+		4,
+		0.10,
+		func() -> float: return 0.99,
+		func(_n: int) -> int: return 0
+	)
+	if none != [1, 2, 3, 4]:
+		_fail("wildcard_round_miss", str(none))
+		return
+	var hit := GameTurnEngineScript.apply_round_wildcard(
+		[1, 2, 3, 4],
+		4,
+		0.10,
+		func() -> float: return 0.0,
+		func(_n: int) -> int: return 2
+	)
+	if hit != [1, 2, 0, 4]:
+		_fail("wildcard_round_one", str(hit))
+		return
+	var only_dealt := GameTurnEngineScript.apply_round_wildcard(
+		[1, 2, 3, 4, 5],
+		2,
+		1.0,
+		func() -> float: return 0.0,
+		func(_n: int) -> int: return 1
+	)
+	if only_dealt != [1, 0, 3, 4, 5]:
+		_fail("wildcard_only_in_dealt", str(only_dealt))
+		return
+	_ok("round_wildcard_once")
