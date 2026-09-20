@@ -2,6 +2,7 @@ extends Node2D
 
 const MAX_CAPACITY = 10
 const CoinScene = preload("res://coin.tscn")
+const GameRulesScript = preload("res://game_rules.gd")
 const STACK_WIDTH := 122.0
 const COIN_BASE_DIAMETER := 52.0
 const COIN_TARGET_WIDTH := 115.0
@@ -81,7 +82,7 @@ func free_slots() -> int:
 func can_receive_value(value: int) -> bool:
 	if is_full():
 		return false
-	if GameRules.is_coin_wildcard_value(value):
+	if GameRulesScript.is_coin_wildcard_value(value):
 		return true
 	return _effective_top_value_for_receive() in [-1, value]
 
@@ -124,7 +125,7 @@ func push(value: int, play_spawn: bool = true) -> bool:
 	
 	# Crear la moneda visualmente
 	var coin_node = CoinScene.instantiate()
-	if GameRules.is_coin_wildcard_value(value) and coin_node.has_method("make_wildcard"):
+	if GameRulesScript.is_coin_wildcard_value(value) and coin_node.has_method("make_wildcard"):
 		coin_node.make_wildcard(get_row_value())
 	else:
 		coin_node.set_value(value)
@@ -312,7 +313,7 @@ func get_row_value() -> int:
 	var idx: int = (list as Array).find(self)
 	if idx < 0:
 		return -1
-	return GameRules.coin_value_from_board_row(int(board.call("get_stack_board_row", idx)))
+	return GameRulesScript.coin_value_from_board_row(int(board.call("get_stack_board_row", idx)))
 
 func _resolve_attached_wildcard(moving_coin: Node) -> void:
 	if moving_coin == null or not is_instance_valid(moving_coin):

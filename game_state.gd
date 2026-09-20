@@ -295,6 +295,8 @@ func stop_board_music() -> void:
 func _ensure_board_music_player() -> void:
 	if _board_music_player != null:
 		return
+	if DisplayServer.get_name() == "headless":
+		return
 	var stream := load(BOARD_MUSIC_PATH) as AudioStream
 	if stream == null:
 		push_warning("No se pudo cargar la música del tablero: %s" % BOARD_MUSIC_PATH)

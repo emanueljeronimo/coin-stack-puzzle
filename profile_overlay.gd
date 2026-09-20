@@ -804,29 +804,17 @@ func _close_custom_color_popup() -> void:
 		custom_color_popup.hide()
 
 func _make_outlined_label(text: String, font_size: int) -> Label:
-	var lbl := Label.new()
-	lbl.text = text
-	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	lbl.add_theme_font_size_override("font_size", font_size)
-	lbl.add_theme_color_override("font_color", Color(0.88, 0.86, 0.83))
-	lbl.add_theme_color_override("font_outline_color", Color(0.22, 0.20, 0.24, 0.78))
-	lbl.add_theme_constant_override("outline_size", 5)
-	if LogoFont != null:
-		lbl.add_theme_font_override("font", LogoFont)
-	return lbl
+	return UiStyleUtils.make_outlined_label(
+		text,
+		font_size,
+		LogoFont,
+		Color(0.88, 0.86, 0.83),
+		Color(0.22, 0.20, 0.24, 0.78),
+		5
+	)
 
 func _flat_style(bg: Color, border: Color, radius: int, border_w: int = 3) -> StyleBoxFlat:
-	var style := StyleBoxFlat.new()
-	style.bg_color = bg
-	style.border_color = border
-	style.border_width_left = border_w
-	style.border_width_top = border_w
-	style.border_width_right = border_w
-	style.border_width_bottom = border_w
-	style.corner_radius_top_left = radius
-	style.corner_radius_top_right = radius
-	style.corner_radius_bottom_left = radius
-	style.corner_radius_bottom_right = radius
+	var style := UiStyleUtils.flat_style(bg, border, radius, border_w)
 	style.anti_aliasing = true
 	style.corner_detail = 12
 	return style
@@ -839,16 +827,15 @@ func _ring_style(border_col: Color, radius: int, border_w: int) -> StyleBoxFlat:
 	return style
 
 func _apply_button_style(btn: Button, bg: Color, border: Color, radius: int, font_color: Color) -> void:
-	if btn == null:
-		return
-	btn.add_theme_color_override("font_color", font_color)
-	btn.add_theme_color_override("font_outline_color", Color(0.08, 0.06, 0.14, 0.9))
-	btn.add_theme_constant_override("outline_size", 5)
-	var style := _flat_style(bg, border, radius)
-	btn.add_theme_stylebox_override("normal", style)
-	btn.add_theme_stylebox_override("hover", style)
-	btn.add_theme_stylebox_override("pressed", style)
-	btn.add_theme_stylebox_override("focus", style)
+	UiStyleUtils.apply_button_style(
+		btn,
+		bg,
+		border,
+		radius,
+		font_color,
+		Color(0.08, 0.06, 0.14, 0.9),
+		5
+	)
 
 func _apply_theme_colors() -> void:
 	var p: Dictionary = GameState.get_ui_palette()

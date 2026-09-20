@@ -318,3 +318,46 @@ Ritmo de desbloqueo en prestige 2, 3, etc.
 Definir si el comodín 'vaciar ranura' elimina o solo desplaza las monedas
 
 — fin del documento —
+
+
+15. Mapa Tecnico Actual (Refactor)
+
+15.1 Orquestacion principal
+- [main.gd](main.gd): mantiene el loop de escena y delega logica especifica a servicios.
+- [main_facade.gd](main_facade.gd): facade para llamadas transversales entre UI/estado/tablero.
+
+15.2 Servicios de flujo y reglas
+- [main_input_router.gd](main_input_router.gd): bloqueo de input y consumo por controles.
+- [main_move_interaction_service.gd](main_move_interaction_service.gd): reglas de click/guante/mensajes de interaccion.
+- [main_turn_resolution_service.gd](main_turn_resolution_service.gd): resolucion de turnos y estado bloqueado.
+- [main_board_render_service.gd](main_board_render_service.gd): utilidades de dibujo y estado visual.
+- [wildcard_flow_service.gd](wildcard_flow_service.gd): clasificacion de flujo de comodines.
+- [progression_query_service.gd](progression_query_service.gd): consultas de progreso/checkpoint.
+- [checkpoint_service.gd](checkpoint_service.gd): wrapper de snapshots de checkpoint.
+
+15.3 Economia, slots y compra
+- [temp_slot_purchase_service.gd](temp_slot_purchase_service.gd): armado/validacion de compra de ranura temporal.
+- [adjacent_slot_purchase_service.gd](adjacent_slot_purchase_service.gd): armado/validacion de compra de ranura adyacente.
+- [purchase_offer_factory.gd](purchase_offer_factory.gd): creacion de botones/ofertas de compra.
+
+15.4 HUD, overlays y layout
+- [hud_layout_service.gd](hud_layout_service.gd): layout base de HUD.
+- [hud_topbar_layout_service.gd](hud_topbar_layout_service.gd): metricas topbar.
+- [hud_footer_layout_service.gd](hud_footer_layout_service.gd): posiciones CTA/footer.
+- [hud_action_row_layout_service.gd](hud_action_row_layout_service.gd): fila de comodines/acciones.
+- [dialog_builder_service.gd](dialog_builder_service.gd): overlays modales y escala de dialogos.
+- [slot_overlay_builder.gd](slot_overlay_builder.gd): fabrica de overlays/paneles de ranura.
+- [ui_style_utils.gd](ui_style_utils.gd): estilos compartidos de labels/botones.
+- [ui_theme_service.gd](ui_theme_service.gd): variaciones de tema para cards/dialogos.
+- [ui_hit_test_service.gd](ui_hit_test_service.gd): hit-testing de controles.
+
+15.5 Persistencia
+- [save_manager.gd](save_manager.gd): coordinacion de guardado/carga y sync con GameState.
+- [save_file_repository.gd](save_file_repository.gd): I/O JSON de disco.
+- [profile_repository.gd](profile_repository.gd): defaults/sanitizacion/lookup de perfil.
+- [main_session_adapter.gd](main_session_adapter.gd): adaptacion de payload de sesion.
+
+15.6 Calidad y validacion
+- Runner unico: [tests/run_all_tests.sh](tests/run_all_tests.sh).
+- Regla operativa: todo servicio nuevo debe incluir test unitario dedicado.
+- Skill interna de prolijidad: [.github/skills/godot-prolijidad/SKILL.md](.github/skills/godot-prolijidad/SKILL.md).

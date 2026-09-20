@@ -2,6 +2,7 @@ extends Area2D
 
 const CoinVolumeShader = preload("res://coin_volume.gdshader")
 const CoinWildcardShader = preload("res://coin_wildcard.gdshader")
+const GameRulesScript = preload("res://game_rules.gd")
 
 var value: int = 1
 var number_visible: bool = true
@@ -114,7 +115,7 @@ func is_wildcard_coin() -> bool:
 func make_wildcard(origin_row: int) -> void:
 	is_wildcard = true
 	wildcard_original_row = origin_row
-	value = GameRules.COIN_WILDCARD_VALUE
+	value = GameRulesScript.COIN_WILDCARD_VALUE
 	update_display()
 
 func transform_wildcard(new_value: int) -> void:

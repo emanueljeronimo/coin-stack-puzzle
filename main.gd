@@ -11,6 +11,27 @@ const GameRulesScript = preload("res://game_rules.gd")
 const GameSessionServiceScript = preload("res://game_session_service.gd")
 const GameSlotServiceScript = preload("res://game_slot_service.gd")
 const GameWildcardServiceScript = preload("res://game_wildcard_service.gd")
+const MainMoveInteractionServiceScript = preload("res://main_move_interaction_service.gd")
+const WildcardFlowServiceScript = preload("res://wildcard_flow_service.gd")
+const TempSlotPurchaseServiceScript = preload("res://temp_slot_purchase_service.gd")
+const AdjacentSlotPurchaseServiceScript = preload("res://adjacent_slot_purchase_service.gd")
+const CheckpointServiceScript = preload("res://checkpoint_service.gd")
+const ProgressionQueryServiceScript = preload("res://progression_query_service.gd")
+const BoardMetricsServiceScript = preload("res://board_metrics_service.gd")
+const SlotOverlayBuilderScript = preload("res://slot_overlay_builder.gd")
+const DialogBuilderServiceScript = preload("res://dialog_builder_service.gd")
+const UiHitTestServiceScript = preload("res://ui_hit_test_service.gd")
+const UiThemeServiceScript = preload("res://ui_theme_service.gd")
+const HudTopbarLayoutServiceScript = preload("res://hud_topbar_layout_service.gd")
+const HudFooterLayoutServiceScript = preload("res://hud_footer_layout_service.gd")
+const HudActionRowLayoutServiceScript = preload("res://hud_action_row_layout_service.gd")
+const MainInputRouterScript = preload("res://main_input_router.gd")
+const MainTurnResolutionServiceScript = preload("res://main_turn_resolution_service.gd")
+const MainBoardRenderServiceScript = preload("res://main_board_render_service.gd")
+const PurchaseOfferFactoryScript = preload("res://purchase_offer_factory.gd")
+const HudLayoutServiceScript = preload("res://hud_layout_service.gd")
+const DialogVisibilityServiceScript = preload("res://dialog_visibility_service.gd")
+const MainFacadeScript = preload("res://main_facade.gd")
 const SlotOverlayBgScript = preload("res://slot_overlay_bg.gd")
 const MixIconTexture = preload("res://Imagenes/icono-mezclar.png")
 const HammerIconTexture = preload("res://Imagenes/icono-martillo.png")
@@ -377,8 +398,10 @@ var wildcard_unlock_title_label: Label = null
 var wildcard_unlock_subtitle_label: Label = null
 var wildcard_unlock_continue_button: Control = null
 var _pending_wildcard_unlock_queue: Array[String] = []
+var _main_facade: MainFacade = null
 
 func _ready() -> void:
+	_main_facade = MainFacadeScript.new(self)
 	_apply_portrait_orientation()
 	_sync_player_resources_from_game_state()
 	randomize()
@@ -1005,40 +1028,27 @@ func apply_save_dict(data: Dictionary) -> void:
 		)
 
 func _input(event: InputEvent) -> void:
-	if settings_ui != null and settings_ui.is_open():
+	if MainInputRouterScript.should_block_board_input(
+		settings_ui,
+		shop_ui,
+		level_up_overlay,
+		wildcard_unlock_overlay,
+		no_moves_overlay,
+		purchase_overlay
+	):
 		return
-	if shop_ui != null and shop_ui.is_open():
-		return
-	# Evitar click-through: si el cartel de subida de nivel está abierto, no procesar input del tablero.
-	if level_up_overlay != null and level_up_overlay.visible:
-		return
-	if wildcard_unlock_overlay != null and wildcard_unlock_overlay.visible:
-		return
-	# Evitar click-through: si el cartel de bloqueo está abierto, no procesar input del tablero.
-	if no_moves_overlay != null and no_moves_overlay.visible:
-		return
-	# Evitar click-through: si el popup de compra está abierto, no procesar input del tablero.
-	if purchase_overlay != null and purchase_overlay.visible:
-		return
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		if is_control_clicked(home_chip, event.position):
-			return
-		# No abrir acá: el overlay recibiría este mismo click y se cerraría.
-		# El carrito abre por gui_input, igual que Ajustes.
-		if is_control_clicked(shop_chip, event.position):
-			return
-		if is_control_clicked(settings_chip, event.position):
-			return
-		if is_control_clicked(life_chip, event.position):
-			return
-		if is_control_clicked(stars_chip, event.position):
+	if MainInputRouterScript.is_left_click(event):
+		if MainInputRouterScript.is_click_consumed_by_controls(
+			event.position,
+			[home_chip, shop_chip, settings_chip, life_chip, stars_chip]
+		):
 			return
 	if board_locked:
 		return
 	if event.is_action_pressed("ui_accept"):
 		perform_roll()
 		return
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+	if MainInputRouterScript.is_left_click(event):
 		if undo_button != null and is_control_clicked(undo_button, event.position):
 			try_undo_last_move()
 			return
@@ -1061,31 +1071,27 @@ func _input(event: InputEvent) -> void:
 		if glove_mode_active:
 			handle_glove_click(event.position)
 			return
-		if action_pills.size() > 0 and is_control_clicked(action_pills[0], event.position):
-			return
-		if action_pills.size() > 1 and is_control_clicked(action_pills[1], event.position):
-			return
-		if action_pills.size() > 2 and is_control_clicked(action_pills[2], event.position):
+		if MainInputRouterScript.is_click_consumed_by_controls(event.position, action_pills):
 			return
 		handle_click(event.position)
 
 func handle_glove_click(mouse_pos: Vector2) -> void:
-	if has_pending_coin_animations():
+	if not MainMoveInteractionServiceScript.can_process_click(has_pending_coin_animations()):
 		return
 	var clicked_stack = get_stack_at_point(mouse_pos)
-	if clicked_stack == null:
+	if MainMoveInteractionServiceScript.clicked_outside_stack(clicked_stack):
 		if selected_stack != null:
 			clear_selection()
-		print("Guante: elegí origen y después un destino con espacio.")
+		print(MainMoveInteractionServiceScript.glove_prompt_no_stack())
 		return
 	if selected_stack == null:
 		if clicked_stack.is_empty():
-			print("Guante: elegí una pila con fichas.")
+			print(MainMoveInteractionServiceScript.glove_prompt_empty_origin())
 			return
 		selected_stack = clicked_stack
 		selected_stack.set_selected(true)
 		queue_redraw()
-		print("Guante: ahora tocá el destino (cualquier ranura con hueco).")
+		print(MainMoveInteractionServiceScript.glove_prompt_pick_destination())
 		return
 	if selected_stack == clicked_stack:
 		clear_selection()
@@ -1103,10 +1109,10 @@ func handle_glove_click(mouse_pos: Vector2) -> void:
 		print("Guante: destino sin espacio.")
 
 func handle_click(mouse_pos: Vector2) -> void:
-	if has_pending_coin_animations():
+	if not MainMoveInteractionServiceScript.can_process_click(has_pending_coin_animations()):
 		return
 	var clicked_stack = get_stack_at_point(mouse_pos)
-	if clicked_stack == null:
+	if MainMoveInteractionServiceScript.clicked_outside_stack(clicked_stack):
 		print("Click fuera de pila.")
 		clear_selection()
 		return
@@ -1128,7 +1134,7 @@ func handle_click(mouse_pos: Vector2) -> void:
 		board_locked = true
 		_consume_temp_slot_action()
 	if moved == 0:
-		print("Movimiento invalido: destino lleno o tope incompatible.")
+		print(MainMoveInteractionServiceScript.invalid_move_message())
 	clear_selection(false)
 	# La resolución (fusiones, checkpoint, bloqueo) corre al asentarse la animación en stack.gd.
 	# No llamar resolve_board_after_action() aquí: el tablero aún está a medias y puede dar bloqueo falso.
@@ -1253,9 +1259,11 @@ func _consume_temp_slot_action() -> void:
 		close_temporary_slot()
 
 func resolve_board_after_action(expected_revision: int = -1, skip_fusions: bool = false) -> void:
-	if expected_revision >= 0 and expected_revision != board_revision:
-		return
-	if has_pending_incoming_coins():
+	if MainTurnResolutionServiceScript.should_abort_resolution(
+		expected_revision,
+		board_revision,
+		has_pending_incoming_coins()
+	):
 		return
 	if not skip_fusions:
 		resolve_fusions()
@@ -1264,18 +1272,21 @@ func resolve_board_after_action(expected_revision: int = -1, skip_fusions: bool 
 	var leveled_up := update_checkpoint_level()
 	if leveled_up:
 		_force_progress_bar_display(1.0)
-	var level_alert_open := (
-		(level_up_overlay != null and level_up_overlay.visible)
-		or not _pending_level_up_alerts.is_empty()
-		or _pending_cycle_reset_milestone > 0
-		or _cycle_reset_transition_playing
+	var level_alert_open := MainTurnResolutionServiceScript.level_alert_open(
+		level_up_overlay,
+		_pending_level_up_alerts,
+		_pending_cycle_reset_milestone,
+		_cycle_reset_transition_playing
 	)
-	var wildcard_alert_open := wildcard_unlock_overlay != null and wildcard_unlock_overlay.visible
-	if not level_alert_open and not wildcard_alert_open:
+	var wildcard_alert_open := MainTurnResolutionServiceScript.wildcard_alert_open(wildcard_unlock_overlay)
+	if MainTurnResolutionServiceScript.should_unlock_board(level_alert_open, wildcard_alert_open):
 		board_locked = false
-	print_status()
-	save_game()
-	if not level_alert_open and not wildcard_alert_open:
+	if _main_facade != null:
+		_main_facade.save_and_print()
+	else:
+		print_status()
+		save_game()
+	if MainTurnResolutionServiceScript.should_unlock_board(level_alert_open, wildcard_alert_open):
 		check_blocked_state()
 	_update_undo_button_state()
 
@@ -1327,11 +1338,11 @@ func has_pending_incoming_coins() -> bool:
 
 ## Muestra el cartel "No hay movimientos" solo si no hay jugadas entre pilas ni espacio para repartir.
 func check_blocked_state() -> void:
-	if level_up_overlay != null and level_up_overlay.visible:
-		return
-	if wildcard_unlock_overlay != null and wildcard_unlock_overlay.visible:
-		return
-	if no_moves_overlay != null and no_moves_overlay.visible:
+	if DialogVisibilityServiceScript.any_visible([
+		level_up_overlay,
+		wildcard_unlock_overlay,
+		no_moves_overlay,
+	]):
 		return
 	if has_pending_coin_animations():
 		return
@@ -1506,31 +1517,26 @@ func refresh_all_stack_layout() -> void:
 			stacks[i].normalize_coin_scales()
 
 func try_purchase_temp_slot() -> void:
-	var economy := GameEconomyServiceScript.purchase_temp_slot(
-		{
-			"player_stars": player_stars,
-			"temp_slot_bonus_active": temp_slot_bonus_active,
-			"has_active_temp_stack": has_active_temp_stack(),
-		},
-		{
-			"temp_slot_cost_stars": TEMP_SLOT_COST_STARS,
-			"temp_slot_duration_sec": TEMP_SLOT_DURATION_SEC,
-			"temp_slot_actions_to_close": (
-				GameRulesScript.TEMP_SLOT_ACTIONS_TO_CLOSE if GameRulesScript.TEMP_SLOT_CLOSE_BY_ACTIONS else 0
-			),
-		}
+	var request := TempSlotPurchaseServiceScript.build_purchase_request(
+		player_stars,
+		temp_slot_bonus_active,
+		has_active_temp_stack()
 	)
+	var rules := TempSlotPurchaseServiceScript.build_rules(
+		TEMP_SLOT_COST_STARS,
+		TEMP_SLOT_DURATION_SEC,
+		GameRulesScript.TEMP_SLOT_ACTIONS_TO_CLOSE if GameRulesScript.TEMP_SLOT_CLOSE_BY_ACTIONS else 0
+	)
+	var economy := GameEconomyServiceScript.purchase_temp_slot(request, rules)
 	if not bool(economy.get("ok", false)):
 		var reason := str(economy.get("reason", ""))
-		if reason == "already_active":
-			print("Ya tenés una ranura temporal activa.")
-			return
-		if reason == "insufficient_stars":
-			print(
-				"Necesitás %d monedas para la ranura temporal (tenés %d)."
-				% [int(economy.get("required", TEMP_SLOT_COST_STARS)), int(economy.get("current", player_stars))]
-			)
-			return
+		var message := TempSlotPurchaseServiceScript.message_for_rejection(
+			reason,
+			int(economy.get("required", TEMP_SLOT_COST_STARS)),
+			int(economy.get("current", player_stars))
+		)
+		if not message.is_empty():
+			print(message)
 		return
 
 	if temp_slot_bonus_active and has_active_temp_stack():
@@ -1765,24 +1771,10 @@ func has_any_valid_moves() -> bool:
 	return count_legal_moves() > 0 or can_repartir()
 
 func count_legal_moves() -> int:
-	var total := 0
-	for i in range(stacks.size()):
-		if stacks[i].is_empty():
-			continue
-		var value: int = stacks[i].top_value()
-		for j in range(stacks.size()):
-			if i == j:
-				continue
-			if stacks[j].can_receive_value(value):
-				total += 1
-	return total
+	return BoardMetricsServiceScript.count_legal_moves(stacks)
 
 func count_total_free_slots() -> int:
-	var total := 0
-	for stack in stacks:
-		if stack.has_method("free_slots"):
-			total += int(stack.free_slots())
-	return total
+	return BoardMetricsServiceScript.count_total_free_slots(stacks)
 
 ## Valor de ficha más alto presente en cualquier pila del tablero (0 si está vacío).
 func highest_coin_value_on_board() -> int:
@@ -1822,7 +1814,8 @@ func max_count_of_value(value: int) -> int:
 ## Calcula el nivel según las pilas: ≥5 de un valor, y otra vez al completar (10 / crear el siguiente).
 ## 1-4 no suben. Un 8 suelto no cuenta como haber pasado los 5/6/7.
 func evaluate_checkpoint_level() -> int:
-	return GameEngineScript.evaluate_checkpoint_from_piles(
+	return ProgressionQueryServiceScript.evaluate_checkpoint_level(
+		GameEngineScript,
 		Callable(self, "max_count_of_value"),
 		roll_value_floor,
 		CHECKPOINT_BASE_VALUE,
@@ -1834,7 +1827,8 @@ func evaluate_checkpoint_level() -> int:
 
 ## Progreso 0..1 hacia un nivel objetivo (según el estado actual del tablero).
 func get_progress_toward_checkpoint_level(target_level: int) -> float:
-	return GameEngineScript.progress_toward_checkpoint_level(
+	return ProgressionQueryServiceScript.progress_toward_checkpoint(
+		GameEngineScript,
 		target_level,
 		highest_coin_value_for_checkpoint(),
 		Callable(self, "max_count_of_value"),
@@ -2038,20 +2032,23 @@ func _show_next_level_up_alert() -> void:
 
 ## Guarda tablero y progresión en el momento del checkpoint (para reinicio / save).
 func capture_checkpoint_snapshot() -> void:
-	checkpoint_snapshot = GameSessionServiceScript.build_checkpoint_snapshot({
-		"checkpoint_level": checkpoint_level,
-		"current_level": current_level,
-		"max_value": max_value,
-		"roll_value_floor": roll_value_floor,
-		"cycle_checkpoint_origin": cycle_checkpoint_origin,
-		"cycle_rules_revision": cycle_rules_revision,
-		"active_stacks": active_stacks,
-		"next_free_slot_unlock_level": next_free_slot_unlock_level,
-		"adjacent_slot_next_price": adjacent_slot_next_price,
-		"wildcard_counts": wildcard_counts,
-		"wildcard_unlock_granted": wildcard_unlock_granted,
-		"stacks": _capture_stack_data(),
-	})
+	checkpoint_snapshot = CheckpointServiceScript.build_snapshot(
+		{
+			"checkpoint_level": checkpoint_level,
+			"current_level": current_level,
+			"max_value": max_value,
+			"roll_value_floor": roll_value_floor,
+			"cycle_checkpoint_origin": cycle_checkpoint_origin,
+			"cycle_rules_revision": cycle_rules_revision,
+			"active_stacks": active_stacks,
+			"next_free_slot_unlock_level": next_free_slot_unlock_level,
+			"adjacent_slot_next_price": adjacent_slot_next_price,
+			"wildcard_counts": wildcard_counts,
+			"wildcard_unlock_granted": wildcard_unlock_granted,
+			"stacks": _capture_stack_data(),
+		},
+		Callable(GameSessionServiceScript, "build_checkpoint_snapshot")
+	)
 
 ## Restaura el tablero al último checkpoint guardado (pérdida de vida, compra de vidas, anuncio).
 func restore_checkpoint() -> void:
@@ -2071,13 +2068,13 @@ func restore_checkpoint() -> void:
 	temp_slot_actions_remaining = 0
 	_temp_slot_timer_shown_sec = -1
 	configure_process_for_temp_slot()
-	checkpoint_level = maxi(1, int(checkpoint_snapshot.get("checkpoint_level", checkpoint_level)))
-	current_level = maxi(1, int(checkpoint_snapshot.get("current_level", 1)))
-	max_value = maxi(CHECKPOINT_BASE_VALUE, int(checkpoint_snapshot.get("max_value", CHECKPOINT_BASE_VALUE)))
-	roll_value_floor = maxi(1, int(checkpoint_snapshot.get("roll_value_floor", 1)))
-	cycle_checkpoint_origin = maxi(0, int(checkpoint_snapshot.get("cycle_checkpoint_origin", cycle_checkpoint_origin)))
-	cycle_rules_revision = maxi(0, int(checkpoint_snapshot.get("cycle_rules_revision", cycle_rules_revision)))
-	active_stacks = maxi(1, int(checkpoint_snapshot.get("active_stacks", 5)))
+	checkpoint_level = maxi(1, CheckpointServiceScript.read_int(checkpoint_snapshot, "checkpoint_level", checkpoint_level))
+	current_level = maxi(1, CheckpointServiceScript.read_int(checkpoint_snapshot, "current_level", 1))
+	max_value = maxi(CHECKPOINT_BASE_VALUE, CheckpointServiceScript.read_int(checkpoint_snapshot, "max_value", CHECKPOINT_BASE_VALUE))
+	roll_value_floor = maxi(1, CheckpointServiceScript.read_int(checkpoint_snapshot, "roll_value_floor", 1))
+	cycle_checkpoint_origin = maxi(0, CheckpointServiceScript.read_int(checkpoint_snapshot, "cycle_checkpoint_origin", cycle_checkpoint_origin))
+	cycle_rules_revision = maxi(0, CheckpointServiceScript.read_int(checkpoint_snapshot, "cycle_rules_revision", cycle_rules_revision))
+	active_stacks = maxi(1, CheckpointServiceScript.read_int(checkpoint_snapshot, "active_stacks", 5))
 	next_free_slot_unlock_level = int(
 		checkpoint_snapshot.get(
 			"next_free_slot_unlock_level",
@@ -2097,7 +2094,7 @@ func restore_checkpoint() -> void:
 		)
 	clear_board_stacks()
 	create_stack_nodes(active_stacks)
-	var stack_data: Array = checkpoint_snapshot.get("stacks", [])
+	var stack_data: Array = CheckpointServiceScript.read_array(checkpoint_snapshot, "stacks")
 	for i in range(mini(stacks.size(), stack_data.size())):
 		if stack_data[i] is Array:
 			for v in stack_data[i]:
@@ -2221,31 +2218,36 @@ func _draw() -> void:
 	var inset: float = BOARD_SLOT_INSET * layout_sc
 	var border_base := int(maxi(BOARD_SLOT_BORDER_WIDTH * layout_sc, 2.0))
 	for i in range(TOTAL_SLOTS):
-		if i == TEMP_SLOT_BOARD_INDEX and not temp_slot_bonus_active:
-			continue
-		if i == adjacent_offer_board_index and adjacent_offer_board_index >= 0:
+		if MainBoardRenderServiceScript.should_skip_slot(
+			i,
+			TEMP_SLOT_BOARD_INDEX,
+			temp_slot_bonus_active,
+			adjacent_offer_board_index
+		):
 			continue
 		var slot_rect = get_slot_rect(i).grow(-inset)
-		var is_selected_slot := selected_slot_idx >= 0 and i == selected_slot_idx
-		var style_key := "inactive"
-		var fill := theme_slot_fill_dim
-		var border := theme_slot_border_dim
-		if i == TEMP_SLOT_BOARD_INDEX and not temp_slot_bonus_active:
-			style_key = "temp"
-			fill = theme_slot_fill_temp
-			border = theme_slot_border_temp
-		elif is_selected_slot:
-			style_key = "selected"
-			fill = BOARD_SLOT_SELECTED_FILL
-			border = BOARD_SLOT_BORDER_SELECTED
-		elif is_slot_active(i):
-			style_key = "active"
-			fill = theme_slot_fill
-			border = theme_slot_border
-		var slot_style := _get_cached_slot_style(style_key)
-		slot_style.bg_color = fill
-		slot_style.border_color = border
-		var border_w := border_base + (1 if is_selected_slot else 0)
+		var slot_state := MainBoardRenderServiceScript.slot_visual_state(
+			i,
+			TEMP_SLOT_BOARD_INDEX,
+			temp_slot_bonus_active,
+			selected_slot_idx,
+			is_slot_active(i),
+			theme_slot_fill_dim,
+			theme_slot_border_dim,
+			theme_slot_fill_temp,
+			theme_slot_border_temp,
+			BOARD_SLOT_SELECTED_FILL,
+			BOARD_SLOT_BORDER_SELECTED,
+			theme_slot_fill,
+			theme_slot_border
+		)
+		var slot_style := _get_cached_slot_style(str(slot_state.get("style_key", "inactive")))
+		slot_style.bg_color = slot_state.get("fill", theme_slot_fill_dim)
+		slot_style.border_color = slot_state.get("border", theme_slot_border_dim)
+		var border_w := MainBoardRenderServiceScript.slot_border_width(
+			border_base,
+			bool(slot_state.get("selected", false))
+		)
 		slot_style.border_width_left = border_w
 		slot_style.border_width_top = border_w
 		slot_style.border_width_right = border_w
@@ -2314,12 +2316,11 @@ func _apply_theme_ui_colors() -> void:
 
 ## Misma receta visual que SettingsOverlay: card_bg aclarado + borde oscurecido.
 func _settings_card_colors() -> Dictionary:
-	var p: Dictionary = GameState.get_ui_palette()
-	var card_bg: Color = p.get("settings_card_bg", Color(0.62, 0.52, 0.82, 0.98))
-	card_bg = card_bg.lightened(0.18)
-	var card_border: Color = p.get("settings_card_border", Color(0.42, 0.28, 0.58, 0.95))
-	card_border = card_border.darkened(0.35)
-	return {"bg": card_bg, "border": card_border}
+	return UiThemeServiceScript.settings_card_colors(
+		GameState.get_ui_palette(),
+		Color(0.62, 0.52, 0.82, 0.98),
+		Color(0.42, 0.28, 0.58, 0.95)
+	)
 
 ## Fondo de cartel + borde del color del CTA (Continuar / botón on del tema).
 func _apply_cta_border_dialog_card(card: Panel, radius: int = 30, border_w: int = 5) -> void:
@@ -2645,18 +2646,10 @@ func find_adjacent_extra_slot_offer_board_index() -> int:
 
 
 func build_adjacent_slot_offer_ui() -> void:
-	adjacent_slot_offer_root = Control.new()
-	adjacent_slot_offer_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	adjacent_slot_offer_root.visible = false
-	adjacent_slot_offer_root.z_index = 12
+	adjacent_slot_offer_root = SlotOverlayBuilderScript.create_overlay_root(12)
 	hud_layer.add_child(adjacent_slot_offer_root)
 
-	adjacent_slot_offer_panel = SlotOverlayBgScript.new()
-	adjacent_slot_offer_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
-	adjacent_slot_offer_panel.offset_left = 0
-	adjacent_slot_offer_panel.offset_top = 0
-	adjacent_slot_offer_panel.offset_right = 0
-	adjacent_slot_offer_panel.offset_bottom = 0
+	adjacent_slot_offer_panel = SlotOverlayBuilderScript.create_full_rect_texture_panel(SlotOverlayBgScript)
 	adjacent_slot_offer_root.add_child(adjacent_slot_offer_panel)
 
 	var center := CenterContainer.new()
@@ -2761,22 +2754,21 @@ func is_click_on_adjacent_extra_slot_offer(mouse_pos: Vector2) -> bool:
 
 func try_purchase_adjacent_extra_slot() -> void:
 	_reconcile_future_free_slot_unlock_cursor()
-	var economy := GameEconomyServiceScript.purchase_adjacent_slot(
-		{
-			"adjacent_offer_board_index": adjacent_offer_board_index,
-			"active_stacks": active_stacks,
-			"max_permanent_stacks": MAX_PERMANENT_STACKS,
-			"checkpoint_level": checkpoint_level,
-			"next_free_slot_unlock_level": get_adjacent_slot_free_unlock_level(),
-			"player_stars": player_stars,
-			"adjacent_slot_next_price": adjacent_slot_next_price,
-		}
+	var request := AdjacentSlotPurchaseServiceScript.build_purchase_request(
+		adjacent_offer_board_index,
+		active_stacks,
+		MAX_PERMANENT_STACKS,
+		checkpoint_level,
+		get_adjacent_slot_free_unlock_level(),
+		player_stars,
+		adjacent_slot_next_price
 	)
+	var economy := GameEconomyServiceScript.purchase_adjacent_slot(request)
 	if not bool(economy.get("ok", false)):
-		if str(economy.get("reason", "")) == "insufficient_stars":
+		if AdjacentSlotPurchaseServiceScript.is_insufficient_stars(str(economy.get("reason", ""))):
 			show_adjacent_slot_insufficient_stars_message()
 		return
-	if str(economy.get("reason", "")) == "free_unlock":
+	if AdjacentSlotPurchaseServiceScript.is_free_unlock(str(economy.get("reason", ""))):
 		try_unlock_adjacent_slots_by_level()
 		_sync_slot_overlay_controls()
 		queue_redraw()
@@ -3389,13 +3381,20 @@ func layout_mock_ui() -> void:
 	var board_rect = get_board_rect()
 	var scale = get_layout_scale()
 	var chip_y: float = maxf(12.0 * scale, board_rect.position.y - 132.0 * scale)
-	var edge_margin: float = HUD_EDGE_MARGIN * scale
-	var stat_w: float = HUD_CHIP_STAT_W * scale
-	var chip_h: float = HUD_CHIP_HEIGHT * scale
+	var topbar := HudTopbarLayoutServiceScript.topbar_base_metrics(
+		scale,
+		HUD_EDGE_MARGIN,
+		HUD_CHIP_STAT_W,
+		HUD_CHIP_HEIGHT,
+		HUD_CHIP_GAP
+	)
+	var edge_margin: float = float(topbar.get("edge_margin", HUD_EDGE_MARGIN * scale))
+	var stat_w: float = float(topbar.get("stat_w", HUD_CHIP_STAT_W * scale))
+	var chip_h: float = float(topbar.get("chip_h", HUD_CHIP_HEIGHT * scale))
 	# Home/tienda/ajustes: círculos del mismo alto que las pastillas de vidas/estrellas.
 	var corner_w: float = chip_h
 	var inner_gap: float = 10.0 * scale
-	var col_gap: float = HUD_CHIP_GAP * scale
+	var col_gap: float = float(topbar.get("col_gap", HUD_CHIP_GAP * scale))
 	var life_hang: float = HudTextureButtons.resource_chip_hang(
 		chip_h, HUD_RESOURCE_PILL_H_RATIO, HUD_LIFE_ICON_H_RATIO
 	)
@@ -3496,12 +3495,20 @@ func layout_mock_ui() -> void:
 	_style_progress_label(progress_right_label, int(PROGRESS_PERCENT_FONT_SIZE * scale))
 	update_progress_bar(false)
 
-	var cta_w = board_rect.size.x * CTA_WIDTH_RATIO
-	var cta_h = CTA_HEIGHT * scale
-	var footer_y = board_rect.end.y + 14.0 * scale
-	var btn_gap = CTA_FOOTER_BTN_GAP * scale
+	var footer := HudFooterLayoutServiceScript.compute_footer_positions(
+		viewport_size,
+		board_rect,
+		scale,
+		CTA_WIDTH_RATIO,
+		CTA_HEIGHT,
+		CTA_FOOTER_BTN_GAP
+	)
+	var cta_w: float = float(footer.get("cta_w", board_rect.size.x * CTA_WIDTH_RATIO))
+	var cta_h: float = float(footer.get("cta_h", CTA_HEIGHT * scale))
+	var footer_y: float = float(footer.get("footer_y", board_rect.end.y + 14.0 * scale))
+	var btn_gap: float = float(footer.get("btn_gap", CTA_FOOTER_BTN_GAP * scale))
 
-	cta_button.position = Vector2((viewport_size.x - cta_w) * 0.5, footer_y)
+	cta_button.position = Vector2(float(footer.get("cta_x", (viewport_size.x - cta_w) * 0.5)), footer_y)
 	cta_button.size = Vector2(cta_w, cta_h)
 	if cta_shadow != null:
 		cta_shadow.visible = false
@@ -3520,11 +3527,17 @@ func layout_mock_ui() -> void:
 	if undo_icon != null:
 		undo_icon.add_theme_font_size_override("font_size", int(UNDO_ICON_FONT_SIZE * scale * (undo_size / icon_btn_size)))
 
-	var action_y = cta_button.position.y + cta_h + 20.0 * scale
-	var action_size = icon_btn_size
-	var action_gap = WILDCARD_BUTTON_GAP * scale
-	var actions_total_w = action_size * 3 + action_gap * 2
-	var actions_start_x = (viewport_size.x - actions_total_w) * 0.5
+	var action_row := HudActionRowLayoutServiceScript.compute_action_row(
+		cta_button.position,
+		cta_h,
+		icon_btn_size,
+		WILDCARD_BUTTON_GAP * scale,
+		viewport_size.x
+	)
+	var action_y: float = float(action_row.get("action_y", cta_button.position.y + cta_h + 20.0 * scale))
+	var action_size: float = float(action_row.get("action_size", icon_btn_size))
+	var action_gap: float = float(action_row.get("action_gap", WILDCARD_BUTTON_GAP * scale))
+	var actions_start_x: float = float(action_row.get("actions_start_x", (viewport_size.x - (action_size * 3.0 + action_gap * 2.0)) * 0.5))
 	var badge_w = 36.0 * scale
 	var badge_h = 30.0 * scale
 	var badge_font = int(22.0 * scale)
@@ -3614,9 +3627,7 @@ func _dialog_inner_button_width(card_w: float) -> float:
 	return card_w * MENU_CARD_INNER_BTN_WIDTH_RATIO
 
 func is_control_clicked(ctrl: Control, point: Vector2) -> bool:
-	if ctrl == null or not ctrl.visible:
-		return false
-	return ctrl.get_global_rect().has_point(point)
+	return UiHitTestServiceScript.is_control_clicked(ctrl, point)
 
 func perform_mix_action() -> void:
 	if board_locked:
@@ -3729,16 +3740,16 @@ func try_use_wildcard(wildcard_type: String) -> void:
 			% [get_wildcard_display_name(wildcard_type), get_wildcard_unlock_level(wildcard_type)]
 		)
 		return
-	if int(wildcard_counts.get(wildcard_type, 0)) <= 0:
+	if not WildcardFlowServiceScript.has_uses(wildcard_counts, wildcard_type):
 		open_purchase_dialog(wildcard_type)
 		return
 
-	match wildcard_type:
+	match WildcardFlowServiceScript.wildcard_action_kind(wildcard_type):
 		"mix":
 			# Mezclar no tiene undo (reparte de nuevo el tablero).
 			consume_wildcard(wildcard_type)
 			perform_mix_action()
-		"hammer", "glove":
+		"tool":
 			# Snapshot ANTES de gastar: deshacer devuelve tablero + comodín.
 			_clear_undo_snapshot()
 			undo_snapshot = capture_board_snapshot()
@@ -3898,43 +3909,13 @@ func build_purchase_dialog() -> void:
 	layout_purchase_dialog_controls()
 
 func _create_purchase_offer_button(amount: int, cost: int) -> Dictionary:
-	var btn := Button.new()
-	btn.focus_mode = Control.FOCUS_NONE
-	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	btn.pressed.connect(_on_purchase_confirmed.bind(amount, cost))
-
-	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	btn.add_child(center)
-
-	var content := HBoxContainer.new()
-	content.alignment = BoxContainer.ALIGNMENT_CENTER
-	content.add_theme_constant_override("separation", 18)
-	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	center.add_child(content)
-
-	var qty_label := create_label("x%d" % amount, 52, Color(0.95, 0.98, 0.92))
-	content.add_child(qty_label)
-
-	var gem_icon := TextureRect.new()
-	gem_icon.texture = StarIconTexture
-	gem_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	gem_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	gem_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	content.add_child(gem_icon)
-
-	var cost_label := create_label(str(cost), 56, Color(0.95, 0.98, 0.92))
-	content.add_child(cost_label)
-
-	return {
-		"button": btn,
-		"center": center,
-		"content": content,
-		"qty_label": qty_label,
-		"gem_icon": gem_icon,
-		"cost_label": cost_label,
-	}
+	return PurchaseOfferFactoryScript.build_offer_button(
+		amount,
+		cost,
+		StarIconTexture,
+		Callable(self, "create_label"),
+		_on_purchase_confirmed.bind(amount, cost)
+	)
 
 func open_purchase_dialog(wildcard_type: String) -> void:
 	if not is_wildcard_unlocked(wildcard_type):
@@ -3971,7 +3952,8 @@ func layout_purchase_dialog_controls() -> void:
 	if purchase_overlay == null or purchase_card == null:
 		return
 	var viewport_size = get_viewport_rect().size
-	var scale = clampf(min(viewport_size.x / 1080.0, viewport_size.y / 1920.0), 0.75, 1.2)
+	var hud_layout_service := HudLayoutServiceScript.new()
+	var scale := hud_layout_service.safe_scale(viewport_size, 1080.0, 1920.0, 0.75, 1.2)
 
 	var title_h: float = 70.0 * scale
 	var subtitle_h: float = 40.0 * scale
@@ -4201,14 +4183,8 @@ func _layout_dialog_gradient_button(btn: Control, btn_w: float, scale: float, fo
 		lbl.add_theme_font_size_override("font_size", int(font_size * scale))
 
 func build_no_moves_dialog() -> void:
-	no_moves_overlay = ColorRect.new()
-	no_moves_overlay.color = Color(0.0, 0.0, 0.0, 0.45)
-	no_moves_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	no_moves_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
-	no_moves_overlay.visible = false
+	no_moves_overlay = DialogBuilderServiceScript.create_modal_overlay(0.45, 320)
 	# Debe quedar por encima de cualquier otro overlay del HUD.
-	no_moves_overlay.z_as_relative = false
-	no_moves_overlay.z_index = 320
 	hud_layer.add_child(no_moves_overlay)
 
 	no_moves_card = _create_dialog_card(false)
@@ -4259,7 +4235,7 @@ func layout_no_moves_dialog_controls() -> void:
 	var viewport_size: Vector2 = get_viewport_rect().size
 	if viewport_size.x < 2.0 or viewport_size.y < 2.0:
 		return
-	var ui_scale: float = clampf(minf(viewport_size.x / 1080.0, viewport_size.y / 1920.0), 0.75, 1.2)
+	var ui_scale: float = DialogBuilderServiceScript.dialog_scale(viewport_size)
 	var visible_btns := 0
 	if no_moves_restart_button != null and no_moves_restart_button.visible:
 		visible_btns += 1
@@ -4367,13 +4343,7 @@ func _on_no_moves_watch_ad_pressed() -> void:
 	_restart_after_no_moves()
 
 func build_level_up_dialog() -> void:
-	level_up_overlay = ColorRect.new()
-	level_up_overlay.color = Color(0.0, 0.0, 0.0, 0.40)
-	level_up_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	level_up_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
-	level_up_overlay.visible = false
-	level_up_overlay.z_as_relative = false
-	level_up_overlay.z_index = 310
+	level_up_overlay = DialogBuilderServiceScript.create_modal_overlay(0.40, 310)
 	dialog_layer.add_child(level_up_overlay)
 
 	level_up_card = _create_dialog_card(false)
@@ -4419,7 +4389,7 @@ func layout_level_up_dialog_controls() -> void:
 	var viewport_size = get_viewport_rect().size
 	if viewport_size.x < 2.0 or viewport_size.y < 2.0:
 		return
-	var scale = clampf(min(viewport_size.x / 1080.0, viewport_size.y / 1920.0), 0.75, 1.2)
+	var scale = DialogBuilderServiceScript.dialog_scale(viewport_size)
 	# Título + "Nivel N" + Continuar (sin explicación larga).
 	var card_size = Vector2(min(viewport_size.x * 0.88, 720.0 * scale), 420.0 * scale)
 	level_up_card.size = card_size
@@ -4493,13 +4463,8 @@ func _on_level_up_continue_pressed() -> void:
 	check_blocked_state()
 
 func build_wildcard_unlock_dialog() -> void:
-	wildcard_unlock_overlay = ColorRect.new()
-	wildcard_unlock_overlay.color = Color(0.0, 0.0, 0.0, 0.40)
+	wildcard_unlock_overlay = DialogBuilderServiceScript.create_modal_overlay(0.40, 315)
 	wildcard_unlock_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-	wildcard_unlock_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
-	wildcard_unlock_overlay.visible = false
-	wildcard_unlock_overlay.z_as_relative = false
-	wildcard_unlock_overlay.z_index = 315
 	dialog_layer.add_child(wildcard_unlock_overlay)
 
 	wildcard_unlock_card = _create_dialog_card(false)
@@ -4547,7 +4512,7 @@ func layout_wildcard_unlock_dialog_controls() -> void:
 	var viewport_size: Vector2 = get_viewport_rect().size
 	if viewport_size.x < 2.0 or viewport_size.y < 2.0:
 		return
-	var ui_scale: float = clampf(minf(viewport_size.x / 1080.0, viewport_size.y / 1920.0), 0.75, 1.2)
+	var ui_scale: float = DialogBuilderServiceScript.dialog_scale(viewport_size)
 	var card_w: float = minf(viewport_size.x * 0.86, 720.0 * ui_scale)
 	var card_h: float = WILDCARD_UNLOCK_CARD_HEIGHT * ui_scale
 	var card_size := Vector2(card_w, card_h)

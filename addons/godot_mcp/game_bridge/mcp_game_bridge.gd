@@ -2,9 +2,11 @@ extends Node
 class_name MCPGameBridge
 
 const DEFAULT_MAX_WIDTH := 1920
+const MCPFrameProfilerScript = preload("res://addons/godot_mcp/game_bridge/mcp_frame_profiler.gd")
+const MCPLogScript = preload("res://addons/godot_mcp/core/mcp_log.gd")
 
 var _logger: _MCPGameLogger
-var _profiler: MCPFrameProfiler
+var _profiler: EngineProfiler
 
 
 func _ready() -> void:
@@ -12,10 +14,10 @@ func _ready() -> void:
 		return
 	_logger = _MCPGameLogger.new()
 	OS.add_logger(_logger)
-	_profiler = MCPFrameProfiler.new()
+	_profiler = MCPFrameProfilerScript.new()
 	EngineDebugger.register_profiler("mcp_frame_profiler", _profiler)
 	EngineDebugger.register_message_capture("godot_mcp", _on_debugger_message)
-	MCPLog.info("Game bridge initialized")
+	MCPLogScript.info("Game bridge initialized")
 
 
 func _exit_tree() -> void:
@@ -247,7 +249,7 @@ func _handle_get_performance_metrics() -> void:
 
 
 func _handle_get_profiler_data() -> void:
-	var data := _profiler.get_buffer_data() if _profiler else {}
+	var data: Dictionary = _profiler.get_buffer_data() if _profiler else {}
 	EngineDebugger.send_message("godot_mcp:game_response", ["get_profiler_data", data])
 
 

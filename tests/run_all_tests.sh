@@ -13,6 +13,9 @@ fi
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
 
+# Pre-import assets once to avoid repeated .godot/imported missing noise in headless runs.
+$GODOT_BIN --headless --path . --import >/dev/null 2>&1 || true
+
 TEST_SCRIPTS=(
   "res://tests/cycle_reset_test.gd"
   "res://tests/crash_stress_test.gd"
@@ -24,6 +27,23 @@ TEST_SCRIPTS=(
   "res://tests/game_rules_test.gd"
   "res://tests/game_turn_engine_test.gd"
   "res://tests/game_economy_service_test.gd"
+  "res://tests/ui_style_utils_test.gd"
+  "res://tests/main_input_router_test.gd"
+  "res://tests/main_turn_resolution_service_test.gd"
+  "res://tests/main_board_render_service_test.gd"
+  "res://tests/profile_repository_test.gd"
+  "res://tests/hud_layout_service_test.gd"
+  "res://tests/main_move_interaction_service_test.gd"
+  "res://tests/wildcard_flow_service_test.gd"
+  "res://tests/board_metrics_service_test.gd"
+  "res://tests/dialog_builder_service_test.gd"
+  "res://tests/save_file_repository_test.gd"
+  "res://tests/ui_theme_service_test.gd"
+  "res://tests/slot_overlay_builder_test.gd"
+  "res://tests/temp_slot_purchase_service_test.gd"
+  "res://tests/adjacent_slot_purchase_service_test.gd"
+  "res://tests/hud_action_row_layout_service_test.gd"
+  "res://tests/integration_undo_wildcard_checkpoint_test.gd"
   "res://tests/integration_gameplay_progression_test.gd"
   "res://tests/integration_runtime_resume_test.gd"
   "res://tests/integration_stack_flow_test.gd"

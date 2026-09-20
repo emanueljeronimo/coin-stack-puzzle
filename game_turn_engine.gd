@@ -1,6 +1,8 @@
 extends RefCounted
 class_name GameTurnEngine
 
+const GameRulesScript = preload("res://game_rules.gd")
+
 # Motor puro para decisiones del turno de reparto.
 
 static func build_roll_values(roll_min: int, roll_max: int, extra_count_provider: Callable) -> Array:
@@ -33,7 +35,7 @@ static func apply_round_wildcard(
 		return values
 	var idx := int(pick_index.call(n))
 	idx = clampi(idx, 0, n - 1)
-	values[idx] = GameRules.COIN_WILDCARD_VALUE
+	values[idx] = GameRulesScript.COIN_WILDCARD_VALUE
 	return values
 
 static func pick_balanced_index(

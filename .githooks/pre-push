@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$REPO_ROOT"
+
+echo "[pre-push] Running full test suite..."
+bash tests/run_all_tests.sh

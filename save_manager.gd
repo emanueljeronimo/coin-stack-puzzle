@@ -13,6 +13,10 @@ signal player_data_changed
 const SAVE_PATH := "user://player_save.json"
 const AUTOSAVE_INTERVAL_SEC := 30.0
 const SAVE_VERSION := 1
+const GameEngineScript = preload("res://game_engine.gd")
+const ProfileRepositoryScript = preload("res://profile_repository.gd")
+const SaveFileRepositoryScript = preload("res://save_file_repository.gd")
+const MainSessionAdapterScript = preload("res://main_session_adapter.gd")
 
 const ADJECTIVES: Array[String] = [
 	"Valiente", "Astuto", "Veloz", "Brillante", "Audaz", "Noble", "Feroz", "Sabio",
@@ -55,7 +59,7 @@ func _notification(what: int) -> void:
 
 
 func has_save_file() -> bool:
-	return FileAccess.file_exists(SAVE_PATH)
+	return SaveFileRepositoryScript.has_file(SAVE_PATH)
 
 
 func get_username() -> String:
@@ -63,11 +67,9 @@ func get_username() -> String:
 
 
 func set_username(new_name: String) -> void:
-	var cleaned := new_name.strip_edges()
+	var cleaned := ProfileRepositoryScript.sanitize_username(new_name, 20)
 	if cleaned.is_empty():
 		return
-	if cleaned.length() > 20:
-		cleaned = cleaned.substr(0, 20)
 	player_data["username"] = cleaned
 	if GameState != null:
 		GameState.username = cleaned
@@ -103,11 +105,11 @@ const DEFAULT_CUSTOM_BORDER_COLOR := Color(0.25, 0.75, 0.40)
 
 
 func get_avatar_options() -> Array:
-	return AVATAR_OPTIONS.duplicate(true)
+	return ProfileRepositoryScript.avatar_options()
 
 
 func get_default_avatar_id() -> String:
-	return str(AVATAR_OPTIONS[0].get("id", "mariposa"))
+	return ProfileRepositoryScript.default_avatar_id()
 
 
 func get_avatar_id() -> String:
@@ -128,7 +130,7 @@ func set_avatar_id(avatar_id: String) -> void:
 func get_avatar_path() -> String:
 	var path := _avatar_path_for_id(get_avatar_id())
 	if path.is_empty():
-		path = str(AVATAR_OPTIONS[0].get("path", ""))
+		path = _avatar_path_for_id(get_default_avatar_id())
 	return path
 
 
@@ -137,11 +139,11 @@ func get_avatar_texture() -> Texture2D:
 
 
 func get_border_color_options() -> Array:
-	return BORDER_COLOR_OPTIONS.duplicate(true)
+	return ProfileRepositoryScript.border_options()
 
 
 func get_default_border_color_id() -> String:
-	return str(BORDER_COLOR_OPTIONS[0].get("id", "verde"))
+	return ProfileRepositoryScript.default_border_color_id()
 
 
 func get_avatar_border_color_id() -> String:
@@ -191,14 +193,14 @@ func get_avatar_border_color() -> Color:
 	var c: Variant = _border_color_for_id(get_avatar_border_color_id())
 	if c is Color:
 		return c
-	return Color(BORDER_COLOR_OPTIONS[0].get("color", DEFAULT_CUSTOM_BORDER_COLOR))
+	var fallback: Variant = _border_color_for_id(get_default_border_color_id())
+	if fallback is Color:
+		return fallback
+	return DEFAULT_CUSTOM_BORDER_COLOR
 
 
 func _border_color_for_id(border_id: String) -> Variant:
-	for opt in BORDER_COLOR_OPTIONS:
-		if str(opt.get("id", "")) == border_id:
-			return opt.get("color", null)
-	return null
+	return ProfileRepositoryScript.border_color_for_id(border_id)
 
 
 ## Mayor valor de ficha desbloqueado para la portada (no el próximo objetivo).
@@ -224,7 +226,7 @@ func get_max_unlocked_coin_value() -> int:
 			max_value = int(gs.get("max_value", 0))
 			if highest <= 0:
 				highest = _highest_coin_in_rows(gs.get("stacks", []))
-	return GameEngine.cover_showcase_coin_value(max_value, highest)
+	return GameEngineScript.cover_showcase_coin_value(max_value, highest)
 
 
 func _highest_coin_in_rows(rows: Variant) -> int:
@@ -240,10 +242,7 @@ func _highest_coin_in_rows(rows: Variant) -> int:
 
 
 func _avatar_path_for_id(avatar_id: String) -> String:
-	for opt in AVATAR_OPTIONS:
-		if str(opt.get("id", "")) == avatar_id:
-			return str(opt.get("path", ""))
-	return ""
+	return ProfileRepositoryScript.avatar_path_for_id(avatar_id)
 
 
 func get_position() -> Vector2:
@@ -286,24 +285,13 @@ func load_game() -> bool:
 		player_data_changed.emit()
 		return false
 
-	var file := FileAccess.open(SAVE_PATH, FileAccess.READ)
-	if file == null:
+	var loaded := SaveFileRepositoryScript.read_json_dict(SAVE_PATH)
+	if loaded.is_empty():
 		push_error("SaveManager: no se pudo abrir %s" % SAVE_PATH)
 		player_data = _create_default_player_data()
 		_apply_to_game_state(true)
 		return false
 
-	var text := file.get_as_text()
-	file.close()
-
-	var parsed: Variant = JSON.parse_string(text)
-	if not parsed is Dictionary:
-		push_error("SaveManager: JSON inválido en %s" % SAVE_PATH)
-		player_data = _create_default_player_data()
-		_apply_to_game_state(true)
-		return false
-
-	var loaded := parsed as Dictionary
 	var had_life_timer := loaded.has("next_free_life_unix")
 	var lives_loaded := int(loaded.get("lives", GameState.INITIAL_LIVES))
 	player_data = _merge_with_defaults(loaded)
@@ -316,45 +304,27 @@ func load_game() -> bool:
 
 func save_game() -> void:
 	if _session_collector.is_valid():
-		var session: Variant = _session_collector.call()
+		var session_payload := MainSessionAdapterScript.build_save_payload(_session_collector, {})
+		var session: Variant = session_payload
 		if session is Dictionary:
 			merge_session_data(session)
 	else:
 		_sync_core_fields_to_player_data()
 
 	player_data["save_version"] = SAVE_VERSION
-
-	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
-	if file == null:
+	if not SaveFileRepositoryScript.write_json_dict(SAVE_PATH, player_data):
 		push_error("SaveManager: no se pudo escribir %s" % SAVE_PATH)
-		return
-	file.store_string(JSON.stringify(player_data, "\t"))
-	file.close()
 
 
 func _create_default_player_data() -> Dictionary:
-	return {
-		"save_version": SAVE_VERSION,
-		"username": _generate_random_username(),
-		"avatar_id": "mariposa",
-		"avatar_border_id": "verde",
-		"avatar_border_custom": {
-			"r": DEFAULT_CUSTOM_BORDER_COLOR.r,
-			"g": DEFAULT_CUSTOM_BORDER_COLOR.g,
-			"b": DEFAULT_CUSTOM_BORDER_COLOR.b,
-		},
-		"level": 1,
-		"coins": GameState.INITIAL_STARS,
-		"position": {"x": 0.0, "y": 0.0},
-		"lives": GameState.INITIAL_LIVES,
-		"gems": GameState.INITIAL_GEMS,
-		"checkpoint_level": 1,
-		"checkpoint_snapshot": {},
-		"current_level": 1,
-		"max_value": 5,
-		"active_stacks": 5,
-		"player_stars": GameState.INITIAL_STARS,
-	}
+	return ProfileRepositoryScript.default_player_data(
+		SAVE_VERSION,
+		_generate_random_username(),
+		DEFAULT_CUSTOM_BORDER_COLOR,
+		GameState.INITIAL_STARS,
+		GameState.INITIAL_LIVES,
+		GameState.INITIAL_GEMS
+	)
 
 
 func _merge_with_defaults(loaded: Dictionary) -> Dictionary:
@@ -409,7 +379,7 @@ func _apply_to_game_state(had_life_timer: bool = true) -> void:
 	if GameState == null:
 		return
 	GameState.username = get_username()
-	GameState.player_level = GameEngine.healed_display_checkpoint(
+	GameState.player_level = GameEngineScript.healed_display_checkpoint(
 		maxi(1, int(player_data.get("level", player_data.get("checkpoint_level", 1)))),
 		player_data
 	)
