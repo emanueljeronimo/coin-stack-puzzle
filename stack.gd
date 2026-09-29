@@ -320,11 +320,7 @@ func _resolve_attached_wildcard(moving_coin: Node) -> void:
 		return
 	if not moving_coin.has_method("is_wildcard_coin") or not moving_coin.is_wildcard_coin():
 		return
-	var dest_row := get_row_value()
-	var origin_row := int(moving_coin.get("wildcard_original_row"))
-	if dest_row < 1 or origin_row < 1 or dest_row == origin_row:
-		return
-	# El número es el de las fichas de la pila destino (p.ej. 28), no el índice de fila (1-3).
+	# Pasa a ser el número de la ficha que quedó debajo (la pila destino).
 	if coins.size() < 2:
 		return
 	var dest_value := int(coins[coins.size() - 2])

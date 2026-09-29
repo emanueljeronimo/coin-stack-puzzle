@@ -30,6 +30,10 @@ func _run() -> void:
 	_test_overflow_keeps_nines_together()
 	_test_wildcard_mix_joins_fused()
 	_test_wildcard_mix_does_not_chain()
+	_test_mix_keeps_star_coins_separate()
+	_test_overflow_keeps_medium_group_pure()
+	_test_mix_fill_order_reads_top_left()
+	_test_mix_plan_sorted_by_number()
 	print("=== RESULT: %d passed, %d failed ===" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -490,3 +494,92 @@ func _test_wildcard_mix_does_not_chain() -> void:
 		_fail("wildcard_sixes_together", str(plan))
 		return
 	_ok("wildcard_mix_converts_completed_stack")
+
+func _test_mix_keeps_star_coins_separate() -> void:
+	var values: Array = []
+	for _i in range(8):
+		values.append(5)
+	for _i in range(3):
+		values.append(0)
+	var plan: Array = GameRules.build_wildcard_mix_plan(values, 3, STACK_CAPACITY)
+	if _count_value(plan, 5) != 8:
+		_fail("star_keep_fives", "5s=%d" % _count_value(plan, 5))
+		return
+	if _count_value(plan, 0) != 3:
+		_fail("star_keep_zeros", "0s=%d" % _count_value(plan, 0))
+		return
+	if _count_pure_stacks_of(plan, 5) != 1:
+		_fail("star_five_stack", str(plan))
+		return
+	if _count_pure_stacks_of(plan, 0) != 1:
+		_fail("star_zero_stack", str(plan))
+		return
+	if not _assert_all_homogeneous(plan, "star_coins_separate"):
+		return
+	_ok("mix_keeps_star_coins_separate")
+
+func _test_overflow_keeps_medium_group_pure() -> void:
+	# 9 ranuras y 8 numeros: 16x24 y 12x27 piden segunda pila. Los 8x22
+	# tienen que quedar juntos, no mezclados con el resto de 27.
+	var values: Array = []
+	for _i in range(16):
+		values.append(24)
+	for _i in range(12):
+		values.append(27)
+	for _i in range(8):
+		values.append(22)
+	for _i in range(6):
+		values.append(28)
+	for _i in range(5):
+		values.append(29)
+	for _i in range(5):
+		values.append(26)
+	for _i in range(4):
+		values.append(23)
+	for _i in range(2):
+		values.append(31)
+	var plan: Array = GameRules.build_wildcard_mix_plan(values, 9, STACK_CAPACITY)
+	if _count_value(plan, 22) != 8:
+		_fail("medium_keep_22_count", "22s=%d" % _count_value(plan, 22))
+		return
+	if _count_pure_stacks_of(plan, 22) != 1:
+		_fail("medium_22_pure", str(plan))
+		return
+	for segment in plan:
+		var has_22 := false
+		var has_27 := false
+		for raw in segment:
+			if int(raw) == 22:
+				has_22 = true
+			if int(raw) == 27:
+				has_27 = true
+		if has_22 and has_27:
+			_fail("medium_22_not_with_27", str(segment))
+			return
+	if _count_mixed(plan) > 1:
+		_fail("medium_one_mixed_stack", "mixed=%d plan=%s" % [_count_mixed(plan), str(plan)])
+		return
+	_ok("overflow_keeps_medium_group_pure")
+
+func _test_mix_fill_order_reads_top_left() -> void:
+	var order: Array = GameRules.mix_fill_order_by_slot([10, 11, 5, 6], 5)
+	if order != [2, 3, 0, 1]:
+		_fail("fill_order_ttb", str(order))
+		return
+	_ok("mix_fill_order_reads_top_left")
+
+func _test_mix_plan_sorted_by_number() -> void:
+	var values: Array = []
+	for v in [24, 21, 23, 22]:
+		for _i in range(3):
+			values.append(v)
+	var plan: Array = GameRules.build_mix_stack_plan(values, 4, STACK_CAPACITY, false)
+	var nums: Array = []
+	for segment in plan:
+		if (segment as Array).is_empty():
+			continue
+		nums.append(int(segment[0]))
+	if nums != [21, 22, 23, 24]:
+		_fail("plan_sorted", str(nums))
+		return
+	_ok("mix_plan_sorted_by_number")
