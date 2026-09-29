@@ -1,9 +1,11 @@
 <!doctype html>
 <html lang="es">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Coin Viewer</title>
+
   <style>
     :root {
       --bg-top: #f2f4f8;
@@ -78,270 +80,816 @@
     }
   </style>
 </head>
+
 <body>
+
   <div id="app"></div>
+
   <div class="toolbar">
     <label>
       <input id="move-coin-toggle" type="checkbox" />
-      Girar ficha
+      Girar moneda
     </label>
+
     <div class="axis-row">
-      <label><input id="axis-x" type="checkbox" checked /> X</label>
-      <label><input id="axis-y" type="checkbox" /> Y</label>
-      <label><input id="axis-z" type="checkbox" /> Z</label>
+      <label>
+        <input id="axis-x" type="checkbox" checked />
+        X
+      </label>
+
+      <label>
+        <input id="axis-y" type="checkbox" />
+        Y
+      </label>
+
+      <label>
+        <input id="axis-z" type="checkbox" />
+        Z
+      </label>
     </div>
   </div>
+
   <div class="hint">
-    Arrastrar: orbitar camara<br />
-    Check "Girar ficha": rotar en ejes X/Y/Z<br />
+    Arrastrar: orbitar cámara<br />
+    Check "Girar moneda": rotar en ejes X/Y/Z<br />
     Rueda: acercar / alejar<br />
-    Si abre por file:// usa servidor local (python3 -m http.server)
+    Si abre por file:// usa servidor local
   </div>
 
   <script src="./vendor/three/three.min.js"></script>
   <script src="./vendor/three/OrbitControls.js"></script>
+
   <script>
     function initViewer() {
 
-    const app = document.getElementById("app");
-    const moveCoinToggle = document.getElementById("move-coin-toggle");
-    const axisXToggle = document.getElementById("axis-x");
-    const axisYToggle = document.getElementById("axis-y");
-    const axisZToggle = document.getElementById("axis-z");
+      const app = document.getElementById("app");
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    if ("outputColorSpace" in renderer && "SRGBColorSpace" in THREE) {
-      renderer.outputColorSpace = THREE.SRGBColorSpace;
-    } else {
-      renderer.outputEncoding = THREE.sRGBEncoding;
-    }
-    app.appendChild(renderer.domElement);
+      const moveCoinToggle = document.getElementById("move-coin-toggle");
+      const axisXToggle = document.getElementById("axis-x");
+      const axisYToggle = document.getElementById("axis-y");
+      const axisZToggle = document.getElementById("axis-z");
 
-    const scene = new THREE.Scene();
-    scene.background = null;
+      // ============================================================
+      // CONFIGURACIÓN DE LA MONEDA
+      // ============================================================
 
-    const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 100);
-    camera.position.set(1.2, 0.45, 1.35);
+      // Cambiá este valor para probar diferentes monedas.
+      const COIN_VALUE = "5";
 
-    const controls = new THREE.OrbitControls(camera, renderer.domElement);
-    controls.target.set(0, 0.28, 0);
-    controls.enablePan = false;
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.08;
-    controls.minDistance = 0.7;
-    controls.maxDistance = 3.2;
-    controls.minPolarAngle = 0.35;
-    controls.maxPolarAngle = Math.PI - 0.35;
+      // Color principal de la moneda.
+      const COIN_COLOR = 0xf3a6dc;
 
-    const hemiLight = new THREE.HemisphereLight(0xffffff, 0xc7ced8, 0.45);
-    scene.add(hemiLight);
+      // Color ligeramente más oscuro para el canto.
+      const COIN_EDGE_COLOR = 0xd97fbf;
 
-    const keyLight = new THREE.DirectionalLight(0xffffff, 1.15);
-    keyLight.position.set(2.8, 4.0, 2.2);
-    keyLight.castShadow = true;
-    keyLight.shadow.mapSize.set(2048, 2048);
-    keyLight.shadow.bias = -0.00015;
-    keyLight.shadow.camera.left = -2;
-    keyLight.shadow.camera.right = 2;
-    keyLight.shadow.camera.top = 2;
-    keyLight.shadow.camera.bottom = -2;
-    keyLight.shadow.camera.near = 0.1;
-    keyLight.shadow.camera.far = 10;
-    scene.add(keyLight);
+      // ============================================================
+      // RENDERER
+      // ============================================================
 
-    const fillLight = new THREE.DirectionalLight(0xffffff, 0.35);
-    fillLight.position.set(-2.0, 1.2, -1.7);
-    scene.add(fillLight);
+      const renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        alpha: true,
+        preserveDrawingBuffer: true
+      });
 
-    const floorGeo = new THREE.CircleGeometry(3.2, 64);
-    const floorMat = new THREE.ShadowMaterial({ opacity: 0.3 });
-    const floor = new THREE.Mesh(floorGeo, floorMat);
-    floor.rotation.x = -Math.PI / 2;
-    floor.position.y = -0.42;
-    floor.receiveShadow = true;
-    scene.add(floor);
-
-    const coin = new THREE.Group();
-    scene.add(coin);
-
-    const edgeMat = new THREE.MeshStandardMaterial({
-      color: 0xf9fbff,
-      roughness: 0.42,
-      metalness: 0.04
-    });
-
-    const faceMat = new THREE.MeshStandardMaterial({
-      color: 0xffffff,
-      roughness: 0.32,
-      metalness: 0.03
-    });
-
-    const outerRadius = 0.5;
-    const innerRadius = 0.34;
-    const edgeThickness = 0.2;
-
-    const edgeShape = new THREE.Shape();
-    edgeShape.absarc(0, 0, outerRadius, 0, Math.PI * 2, false);
-    const edgeHole = new THREE.Path();
-    edgeHole.absarc(0, 0, innerRadius, 0, Math.PI * 2, true);
-    edgeShape.holes.push(edgeHole);
-
-    const edgeRing = new THREE.Mesh(
-      new THREE.ExtrudeGeometry(edgeShape, {
-        depth: edgeThickness,
-        bevelEnabled: false,
-        curveSegments: 128
-      }),
-      edgeMat
-    );
-    edgeRing.rotation.x = -Math.PI / 2;
-    edgeRing.position.y = -edgeThickness * 0.5;
-    edgeRing.castShadow = true;
-    edgeRing.receiveShadow = true;
-    coin.add(edgeRing);
-
-    coin.rotation.z = Math.PI / 2;
-    coin.position.y = 0.32;
-
-    const centerCapRadius = innerRadius + 0.018;
-    const centerCapThickness = 0.014;
-    const centerCapMat = new THREE.MeshStandardMaterial({ color: 0xf4f7fc, roughness: 0.31, metalness: 0.02 });
-    const centerCapTop = new THREE.Mesh(
-      new THREE.CylinderGeometry(centerCapRadius, centerCapRadius, centerCapThickness, 96),
-      centerCapMat
-    );
-    centerCapTop.position.y = 0.056;
-    centerCapTop.castShadow = true;
-    centerCapTop.receiveShadow = true;
-    coin.add(centerCapTop);
-
-    const centerCapBottom = centerCapTop.clone();
-    centerCapBottom.position.y = -0.056;
-    coin.add(centerCapBottom);
-
-    const faceNotchMat = new THREE.MeshStandardMaterial({
-      color: 0xe9eef8,
-      roughness: 0.34,
-      metalness: 0.02
-    });
-    const faceNotchCount = 18;
-    const faceNotchRadius = 0.021;
-    const faceNotchOrbit = outerRadius - 0.06;
-    const topNotchY = edgeThickness * 0.5;
-    const bottomNotchY = -edgeThickness * 0.5;
-    for (let i = 0; i < faceNotchCount; i += 1) {
-      const angle = (i / faceNotchCount) * Math.PI * 2;
-
-      const notchTop = new THREE.Mesh(
-        new THREE.SphereGeometry(faceNotchRadius, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.5),
-        faceNotchMat
+      renderer.setPixelRatio(
+        Math.min(window.devicePixelRatio, 2)
       );
-      notchTop.position.set(Math.cos(angle) * faceNotchOrbit, topNotchY, Math.sin(angle) * faceNotchOrbit);
-      notchTop.castShadow = true;
-      notchTop.receiveShadow = true;
-      coin.add(notchTop);
 
-      const notchBottom = new THREE.Mesh(
-        new THREE.SphereGeometry(faceNotchRadius, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.5),
-        faceNotchMat
+      renderer.setSize(
+        window.innerWidth,
+        window.innerHeight
       );
-      notchBottom.rotation.x = Math.PI;
-      notchBottom.position.set(Math.cos(angle) * faceNotchOrbit, bottomNotchY, Math.sin(angle) * faceNotchOrbit);
-      notchBottom.castShadow = true;
-      notchBottom.receiveShadow = true;
-      coin.add(notchBottom);
-    }
 
-    let isRotatingCoin = false;
-    let lastPointerX = 0;
-    let lastPointerY = 0;
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-    function isMoveMode() {
-      return !!(moveCoinToggle && moveCoinToggle.checked);
-    }
-
-    function updateControlMode() {
-      controls.enabled = !isMoveMode();
-      renderer.domElement.style.cursor = controls.enabled ? "grab" : "ew-resize";
-    }
-
-    function getAxisSelection() {
-      return {
-        x: !!(axisXToggle && axisXToggle.checked),
-        y: !!(axisYToggle && axisYToggle.checked),
-        z: !!(axisZToggle && axisZToggle.checked)
-      };
-    }
-
-    renderer.domElement.addEventListener("pointerdown", (event) => {
-      if (!isMoveMode()) {
-        return;
+      if ("outputColorSpace" in renderer && "SRGBColorSpace" in THREE) {
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+      } else {
+        renderer.outputEncoding = THREE.sRGBEncoding;
       }
-      isRotatingCoin = true;
-      lastPointerX = event.clientX;
-      lastPointerY = event.clientY;
-      renderer.domElement.style.cursor = "grabbing";
-    });
 
-    renderer.domElement.addEventListener("pointermove", (event) => {
-      if (!isRotatingCoin) {
-        return;
-      }
-      const deltaX = event.clientX - lastPointerX;
-      const deltaY = event.clientY - lastPointerY;
-      lastPointerX = event.clientX;
-      lastPointerY = event.clientY;
+      app.appendChild(renderer.domElement);
 
-      const axis = getAxisSelection();
-      const speed = 0.012;
-      if (axis.x) {
-        coin.rotation.x += deltaY * speed;
-      }
-      if (axis.y) {
-        coin.rotation.y += deltaX * speed;
-      }
-      if (axis.z) {
-        coin.rotation.z += deltaX * speed;
-      }
-    });
+      // ============================================================
+      // SCENE
+      // ============================================================
 
-    function stopCoinDrag() {
-      isRotatingCoin = false;
+      const scene = new THREE.Scene();
+      scene.background = null;
+
+      // ============================================================
+      // CAMERA
+      // ============================================================
+
+      const camera = new THREE.PerspectiveCamera(
+        42,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        100
+      );
+
+      camera.position.set(
+        1.2,
+        0.45,
+        1.35
+      );
+
+      // ============================================================
+      // CONTROLS
+      // ============================================================
+
+      const controls = new THREE.OrbitControls(
+        camera,
+        renderer.domElement
+      );
+
+      controls.target.set(
+        0,
+        0.28,
+        0
+      );
+
+      controls.enablePan = false;
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.08;
+
+      controls.minDistance = 0.7;
+      controls.maxDistance = 3.2;
+
+      controls.minPolarAngle = 0.35;
+      controls.maxPolarAngle = Math.PI - 0.35;
+
+      // ============================================================
+      // LIGHTING
+      // ============================================================
+
+      const hemiLight = new THREE.HemisphereLight(
+        0xffffff,
+        0xc7ced8,
+        0.55
+      );
+
+      scene.add(hemiLight);
+
+      const keyLight = new THREE.DirectionalLight(
+        0xffffff,
+        1.25
+      );
+
+      keyLight.position.set(
+        2.8,
+        4.0,
+        2.2
+      );
+
+      keyLight.castShadow = true;
+
+      keyLight.shadow.mapSize.set(
+        2048,
+        2048
+      );
+
+      keyLight.shadow.bias = -0.00015;
+
+      keyLight.shadow.camera.left = -2;
+      keyLight.shadow.camera.right = 2;
+      keyLight.shadow.camera.top = 2;
+      keyLight.shadow.camera.bottom = -2;
+
+      keyLight.shadow.camera.near = 0.1;
+      keyLight.shadow.camera.far = 10;
+
+      scene.add(keyLight);
+
+      const fillLight = new THREE.DirectionalLight(
+        0xffffff,
+        0.35
+      );
+
+      fillLight.position.set(
+        -2.0,
+        1.2,
+        -1.7
+      );
+
+      scene.add(fillLight);
+
+      // ============================================================
+      // FLOOR / SHADOW
+      // ============================================================
+
+      const floorGeo = new THREE.CircleGeometry(
+        3.2,
+        64
+      );
+
+      const floorMat = new THREE.ShadowMaterial({
+        opacity: 0.3
+      });
+
+      const floor = new THREE.Mesh(
+        floorGeo,
+        floorMat
+      );
+
+      floor.rotation.x = -Math.PI / 2;
+
+      floor.position.y = -0.42;
+
+      floor.receiveShadow = true;
+
+      scene.add(floor);
+
+      // ============================================================
+      // MONEDA
+      // ============================================================
+
+      const coin = new THREE.Group();
+
+      scene.add(coin);
+
+      // ------------------------------------------------------------
+      // DIMENSIONES
+      // ------------------------------------------------------------
+
+      const coinRadius = 0.5;
+
+      // Grosor real del cuerpo.
+      const coinThickness = 0.135;
+
+      // Reborde exterior.
+      const rimRadius = 0.438;
+
+      // Cara interior.
+      const faceRadius = 0.415;
+
+      // ============================================================
+      // CUERPO PRINCIPAL
+      // ============================================================
+
+      /*
+       * Antes teníamos:
+       *
+       *   ARO + CENTRO + REMACHES
+       *
+       * Ahora tenemos:
+       *
+       *   UN ÚNICO DISCO SÓLIDO
+       *
+       * El bevel es importante porque elimina el aspecto de
+       * "cilindro cortado" y hace que parezca una moneda.
+       */
+
+      const coinShape = new THREE.Shape();
+
+      coinShape.absarc(
+        0,
+        0,
+        coinRadius,
+        0,
+        Math.PI * 2,
+        false
+      );
+
+      const coinGeometry = new THREE.ExtrudeGeometry(
+        coinShape,
+        {
+          depth: coinThickness,
+
+          bevelEnabled: true,
+
+          bevelSegments: 5,
+
+          bevelSize: 0.025,
+
+          bevelThickness: 0.018,
+
+          curveSegments: 128
+        }
+      );
+
+      coinGeometry.center();
+
+      const coinMaterial = new THREE.MeshStandardMaterial({
+        color: COIN_COLOR,
+
+        roughness: 0.38,
+
+        metalness: 0.08
+      });
+
+      const coinBody = new THREE.Mesh(
+        coinGeometry,
+        coinMaterial
+      );
+
+      coinBody.castShadow = true;
+      coinBody.receiveShadow = true;
+
+      coin.add(coinBody);
+
+      // ============================================================
+      // REBORDE EXTERIOR
+      // ============================================================
+
+      /*
+       * Este NO es un aro tipo ficha.
+       *
+       * Es un reborde extremadamente fino que sigue el perímetro
+       * de la moneda, como el borde de una moneda acuñada.
+       */
+
+      const rimMaterial = new THREE.MeshStandardMaterial({
+        color: COIN_EDGE_COLOR,
+
+        roughness: 0.34,
+
+        metalness: 0.1
+      });
+
+      const outerRim = new THREE.Mesh(
+        new THREE.TorusGeometry(
+          rimRadius,
+          0.014,
+          12,
+          128
+        ),
+        rimMaterial
+      );
+
+      outerRim.rotation.x = Math.PI / 2;
+
+      outerRim.position.y =
+        coinThickness * 0.5 + 0.008;
+
+      outerRim.castShadow = true;
+      outerRim.receiveShadow = true;
+
+      coin.add(outerRim);
+
+      // ============================================================
+      // CARA DE LA MONEDA
+      // ============================================================
+
+      /*
+       * Una superficie ligeramente elevada en el centro.
+       *
+       * Esto sustituye el antiguo "center cap" circular que,
+       * combinado con el aro, hacía parecer que teníamos una ficha.
+       */
+
+      const faceMaterial = new THREE.MeshStandardMaterial({
+        color: COIN_COLOR,
+
+        roughness: 0.32,
+
+        metalness: 0.06
+      });
+
+      const faceGeometry = new THREE.CylinderGeometry(
+        faceRadius,
+        faceRadius,
+        0.012,
+        128
+      );
+
+      const face = new THREE.Mesh(
+        faceGeometry,
+        faceMaterial
+      );
+
+      face.position.y =
+        coinThickness * 0.5 + 0.006;
+
+      face.castShadow = true;
+      face.receiveShadow = true;
+
+      coin.add(face);
+
+      // ============================================================
+      // CÍRCULO INTERIOR DE ACUÑADO
+      // ============================================================
+
+      /*
+       * Una línea muy fina alrededor de la cara.
+       *
+       * Es deliberadamente mucho más sutil que los antiguos
+       * 18 puntos/remaches.
+       */
+
+      const innerRingMaterial =
+        new THREE.MeshStandardMaterial({
+          color: COIN_EDGE_COLOR,
+
+          roughness: 0.4,
+
+          metalness: 0.05
+        });
+
+      const innerRing = new THREE.Mesh(
+        new THREE.TorusGeometry(
+          0.365,
+          0.006,
+          8,
+          128
+        ),
+        innerRingMaterial
+      );
+
+      innerRing.rotation.x = Math.PI / 2;
+
+      innerRing.position.y =
+        coinThickness * 0.5 + 0.014;
+
+      innerRing.castShadow = true;
+      innerRing.receiveShadow = true;
+
+      coin.add(innerRing);
+
+      // ============================================================
+      // NÚMERO DE LA MONEDA
+      // ============================================================
+
+      /*
+       * Creamos el número como una pequeña textura.
+       *
+       * De esta manera no necesitamos FontLoader ni archivos
+       * externos de fuentes para este visor.
+       */
+
+      function createValueTexture(value) {
+
+        const canvas =
+          document.createElement("canvas");
+
+        canvas.width = 512;
+        canvas.height = 512;
+
+        const ctx = canvas.getContext("2d");
+
+        ctx.clearRect(
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        );
+
+        // ----------------------------------------------------------
+        // Sombra / grabado
+        // ----------------------------------------------------------
+
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+
+        ctx.font =
+          'bold 230px "Trebuchet MS", "Segoe UI", sans-serif';
+
+        // Sombra ligeramente desplazada.
+        ctx.fillStyle = "rgba(120, 45, 95, 0.28)";
+
+        ctx.fillText(
+          String(value),
+          256,
+          268
+        );
+
+        // ----------------------------------------------------------
+        // Número principal
+        // ----------------------------------------------------------
+
+        ctx.fillStyle = "#fff7fc";
+
+        ctx.fillText(
+          String(value),
+          256,
+          256
+        );
+
+        const texture =
+          new THREE.CanvasTexture(canvas);
+
+        texture.colorSpace =
+          THREE.SRGBColorSpace;
+
+        texture.anisotropy =
+          renderer.capabilities.getMaxAnisotropy();
+
+        return texture;
+      }
+
+      const valueTexture =
+        createValueTexture(COIN_VALUE);
+
+      const valueMaterial =
+        new THREE.MeshStandardMaterial({
+          map: valueTexture,
+
+          transparent: true,
+
+          alphaTest: 0.02,
+
+          roughness: 0.4,
+
+          metalness: 0.02,
+
+          depthWrite: true
+        });
+
+      const valuePlane = new THREE.Mesh(
+        new THREE.CircleGeometry(
+          0.19,
+          64
+        ),
+        valueMaterial
+      );
+
+      valuePlane.rotation.x =
+        -Math.PI / 2;
+
+      valuePlane.position.y =
+        coinThickness * 0.5 + 0.018;
+
+      valuePlane.castShadow = true;
+      valuePlane.receiveShadow = true;
+
+      coin.add(valuePlane);
+
+      // ============================================================
+      // PEQUEÑOS DETALLES DE ACUÑADO
+      // ============================================================
+
+      /*
+       * Dos pequeños puntos decorativos.
+       *
+       * Son deliberadamente pocos y discretos.
+       * No queremos volver al efecto "ficha de póker".
+       */
+
+      const detailMaterial =
+        new THREE.MeshStandardMaterial({
+          color: COIN_EDGE_COLOR,
+
+          roughness: 0.4,
+
+          metalness: 0.04
+        });
+
+      const detailGeometry =
+        new THREE.SphereGeometry(
+          0.012,
+          16,
+          10
+        );
+
+      const detailLeft =
+        new THREE.Mesh(
+          detailGeometry,
+          detailMaterial
+        );
+
+      detailLeft.position.set(
+        -0.255,
+        coinThickness * 0.5 + 0.016,
+        0
+      );
+
+      detailLeft.castShadow = true;
+
+      coin.add(detailLeft);
+
+      const detailRight =
+        new THREE.Mesh(
+          detailGeometry,
+          detailMaterial
+        );
+
+      detailRight.position.set(
+        0.255,
+        coinThickness * 0.5 + 0.016,
+        0
+      );
+
+      detailRight.castShadow = true;
+
+      coin.add(detailRight);
+
+      // ============================================================
+      // ORIENTACIÓN
+      // ============================================================
+
+      /*
+       * Dejamos la moneda ligeramente inclinada para poder apreciar
+       * tanto la cara como el grosor.
+       */
+
+      coin.rotation.x = -0.18;
+      coin.rotation.z = 0.12;
+
+      coin.position.y = 0.32;
+
+      // ============================================================
+      // ROTACIÓN MANUAL
+      // ============================================================
+
+      let isRotatingCoin = false;
+
+      let lastPointerX = 0;
+      let lastPointerY = 0;
+
+      function isMoveMode() {
+        return !!(
+          moveCoinToggle &&
+          moveCoinToggle.checked
+        );
+      }
+
+      function updateControlMode() {
+
+        controls.enabled = !isMoveMode();
+
+        renderer.domElement.style.cursor =
+          controls.enabled
+            ? "grab"
+            : "ew-resize";
+      }
+
+      function getAxisSelection() {
+
+        return {
+          x: !!(
+            axisXToggle &&
+            axisXToggle.checked
+          ),
+
+          y: !!(
+            axisYToggle &&
+            axisYToggle.checked
+          ),
+
+          z: !!(
+            axisZToggle &&
+            axisZToggle.checked
+          )
+        };
+      }
+
+      // ============================================================
+      // POINTER DOWN
+      // ============================================================
+
+      renderer.domElement.addEventListener(
+        "pointerdown",
+        (event) => {
+
+          if (!isMoveMode()) {
+            return;
+          }
+
+          isRotatingCoin = true;
+
+          lastPointerX =
+            event.clientX;
+
+          lastPointerY =
+            event.clientY;
+
+          renderer.domElement.style.cursor =
+            "grabbing";
+        }
+      );
+
+      // ============================================================
+      // POINTER MOVE
+      // ============================================================
+
+      renderer.domElement.addEventListener(
+        "pointermove",
+        (event) => {
+
+          if (!isRotatingCoin) {
+            return;
+          }
+
+          const deltaX =
+            event.clientX -
+            lastPointerX;
+
+          const deltaY =
+            event.clientY -
+            lastPointerY;
+
+          lastPointerX =
+            event.clientX;
+
+          lastPointerY =
+            event.clientY;
+
+          const axis =
+            getAxisSelection();
+
+          const speed = 0.012;
+
+          if (axis.x) {
+            coin.rotation.x +=
+              deltaY * speed;
+          }
+
+          if (axis.y) {
+            coin.rotation.y +=
+              deltaX * speed;
+          }
+
+          if (axis.z) {
+            coin.rotation.z +=
+              deltaX * speed;
+          }
+        }
+      );
+
+      // ============================================================
+      // STOP DRAG
+      // ============================================================
+
+      function stopCoinDrag() {
+
+        isRotatingCoin = false;
+
+        updateControlMode();
+      }
+
+      renderer.domElement.addEventListener(
+        "pointerup",
+        stopCoinDrag
+      );
+
+      renderer.domElement.addEventListener(
+        "pointerleave",
+        stopCoinDrag
+      );
+
+      // ============================================================
+      // TOGGLE
+      // ============================================================
+
+      if (moveCoinToggle) {
+
+        moveCoinToggle.addEventListener(
+          "change",
+          updateControlMode
+        );
+      }
+
       updateControlMode();
-    }
 
-    renderer.domElement.addEventListener("pointerup", stopCoinDrag);
-    renderer.domElement.addEventListener("pointerleave", stopCoinDrag);
+      // ============================================================
+      // RESIZE
+      // ============================================================
 
-    if (moveCoinToggle) {
-      moveCoinToggle.addEventListener("change", updateControlMode);
-    }
-    updateControlMode();
+      function onResize() {
 
-    function onResize() {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    }
+        camera.aspect =
+          window.innerWidth /
+          window.innerHeight;
 
-    window.addEventListener("resize", onResize);
+        camera.updateProjectionMatrix();
 
-    function render() {
-      if (controls.enabled) {
-        controls.update();
+        renderer.setSize(
+          window.innerWidth,
+          window.innerHeight
+        );
       }
-      renderer.render(scene, camera);
-      requestAnimationFrame(render);
-    }
 
-    render();
+      window.addEventListener(
+        "resize",
+        onResize
+      );
+
+      // ============================================================
+      // RENDER
+      // ============================================================
+
+      function render() {
+
+        if (controls.enabled) {
+          controls.update();
+        }
+
+        renderer.render(
+          scene,
+          camera
+        );
+
+        requestAnimationFrame(render);
+      }
+
+      render();
     }
 
     initViewer();
   </script>
+
 </body>
+
 </html>
