@@ -114,6 +114,8 @@ const HUD_PILL_RADIUS := 34
 ## Barra de progreso — violeta pastel acorde al tablero.
 const PROGRESS_TRACK_BG := Color(0.84, 0.80, 0.96, 0.92)
 const PROGRESS_TRACK_BORDER := Color(0.72, 0.66, 0.88, 0.88)
+const HUD_HAIRLINE := Color(0, 0, 0, 1)
+const HUD_HAIRLINE_W := 2
 const PROGRESS_KNOB_BG := Color(0.91, 0.87, 0.99, 0.97)
 const PROGRESS_KNOB_BORDER := Color(0.74, 0.68, 0.90, 0.9)
 const PROGRESS_TEXT := Color(0.44, 0.36, 0.58)
@@ -327,6 +329,7 @@ var runtime_snapshot: Dictionary = {}
 ## UI ranura bloqueada (crema, reloj de arena, 60 seg, precio); no recibe clics (IGNORE).
 var temp_slot_locked_root: Control = null
 var temp_slot_locked_panel: TextureRect = null
+var temp_slot_locked_hairline: Panel = null
 var temp_slot_locked_hourglass: Label = null
 var temp_slot_locked_lbl_60: Label = null
 var temp_slot_locked_lbl_seg: Label = null
@@ -339,6 +342,7 @@ var temp_slot_timer_label: Label = null
 ## Oferta de ranura extra (panel crema como temporal; precio = número + icono-estrella).
 var adjacent_slot_offer_root: Control = null
 var adjacent_slot_offer_panel: TextureRect = null
+var adjacent_slot_offer_hairline: Panel = null
 var adjacent_slot_offer_lbl_level: Label = null
 var adjacent_slot_offer_lbl_lock: Label = null
 var adjacent_slot_offer_price_row: HBoxContainer = null
@@ -966,7 +970,7 @@ func try_load_saved_game() -> bool:
 
 ## Estado persistible (save/load sigue desactivado; estos helpers quedan listos para reactivarlo).
 ## Incluye el nivel actual (checkpoint) como pide el sistema de checkpoints.
-func collect_save_dict() -> Dictionary:
+func collect_save_dict(_payload: Dictionary = {}) -> Dictionary:
 	_sync_wildcards_into_checkpoint_snapshot()
 	runtime_snapshot = capture_board_snapshot()
 	return GameSessionServiceScript.build_save_payload({
@@ -2300,7 +2304,7 @@ func _apply_theme_ui_colors() -> void:
 	theme_grad_b = palette.get("grad_b", SLOT_OVERLAY_GRAD_ROSA)
 	theme_grad_c = palette.get("grad_c", SLOT_OVERLAY_GRAD_VERDE)
 
-	_set_panel_colors(progress_container, theme_progress_track_bg, theme_progress_track_border)
+	_set_panel_colors(progress_container, theme_progress_track_bg, HUD_HAIRLINE, HUD_HAIRLINE_W)
 	_set_panel_colors(progress_knob, theme_progress_knob_bg, theme_progress_knob_border)
 	if progress_left_label != null:
 		progress_left_label.add_theme_color_override("font_color", theme_progress_text)
@@ -2403,7 +2407,7 @@ func _apply_purchase_offer_button_theme(btn: Button, fill: Color, border: Color)
 	btn.add_theme_stylebox_override("hover", make_flat_style(buy_hover, border.lightened(0.05), 36, 2))
 	btn.add_theme_stylebox_override("pressed", make_flat_style(buy_pressed, border.darkened(0.05), 36, 2))
 
-func _set_panel_colors(panel: Panel, bg: Color, border: Color) -> void:
+func _set_panel_colors(panel: Panel, bg: Color, border: Color, border_w: int = -1) -> void:
 	if panel == null:
 		return
 	var style: StyleBox = panel.get_theme_stylebox("panel")
@@ -2412,6 +2416,16 @@ func _set_panel_colors(panel: Panel, bg: Color, border: Color) -> void:
 	var flat := (style as StyleBoxFlat).duplicate() as StyleBoxFlat
 	flat.bg_color = bg
 	flat.border_color = border
+	if border_w >= 0:
+		flat.border_width_left = border_w
+		flat.border_width_top = border_w
+		flat.border_width_right = border_w
+		flat.border_width_bottom = border_w
+		flat.anti_aliasing = true
+		flat.content_margin_left = float(border_w)
+		flat.content_margin_top = float(border_w)
+		flat.content_margin_right = float(border_w)
+		flat.content_margin_bottom = float(border_w)
 	panel.add_theme_stylebox_override("panel", flat)
 
 func get_unscaled_stack_footprint() -> Vector2:
@@ -2649,6 +2663,8 @@ func build_adjacent_slot_offer_ui() -> void:
 	adjacent_slot_offer_root = SlotOverlayBuilderScript.create_overlay_root(12)
 	hud_layer.add_child(adjacent_slot_offer_root)
 
+	adjacent_slot_offer_hairline = SlotOverlayBuilderScript.create_full_rect_hairline_panel()
+	adjacent_slot_offer_root.add_child(adjacent_slot_offer_hairline)
 	adjacent_slot_offer_panel = SlotOverlayBuilderScript.create_full_rect_texture_panel(SlotOverlayBgScript)
 	adjacent_slot_offer_root.add_child(adjacent_slot_offer_panel)
 
@@ -2801,13 +2817,22 @@ func update_adjacent_slot_offer_ui() -> void:
 		layout_adjacent_slot_star_error_label()
 		return
 	var gr := get_adjacent_extra_slot_offer_global_rect()
-	var inset := maxf(2.0, gr.size.x * 0.025)
+	var inset: float = maxf(2.0, gr.size.x * 0.025)
 	adjacent_slot_offer_root.visible = true
-	adjacent_slot_offer_root.global_position = gr.position + Vector2(inset, inset)
-	adjacent_slot_offer_root.size = gr.size - Vector2(inset * 2.0, inset * 2.0)
-	var fit := minf(adjacent_slot_offer_root.size.x, adjacent_slot_offer_root.size.y)
+	var snapped: Rect2 = SlotOverlayBuilderScript.snap_rect(
+		gr.position + Vector2(inset, inset),
+		gr.size - Vector2(inset * 2.0, inset * 2.0)
+	)
+	adjacent_slot_offer_root.global_position = snapped.position
+	adjacent_slot_offer_root.size = snapped.size
+	var fit := minf(snapped.size.x, snapped.size.y)
 	var corner_px := int(clampf(fit * 0.14, 14.0, 28.0))
-	_apply_slot_overlay_panel_style(adjacent_slot_offer_panel, corner_px, adjacent_slot_offer_root.size)
+	_apply_slot_overlay_panel_style(
+		adjacent_slot_offer_panel,
+		corner_px,
+		snapped.size,
+		adjacent_slot_offer_hairline
+	)
 
 	var g := TEMP_LOCKED_PANEL_GREEN
 	if adjacent_slot_offer_lbl_level != null:
@@ -2835,16 +2860,24 @@ func _sync_slot_overlay_controls() -> void:
 	update_temp_slot_overlay_label()
 	update_adjacent_slot_offer_ui()
 
-func _apply_slot_overlay_panel_style(panel_bg: TextureRect, corner_px: int, panel_size: Vector2) -> void:
-	if panel_bg == null:
-		return
-	if panel_bg.has_method("configure"):
+func _apply_slot_overlay_panel_style(
+	panel_bg: TextureRect,
+	corner_px: int,
+	panel_size: Vector2,
+	hairline: Panel = null
+) -> void:
+	var inset: int = HUD_HAIRLINE_W
+	SlotOverlayBuilderScript.apply_frame_style(hairline, corner_px, HUD_HAIRLINE)
+	SlotOverlayBuilderScript.apply_inset_full_rect(panel_bg, inset)
+	if panel_bg != null and panel_bg.has_method("configure"):
+		var inner := panel_size - Vector2(float(inset) * 2.0, float(inset) * 2.0)
+		var inner_corner: int = SlotOverlayBuilderScript.inner_corner_radius(corner_px, inset)
 		panel_bg.configure(
-			corner_px,
+			inner_corner,
 			theme_grad_a,
 			theme_grad_b,
 			theme_grad_c,
-			panel_size
+			inner
 		)
 
 func build_temp_slot_locked_ui() -> void:
@@ -2854,6 +2887,8 @@ func build_temp_slot_locked_ui() -> void:
 	temp_slot_locked_root.z_index = 12
 	hud_layer.add_child(temp_slot_locked_root)
 
+	temp_slot_locked_hairline = SlotOverlayBuilderScript.create_full_rect_hairline_panel()
+	temp_slot_locked_root.add_child(temp_slot_locked_hairline)
 	temp_slot_locked_panel = SlotOverlayBgScript.new()
 	temp_slot_locked_panel.set_anchors_preset(Control.PRESET_FULL_RECT)
 	temp_slot_locked_panel.offset_left = 0
@@ -2867,7 +2902,7 @@ func build_temp_slot_locked_ui() -> void:
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	temp_slot_locked_root.add_child(center)
 
-	temp_slot_locked_root.clip_contents = true
+	temp_slot_locked_root.clip_contents = false
 
 	var vbox := VBoxContainer.new()
 	vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -2928,12 +2963,21 @@ func update_temp_slot_overlay_label() -> void:
 		var gr = get_temp_slot_global_rect()
 		temp_slot_locked_root.visible = true
 		temp_slot_timer_label.visible = false
-		var inset = maxf(2.0, gr.size.x * 0.025)
-		temp_slot_locked_root.global_position = gr.position + Vector2(inset, inset)
-		temp_slot_locked_root.size = gr.size - Vector2(inset * 2.0, inset * 2.0)
-		var fit := minf(temp_slot_locked_root.size.x, temp_slot_locked_root.size.y)
+		var inset: float = maxf(2.0, gr.size.x * 0.025)
+		var snapped: Rect2 = SlotOverlayBuilderScript.snap_rect(
+			gr.position + Vector2(inset, inset),
+			gr.size - Vector2(inset * 2.0, inset * 2.0)
+		)
+		temp_slot_locked_root.global_position = snapped.position
+		temp_slot_locked_root.size = snapped.size
+		var fit := minf(snapped.size.x, snapped.size.y)
 		var corner_px := int(clampf(fit * 0.14, 10.0, 22.0))
-		_apply_slot_overlay_panel_style(temp_slot_locked_panel, corner_px, temp_slot_locked_root.size)
+		_apply_slot_overlay_panel_style(
+			temp_slot_locked_panel,
+			corner_px,
+			snapped.size,
+			temp_slot_locked_hairline
+		)
 
 		var g = TEMP_LOCKED_PANEL_GREEN
 		var hourglass_fs := int(clampf(fit * 0.38, 28.0, 52.0))
@@ -3274,7 +3318,7 @@ func build_mock_ui() -> void:
 	hud_root.add_child(stars_chip)
 	hud_root.add_child(settings_chip)
 
-	progress_container = create_panel(PROGRESS_TRACK_BG, PROGRESS_TRACK_BORDER, 24)
+	progress_container = create_panel(PROGRESS_TRACK_BG, HUD_HAIRLINE, 24, HUD_HAIRLINE_W, false)
 	progress_container.clip_contents = true
 	progress_fill = SlotOverlayBgScript.new()
 	progress_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -3479,8 +3523,10 @@ func layout_mock_ui() -> void:
 	var progress_w = viewport_size.x * 0.78
 	var progress_h = 54 * scale
 	var progress_y = min(chip_y + chip_h + HUD_CHIP_TO_PROGRESS_GAP * scale, board_rect.position.y - progress_h - 12 * scale)
-	progress_container.position = Vector2((viewport_size.x - progress_w) * 0.5, progress_y)
-	progress_container.size = Vector2(progress_w, progress_h)
+	var progress_x: float = roundf((viewport_size.x - progress_w) * 0.5)
+	var progress_y_px: float = roundf(progress_y)
+	progress_container.position = Vector2(progress_x, progress_y_px)
+	progress_container.size = Vector2(roundf(progress_w), roundf(progress_h))
 	var bar_rect = Rect2(Vector2(54 * scale, progress_h * 0.36), Vector2(progress_w - 110 * scale, progress_h * 0.28))
 	progress_bar_max_width = bar_rect.size.x
 	progress_bar_height = bar_rect.size.y
@@ -3568,20 +3614,25 @@ func update_life_display() -> void:
 func _on_lives_changed() -> void:
 	update_life_display()
 
-func create_panel(bg: Color, border: Color, radius: int) -> Panel:
+func create_panel(bg: Color, border: Color, radius: int, border_width: int = 1, even_stroke: bool = false) -> Panel:
 	var panel = Panel.new()
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var style := StyleBoxFlat.new()
 	style.bg_color = bg
 	style.border_color = border
-	style.border_width_left = 1
-	style.border_width_top = 1
-	style.border_width_right = 1
-	style.border_width_bottom = 1
+	style.anti_aliasing = not even_stroke
+	style.border_width_left = border_width
+	style.border_width_top = border_width
+	style.border_width_right = border_width
+	style.border_width_bottom = border_width
 	style.corner_radius_top_left = radius
 	style.corner_radius_top_right = radius
 	style.corner_radius_bottom_left = radius
 	style.corner_radius_bottom_right = radius
+	style.content_margin_left = float(border_width)
+	style.content_margin_top = float(border_width)
+	style.content_margin_right = float(border_width)
+	style.content_margin_bottom = float(border_width)
 	panel.add_theme_stylebox_override("panel", style)
 	return panel
 
@@ -3676,15 +3727,19 @@ func perform_mix_action() -> void:
 	var plan: Array = GameRulesScript.build_wildcard_mix_plan(
 		all_values, stacks.size(), STACK_CAPACITY
 	)
-	var placed_count := 0
+	var slot_for_index: Array = []
 	for si in range(stacks.size()):
-		var st: Node = stacks[si]
+		slot_for_index.append(get_board_slot_for_stack_index(si))
+	var fill_order: Array = GameRulesScript.mix_fill_order_by_slot(slot_for_index, SLOT_COLUMNS)
+	var placed_count := 0
+	for i in range(fill_order.size()):
+		var st: Node = stacks[int(fill_order[i])]
 		if not is_instance_valid(st):
 			continue
-		var segment: Array = plan[si] if si < plan.size() else []
+		var segment: Array = plan[i] if i < plan.size() else []
 		for raw in segment:
 			if not st.push(int(raw), false):
-				push_error("Mix: no se pudo colocar valor %d en pila %d" % [int(raw), si])
+				push_error("Mix: no se pudo colocar valor %d en pila %d" % [int(raw), int(fill_order[i])])
 				break
 			placed_count += 1
 		if st.has_method("update_coin_positions"):
