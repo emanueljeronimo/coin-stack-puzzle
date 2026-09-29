@@ -2,6 +2,7 @@ extends Area2D
 
 const GameRulesScript = preload("res://game_rules.gd")
 const CoinWildcardShader = preload("res://coin_wildcard.gdshader")
+const CoinNumberFont = preload("res://Fonts/Chewy-Regular.ttf")
 
 var value: int = 1
 var number_visible: bool = true
@@ -38,7 +39,8 @@ const SHADOW_ALPHA := 0.09
 const HIGHLIGHT_ALPHA := 0.14
 const COIN_RADIUS := 26.0
 const NUMBER_TO_DIAMETER := 0.36
-const NUMBER_OUTLINE_TO_FONT := 0.10
+const NUMBER_OUTLINE_PX := 2
+const NUMBER_OUTLINE_COLOR := Color(0, 0, 0, 1)
 const NUMBER_GLYPH_SPACING := -2
 const NUMBER_WIDTH_SCALE := 0.76
 const NUMBER_NUDGE := Vector2(0.0, -1.2)
@@ -70,7 +72,9 @@ func _process(_delta: float) -> void:
 func _ensure_number_font() -> void:
 	if label == null or _number_font != null:
 		return
-	var base: Font = label.get_theme_font("font")
+	var base: Font = CoinNumberFont
+	if base == null:
+		base = label.get_theme_font("font")
 	if base == null:
 		base = ThemeDB.fallback_font
 	_number_font = FontVariation.new()
@@ -84,12 +88,11 @@ func center_number() -> void:
 		return
 	var side: float = COIN_RADIUS * 2.0
 	var font_size: int = maxi(8, int(round(side * NUMBER_TO_DIAMETER)))
-	var outline: int = maxi(1, int(round(float(font_size) * NUMBER_OUTLINE_TO_FONT)))
 	label.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label.add_theme_font_size_override("font_size", font_size)
-	label.add_theme_constant_override("outline_size", outline)
+	label.add_theme_constant_override("outline_size", NUMBER_OUTLINE_PX)
 	label.custom_minimum_size = Vector2(side, side)
 	label.size = Vector2(side, side)
 	label.pivot_offset = Vector2(side, side) * 0.5
@@ -166,8 +169,7 @@ func apply_color_by_value() -> void:
 		if highlight_sprite:
 			highlight_sprite.visible = false
 		if label:
-			var outline := Color(0.72, 0.62, 0.78, 0.50)
-			label.add_theme_color_override("font_outline_color", outline)
+			label.add_theme_color_override("font_outline_color", NUMBER_OUTLINE_COLOR)
 			label.add_theme_color_override("font_color", Color(1.0, 0.99, 1.0, 0.98))
 		return
 	_clear_wildcard_material()
@@ -180,9 +182,7 @@ func apply_color_by_value() -> void:
 		highlight_sprite.visible = true
 		highlight_sprite.self_modulate = Color(1.0, 1.0, 1.0, HIGHLIGHT_ALPHA)
 	if label:
-		var outline := coin_color.darkened(0.50)
-		outline.a = 0.50
-		label.add_theme_color_override("font_outline_color", outline)
+		label.add_theme_color_override("font_outline_color", NUMBER_OUTLINE_COLOR)
 		label.add_theme_color_override("font_color", Color(1.0, 0.99, 1.0, 0.98))
 
 func set_number_visible(visible: bool) -> void:
