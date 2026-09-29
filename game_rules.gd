@@ -7,9 +7,8 @@ const TEMP_SLOT_CLOSE_BY_ACTIONS := false
 const ENABLE_FUSION_CREATE_BONUS := false
 ## Al completar 10 iguales, se crean esta cantidad de fichas del valor siguiente.
 const FUSION_OUTPUT_COUNT := 2
-## Una sola tirada por repartida: chance de incluir exactamente 1 comodín.
-## 0.40 mientras se ajusta el look; volver a 0.10 para play real.
-const WILDCARD_ROUND_CHANCE := 0.40
+## Una sola tirada por repartida: 10% de chance de incluir exactamente 1 comodin.
+const WILDCARD_ROUND_CHANCE := 0.10
 const COIN_WILDCARD_VALUE := 0
 
 const ADJACENT_SLOT_FREE_FIRST_LEVEL := 2
