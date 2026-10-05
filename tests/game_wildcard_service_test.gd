@@ -119,6 +119,12 @@ func _test_consume_and_add() -> void:
 	if int(counts.get("glove", 0)) != 0:
 		_fail("add_locked_glove", str(counts))
 		return
+	counts = GameWildcardServiceScript.add_uses(
+		counts, "glove", 3, 12, GameWildcardServiceScript.UNLOCK_LEVEL, false
+	)
+	if int(counts.get("glove", 0)) != 3:
+		_fail("add_shop_glove", str(counts))
+		return
 	_ok("consume_and_add")
 
 func _test_runtime_roundtrip_preserves_wildcards() -> void:
@@ -152,7 +158,6 @@ func _test_runtime_roundtrip_preserves_wildcards() -> void:
 		"next_free_slot_unlock_level": 14,
 		"temp_slot_actions_remaining": 0,
 		"lives": 5,
-		"gems": 0,
 		"player_stars": 100,
 	})
 	var parsed := GameSessionServiceScript.parse_save_payload(payload, {
@@ -166,7 +171,6 @@ func _test_runtime_roundtrip_preserves_wildcards() -> void:
 		"next_free_slot_unlock_level": 4,
 		"temp_slot_actions_remaining": 0,
 		"lives": 5,
-		"gems": 0,
 		"player_stars": 0,
 		"checkpoint_base_value": 5,
 	})

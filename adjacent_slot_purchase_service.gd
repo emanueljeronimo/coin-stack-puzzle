@@ -12,6 +12,9 @@ static func build_purchase_request(adjacent_offer_board_index: int, active_stack
 		"adjacent_slot_next_price": adjacent_slot_next_price,
 	}
 
+static func confirm_copy(price: int) -> String:
+	return "¿Comprar ranura extra por %d?" % maxi(0, price)
+
 static func is_insufficient_stars(reason: String) -> bool:
 	return reason == "insufficient_stars"
 

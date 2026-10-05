@@ -79,12 +79,13 @@ static func add_uses(
 	wildcard_type: String,
 	amount: int,
 	checkpoint_level: int,
-	unlock_levels: Dictionary = UNLOCK_LEVEL
+	unlock_levels: Dictionary = UNLOCK_LEVEL,
+	require_unlock: bool = true
 ) -> Dictionary:
 	var out := normalize_counts(counts)
 	if not TYPES.has(wildcard_type):
 		return out
-	if not is_unlocked(wildcard_type, checkpoint_level, unlock_levels):
+	if require_unlock and not is_unlocked(wildcard_type, checkpoint_level, unlock_levels):
 		return out
 	out[wildcard_type] = int(out.get(wildcard_type, 0)) + maxi(1, amount)
 	return out

@@ -187,14 +187,14 @@ func layout_for_viewport(viewport_size: Vector2) -> void:
 	card.position = Vector2((viewport_size.x - card_w) * 0.5, (viewport_size.y - card_h) * 0.5)
 
 	if _confirm_title != null:
-		_confirm_title.add_theme_font_size_override("font_size", int(28 * scale))
-		_confirm_title.add_theme_constant_override("outline_size", int(5 * scale))
+		_confirm_title.add_theme_font_size_override("font_size", int(42 * scale))
+		_confirm_title.add_theme_constant_override("outline_size", int(7 * scale))
 	if _confirm_salir_btn != null:
-		_confirm_salir_btn.custom_minimum_size = Vector2(0, 52.0 * scale)
-		_confirm_salir_btn.add_theme_font_size_override("font_size", int(30 * scale))
+		_confirm_salir_btn.custom_minimum_size = Vector2(0, 76.0 * scale)
+		_confirm_salir_btn.add_theme_font_size_override("font_size", int(38 * scale))
 	if _confirm_atras_btn != null:
-		_confirm_atras_btn.custom_minimum_size = Vector2(0, 52.0 * scale)
-		_confirm_atras_btn.add_theme_font_size_override("font_size", int(30 * scale))
+		_confirm_atras_btn.custom_minimum_size = Vector2(0, 76.0 * scale)
+		_confirm_atras_btn.add_theme_font_size_override("font_size", int(38 * scale))
 	_layout_confirm_card(scale)
 
 func _build_ui() -> void:
@@ -248,6 +248,7 @@ func _build_ui() -> void:
 	if LogoFont != null:
 		close_btn.add_theme_font_override("font", LogoFont)
 	close_btn.pressed.connect(close)
+	GameState.hook_button_sound(close_btn)
 	header.add_child(close_btn)
 
 	toggles_well = Panel.new()
@@ -339,20 +340,20 @@ func _build_restart_confirm() -> void:
 
 	var margin := MarginContainer.new()
 	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	margin.add_theme_constant_override("margin_left", 18)
-	margin.add_theme_constant_override("margin_top", 18)
-	margin.add_theme_constant_override("margin_right", 18)
-	margin.add_theme_constant_override("margin_bottom", 18)
+	margin.add_theme_constant_override("margin_left", 28)
+	margin.add_theme_constant_override("margin_top", 28)
+	margin.add_theme_constant_override("margin_right", 28)
+	margin.add_theme_constant_override("margin_bottom", 28)
 	_confirm_card.add_child(margin)
 
 	var vbox := VBoxContainer.new()
 	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	vbox.add_theme_constant_override("separation", 10)
+	vbox.add_theme_constant_override("separation", 16)
 	margin.add_child(vbox)
 
-	_confirm_title = _make_outlined_label("¿Desea reiniciar nivel?\nPerderá una vida", 28)
+	_confirm_title = _make_outlined_label("¿Desea reiniciar nivel?\nPerderá una vida", 42)
 	_confirm_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	vbox.add_child(_confirm_title)
 
@@ -380,31 +381,43 @@ func _hide_restart_confirm() -> void:
 	if _confirm_root != null:
 		_confirm_root.visible = false
 
-func _layout_confirm_card(scale: float) -> void:
+func _layout_confirm_card(_scale: float) -> void:
 	if _confirm_card == null:
 		return
 	var vp := get_viewport_rect().size
-	# Escala acotada: no multiplicar tops sueltos (en pantallas anchas volvía enorme).
-	var s := clampf(min(vp.x / REF_WIDTH, vp.y / 1920.0), 0.7, 1.1)
-	var pad := 20.0 * s
-	var sep := 12.0 * s
-	var title_h := 64.0 * s
-	var btn_h := 52.0 * s
+	var s: float = clampf(minf(vp.x / REF_WIDTH, vp.y / 1920.0), 0.75, 1.25)
+	var pad: float = 32.0 * s
+	var sep: float = 18.0 * s
+	var title_h: float = 120.0 * s
+	var btn_h: float = 76.0 * s
 	if _confirm_salir_btn != null:
 		btn_h = maxf(btn_h, _confirm_salir_btn.custom_minimum_size.y)
-	var card_w := mini(vp.x * 0.72, 360.0 * s)
-	var card_h := pad * 2.0 + title_h + btn_h * 2.0 + sep * 2.0
+	var card_w: float = minf(vp.x * 0.86, 720.0 * s)
+	var card_h: float = pad * 2.0 + title_h + btn_h * 2.0 + sep * 2.0
 	_confirm_card.size = Vector2(card_w, card_h)
 	_confirm_card.position = Vector2((vp.x - card_w) * 0.5, (vp.y - card_h) * 0.5)
 	if _confirm_title != null:
-		_confirm_title.add_theme_font_size_override("font_size", int(28 * s))
-		_confirm_title.add_theme_constant_override("outline_size", int(5 * s))
+		_confirm_title.add_theme_font_size_override("font_size", int(42.0 * s))
+		_confirm_title.add_theme_constant_override("outline_size", int(7.0 * s))
 	if _confirm_salir_btn != null:
 		_confirm_salir_btn.custom_minimum_size = Vector2(0, btn_h)
-		_confirm_salir_btn.add_theme_font_size_override("font_size", int(30 * s))
+		_confirm_salir_btn.add_theme_font_size_override("font_size", int(38.0 * s))
 	if _confirm_atras_btn != null:
 		_confirm_atras_btn.custom_minimum_size = Vector2(0, btn_h)
-		_confirm_atras_btn.add_theme_font_size_override("font_size", int(30 * s))
+		_confirm_atras_btn.add_theme_font_size_override("font_size", int(38.0 * s))
+	var margin: MarginContainer = null
+	for child in _confirm_card.get_children():
+		if child is MarginContainer:
+			margin = child as MarginContainer
+			break
+	if margin != null:
+		var m: int = int(round(pad))
+		margin.add_theme_constant_override("margin_left", m)
+		margin.add_theme_constant_override("margin_top", m)
+		margin.add_theme_constant_override("margin_right", m)
+		margin.add_theme_constant_override("margin_bottom", m)
+		if margin.get_child_count() > 0 and margin.get_child(0) is VBoxContainer:
+			(margin.get_child(0) as VBoxContainer).add_theme_constant_override("separation", int(round(sep)))
 
 func _on_restart_pressed() -> void:
 	_show_restart_confirm()
@@ -436,6 +449,7 @@ func _make_action_button(text: String) -> Button:
 	if LogoFont != null:
 		btn.add_theme_font_override("font", LogoFont)
 	btn.add_theme_font_size_override("font_size", 34)
+	GameState.hook_button_sound(btn)
 	return btn
 
 func _flat_style(bg: Color, border: Color, radius: int, border_w: int = 3) -> StyleBoxFlat:
@@ -520,6 +534,7 @@ func _add_toggle_row(
 	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	btn.toggle_mode = true
 	btn.pressed.connect(_on_toggle_pressed.bind(toggle_idx))
+	GameState.hook_button_sound(btn)
 	if LogoFont != null:
 		btn.add_theme_font_override("font", LogoFont)
 	row.add_child(btn)
@@ -606,6 +621,7 @@ func _build_theme_option(theme: Dictionary) -> Panel:
 	preview.focus_mode = Control.FOCUS_NONE
 	preview.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	preview.pressed.connect(_on_theme_option_pressed.bind(theme_id))
+	GameState.hook_button_sound(preview)
 	wrap.add_child(preview)
 	return wrap
 

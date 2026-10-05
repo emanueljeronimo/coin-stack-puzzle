@@ -54,7 +54,7 @@ static func border_color_for_id(border_id: String) -> Variant:
 			return opt.get("color", null)
 	return null
 
-static func default_player_data(save_version: int, username: String, default_custom_border_color: Color, initial_stars: int, initial_lives: int, initial_gems: int) -> Dictionary:
+static func default_player_data(save_version: int, username: String, default_custom_border_color: Color, initial_stars: int, initial_lives: int) -> Dictionary:
 	return {
 		"save_version": save_version,
 		"username": username,
@@ -69,7 +69,6 @@ static func default_player_data(save_version: int, username: String, default_cus
 		"coins": initial_stars,
 		"position": {"x": 0.0, "y": 0.0},
 		"lives": initial_lives,
-		"gems": initial_gems,
 		"checkpoint_level": 1,
 		"checkpoint_snapshot": {},
 		"current_level": 1,

@@ -267,6 +267,22 @@ func add_coins(amount: int) -> void:
 	save_game()
 
 
+func spend_coins(amount: int) -> bool:
+	if amount <= 0:
+		return false
+	var current: int = int(player_data.get("coins", 0))
+	if GameState != null:
+		current = int(GameState.player_stars)
+	if current < amount:
+		return false
+	player_data["coins"] = current - amount
+	if GameState != null:
+		GameState.player_stars = int(player_data["coins"])
+	player_data_changed.emit()
+	save_game()
+	return true
+
+
 func register_session_collector(collector: Callable) -> void:
 	_session_collector = collector
 
@@ -322,8 +338,7 @@ func _create_default_player_data() -> Dictionary:
 		_generate_random_username(),
 		DEFAULT_CUSTOM_BORDER_COLOR,
 		GameState.INITIAL_STARS,
-		GameState.INITIAL_LIVES,
-		GameState.INITIAL_GEMS
+		GameState.INITIAL_LIVES
 	)
 
 
@@ -351,6 +366,7 @@ func _merge_with_defaults(loaded: Dictionary) -> Dictionary:
 			"g": DEFAULT_CUSTOM_BORDER_COLOR.g,
 			"b": DEFAULT_CUSTOM_BORDER_COLOR.b,
 		}
+	merged.erase("gems")
 	return merged
 
 
@@ -370,7 +386,8 @@ func _sync_core_fields_to_player_data() -> void:
 	player_data["coins"] = int(player_data.get("player_stars", GameState.player_stars))
 	player_data["lives"] = GameState.lives
 	player_data["next_free_life_unix"] = GameState.next_free_life_unix
-	player_data["gems"] = GameState.gems
+	player_data["unlimited_lives_until_unix"] = GameState.unlimited_lives_until_unix
+	player_data.erase("gems")
 	if not player_data.has("username") or str(player_data["username"]).is_empty():
 		player_data["username"] = _generate_random_username()
 
@@ -386,7 +403,7 @@ func _apply_to_game_state(had_life_timer: bool = true) -> void:
 	GameState.player_stars = int(player_data.get("coins", player_data.get("player_stars", GameState.INITIAL_STARS)))
 	GameState.lives = int(player_data.get("lives", GameState.INITIAL_LIVES))
 	GameState.next_free_life_unix = int(player_data.get("next_free_life_unix", 0))
-	GameState.gems = int(player_data.get("gems", GameState.INITIAL_GEMS))
+	GameState.unlimited_lives_until_unix = int(player_data.get("unlimited_lives_until_unix", 0))
 	var snap: Variant = player_data.get("checkpoint_snapshot", {})
 	if snap is Dictionary:
 		GameState.checkpoint_snapshot = snap.duplicate(true)

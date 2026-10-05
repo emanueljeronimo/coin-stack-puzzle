@@ -44,11 +44,14 @@ func _test_lookup_defaults() -> void:
 	_ok("lookup_defaults")
 
 func _test_default_player_data() -> void:
-	var data := ProfileRepositoryScript.default_player_data(7, "Player", Color(0.1, 0.2, 0.3), 99, 5, 4)
+	var data := ProfileRepositoryScript.default_player_data(7, "Player", Color(0.1, 0.2, 0.3), 99, 5)
 	if int(data.get("save_version", 0)) != 7:
 		_fail("save_version", str(data))
 		return
 	if int(data.get("coins", 0)) != 99:
 		_fail("coins", str(data))
+		return
+	if data.has("gems"):
+		_fail("no_gems", str(data))
 		return
 	_ok("default_player_data")

@@ -10,12 +10,12 @@ static func _overlay_open(node: CanvasItem) -> bool:
 static func _panel_open(node: Variant) -> bool:
 	return node != null and node.has_method("is_open") and bool(node.is_open())
 
-static func should_block_board_input(settings_ui: Variant, shop_ui: Variant, level_up_overlay: CanvasItem, wildcard_unlock_overlay: CanvasItem, no_moves_overlay: CanvasItem, purchase_overlay: CanvasItem) -> bool:
+static func should_block_board_input(settings_ui: Variant, shop_ui: Variant, level_up_overlay: CanvasItem, wildcard_unlock_overlay: CanvasItem, no_moves_overlay: CanvasItem, purchase_overlay: CanvasItem, slot_buy_overlay: CanvasItem = null) -> bool:
 	if _panel_open(settings_ui) or _panel_open(shop_ui):
 		return true
 	if _overlay_open(level_up_overlay) or _overlay_open(wildcard_unlock_overlay):
 		return true
-	if _overlay_open(no_moves_overlay) or _overlay_open(purchase_overlay):
+	if _overlay_open(no_moves_overlay) or _overlay_open(purchase_overlay) or _overlay_open(slot_buy_overlay):
 		return true
 	return false
 

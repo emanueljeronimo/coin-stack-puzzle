@@ -15,6 +15,9 @@ static func build_rules(cost_stars: int, duration_sec: float, actions_to_close: 
 		"temp_slot_actions_to_close": actions_to_close,
 	}
 
+static func confirm_copy(price: int) -> String:
+	return "¿Comprar ranura temporal por %d?" % maxi(0, price)
+
 static func message_for_rejection(reason: String, required: int, current: int) -> String:
 	if reason == "already_active":
 		return "Ya tenes una ranura temporal activa."

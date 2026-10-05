@@ -11,6 +11,7 @@ func _initialize() -> void:
 func _run() -> void:
 	print("=== integration_stack_flow test ===")
 	await _test_move_block_and_fuse_result()
+	await _test_move_number_block_onto_wildcard()
 	print("=== RESULT: %d passed, %d failed ===" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -66,4 +67,31 @@ func _test_move_block_and_fuse_result() -> void:
 		return
 
 	_ok("move_block_and_fuse_result")
+	_free_stacks([src, dst])
+
+func _test_move_number_block_onto_wildcard() -> void:
+	var src := _new_stack()
+	var dst := _new_stack()
+	_fill_stack(dst, 0, 1)
+	_fill_stack(src, 4, 3)
+	if not dst.can_receive_value(4):
+		_fail("dest_wildcard_can_receive_number")
+		_free_stacks([src, dst])
+		return
+	var moved := int(src.move_top_block_to(dst))
+	if moved != 3:
+		_fail("move_onto_wildcard_amount", str(moved))
+		_free_stacks([src, dst])
+		return
+	await create_timer(0.8).timeout
+	if int(dst.coins.size()) != 4:
+		_fail("onto_wildcard_count", str(dst.coins))
+		_free_stacks([src, dst])
+		return
+	for v in dst.coins:
+		if int(v) != 4:
+			_fail("onto_wildcard_converted", str(dst.coins))
+			_free_stacks([src, dst])
+			return
+	_ok("move_number_block_onto_wildcard")
 	_free_stacks([src, dst])

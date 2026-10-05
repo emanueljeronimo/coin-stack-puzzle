@@ -1,6 +1,6 @@
 extends Control
 
-const CoverTexture := preload("res://Imagenes/home-2.png")
+const CoverTexture := preload("res://Imagenes/home-nueva.png")
 const UiFont := preload("res://Fonts/Chewy-Regular.ttf")
 const SlotOverlayBgScript := preload("res://slot_overlay_bg.gd")
 
@@ -12,8 +12,8 @@ const PROGRESS_LABEL_COLOR := Color(0.98, 0.99, 0.95)
 const PROGRESS_LABEL_OUTLINE := Color(0.16, 0.38, 0.20)
 
 const BOOT_WARMUP_PRELOADS: Array[String] = [
-	"res://Imagenes/home-2.png",
-	"res://Imagenes/boton-jugar_ahora.png",
+	"res://Imagenes/home-nueva.png",
+	"res://Imagenes/boton-nuevo.png",
 	"res://Fonts/Chewy-Regular.ttf",
 	"res://stack.tscn",
 ]

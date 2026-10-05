@@ -309,6 +309,7 @@ func _build_ui() -> void:
 	if LogoFont != null:
 		close_btn.add_theme_font_override("font", LogoFont)
 	close_btn.pressed.connect(close)
+	GameState.hook_button_sound(close_btn)
 	header.add_child(close_btn)
 
 	# Barra nombre actual
@@ -385,6 +386,7 @@ func _build_ui() -> void:
 	if LogoFont != null:
 		edit_name_btn.add_theme_font_override("font", LogoFont)
 	edit_name_btn.pressed.connect(_on_edit_name_pressed)
+	GameState.hook_button_sound(edit_name_btn)
 	name_row.add_child(edit_name_btn)
 
 	choose_label = _make_outlined_label("Elegí tu avatar:", 36)
@@ -406,6 +408,7 @@ func _build_ui() -> void:
 	if LogoFont != null:
 		tab_avatar_btn.add_theme_font_override("font", LogoFont)
 	tab_avatar_btn.pressed.connect(_on_tab_pressed.bind(0))
+	GameState.hook_button_sound(tab_avatar_btn)
 	tabs_row.add_child(tab_avatar_btn)
 
 	tab_border_btn = Button.new()
@@ -416,6 +419,7 @@ func _build_ui() -> void:
 	if LogoFont != null:
 		tab_border_btn.add_theme_font_override("font", LogoFont)
 	tab_border_btn.pressed.connect(_on_tab_pressed.bind(1))
+	GameState.hook_button_sound(tab_border_btn)
 	tabs_row.add_child(tab_border_btn)
 
 	avatar_well = Panel.new()
@@ -478,6 +482,7 @@ func _build_ui() -> void:
 		save_btn.add_theme_font_override("font", LogoFont)
 	save_btn.add_theme_font_size_override("font_size", 40)
 	save_btn.pressed.connect(_on_save_pressed)
+	GameState.hook_button_sound(save_btn)
 	main_vbox.add_child(save_btn)
 
 	_apply_theme_colors()
@@ -503,6 +508,7 @@ func _make_avatar_cell(avatar_id: String, path: String) -> Control:
 	btn.mouse_filter = Control.MOUSE_FILTER_STOP
 	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	btn.pressed.connect(_on_avatar_pressed.bind(avatar_id))
+	GameState.hook_button_sound(btn)
 	cell.add_child(btn)
 	cell.set_meta("btn", btn)
 
@@ -564,6 +570,7 @@ func _make_border_cell(border_id: String, color: Color) -> Control:
 	swatch.add_theme_stylebox_override("panel", _ring_style(color, 28, 14))
 	swatch.gui_input.connect(func(event: InputEvent) -> void:
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			GameState.play_button_sound()
 			_on_border_pressed(border_id)
 	)
 	cell.add_child(swatch)
@@ -734,6 +741,7 @@ func _ensure_custom_color_popup() -> void:
 		custom_color_done_btn.add_theme_font_override("font", LogoFont)
 	custom_color_done_btn.add_theme_font_size_override("font_size", 34)
 	custom_color_done_btn.pressed.connect(_close_custom_color_popup)
+	GameState.hook_button_sound(custom_color_done_btn)
 	root.add_child(custom_color_done_btn)
 	_apply_custom_picker_size()
 	_apply_custom_done_btn_theme()
@@ -918,6 +926,7 @@ func _on_edit_name_pressed() -> void:
 
 func _on_name_label_gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		GameState.play_button_sound()
 		_set_editing_name(true)
 		accept_event()
 
@@ -973,6 +982,7 @@ func _sync_custom_picker() -> void:
 
 func _on_custom_swatch_gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		GameState.play_button_sound()
 		_on_custom_border_pressed()
 		_open_custom_color_popup()
 		accept_event()

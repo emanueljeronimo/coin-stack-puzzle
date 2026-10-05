@@ -5,6 +5,27 @@ class_name GameLivesService
 
 const MAX_LIVES := 5
 const REGEN_SECONDS := 30 * 60
+const UNLIMITED_HOUR_SEC := 3600
+
+static func is_unlimited(until_unix: int, now: int) -> bool:
+	return until_unix > now
+
+static func unlimited_remaining(until_unix: int, now: int) -> int:
+	return maxi(0, until_unix - now)
+
+static func grant_unlimited(current_until: int, now: int, extra_sec: int) -> int:
+	var extra: int = maxi(0, extra_sec)
+	if extra <= 0:
+		return current_until
+	var base: int = now
+	if current_until > now:
+		base = current_until
+	return base + extra
+
+static func expire_unlimited(until_unix: int, now: int) -> int:
+	if until_unix > 0 and until_unix <= now:
+		return 0
+	return until_unix
 
 static func catch_up(
 	lives: int,

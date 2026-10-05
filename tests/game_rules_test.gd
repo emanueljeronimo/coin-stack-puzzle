@@ -12,6 +12,8 @@ func _run() -> void:
 	print("=== game_rules test ===")
 	_test_unlock_levels()
 	_test_normalize_temp_state()
+	_test_wildcard_stack_receive()
+	_test_attached_wildcard_resolution()
 	print("=== RESULT: %d passed, %d failed ===" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -162,3 +164,40 @@ func _test_normalize_temp_state() -> void:
 		_fail("normalize_ok", str(ok))
 		return
 	_ok("normalize_temp_state")
+
+func _test_wildcard_stack_receive() -> void:
+	var W: int = GameRulesScript.COIN_WILDCARD_VALUE
+	if not GameRulesScript.can_stack_receive_value(5, W, false):
+		_fail("number_accepts_wildcard")
+		return
+	if not GameRulesScript.can_stack_receive_value(W, 5, false):
+		_fail("wildcard_accepts_number")
+		return
+	if not GameRulesScript.can_stack_receive_value(-1, 5, false):
+		_fail("empty_accepts_number")
+		return
+	if GameRulesScript.can_stack_receive_value(5, 7, false):
+		_fail("number_rejects_other")
+		return
+	if GameRulesScript.can_stack_receive_value(W, 5, true):
+		_fail("full_rejects_wildcard_dest")
+		return
+	_ok("wildcard_stack_receive")
+
+func _test_attached_wildcard_resolution() -> void:
+	var W: int = GameRulesScript.COIN_WILDCARD_VALUE
+	var onto_number: Dictionary = GameRulesScript.attached_wildcard_resolution(5, W)
+	if str(onto_number.get("convert", "")) != "incoming" or int(onto_number.get("value", -1)) != 5:
+		_fail("wildcard_onto_number", str(onto_number))
+		return
+	var onto_wildcard: Dictionary = GameRulesScript.attached_wildcard_resolution(W, 5)
+	if str(onto_wildcard.get("convert", "")) != "below" or int(onto_wildcard.get("value", -1)) != 5:
+		_fail("number_onto_wildcard", str(onto_wildcard))
+		return
+	if not GameRulesScript.attached_wildcard_resolution(5, 5).is_empty():
+		_fail("same_numbers_no_convert")
+		return
+	if not GameRulesScript.attached_wildcard_resolution(W, W).is_empty():
+		_fail("two_wildcards_no_convert")
+		return
+	_ok("attached_wildcard_resolution")

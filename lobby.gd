@@ -1,23 +1,30 @@
 extends Control
 
-const CoverTexture = preload("res://Imagenes/home-2.png")
+const CoverTexture = preload("res://Imagenes/home-nueva.png")
 const LifeIconTexture = preload("res://Imagenes/icono-vidas.png")
 const StarIconTexture = preload("res://Imagenes/icono-estrella.png")
 const CartIconTexture = preload("res://Imagenes/icono-cart.png")
 const SettingsIconTexture = preload("res://Imagenes/icono-settings.png")
+const DailyLoginIconTexture = preload("res://Imagenes/icono-login-diario.png")
 const CoinScene = preload("res://coin.tscn")
 const ShopScene = preload("res://Shop.tscn")
 const LogoFont = preload("res://Fonts/Chewy-Regular.ttf")
+const LevelFont = preload("res://Fonts/FredokaOne-Regular.ttf")
 const GameScenePath := "res://Main.tscn"
+const DailyLoginServiceScript = preload("res://daily_login_service.gd")
 
 const REF_WIDTH := 1080.0
 const EDGE_MARGIN := 14.0
 const CHIP_TOP_RATIO := 0.075
-const LEVEL_Y_RATIO := 0.36
-## Centro de la moneda sobre el pedestal/cojín del fondo home-2.
+const LEVEL_Y_RATIO := 0.405
+const LEVEL_FONT_SIZE := 96
+const LEVEL_FILL := Color(0.99, 0.96, 0.88)
+const LEVEL_OUTLINE := Color(0.14, 0.40, 0.20)
+const LEVEL_SHADOW := Color(0.05, 0.20, 0.09, 0.88)
+## Centro de la moneda sobre el pedestal/cojin del fondo home-nueva.
 const PEDESTAL_COIN_X_RATIO := 0.50
-const PEDESTAL_COIN_Y_RATIO := 0.505
-const PEDESTAL_COIN_SCALE := 3.6
+const PEDESTAL_COIN_Y_RATIO := 0.568
+const PEDESTAL_COIN_SCALE := 4.35
 const BTN_GAP := 16.0
 const CORNER_BTN_WIDTH_RATIO := 0.12
 const STAT_BTN_WIDTH_RATIO := 0.19
@@ -28,9 +35,10 @@ const LOBBY_CHIP_HEIGHT_RATIO := 0.76
 const LOBBY_STAT_ICON_RATIO := 0.56
 
 const PLAY_WIDTH_RATIO := 0.46
-const PLAY_BOTTOM_MARGIN := 0.0
-const PLAY_Y_DROP := 58.0
-const PLAY_VISIBLE_HEIGHT := 0.86
+const PLAY_BOTTOM_MARGIN := 80.0
+const PLAY_Y_DROP := 0.0
+const PLAY_VISIBLE_HEIGHT := 1.0
+const DAILY_LOGIN_SIZE_RATIO := 1.65
 
 var background_rect: TextureRect = null
 var hud_layer: CanvasLayer = null
@@ -56,6 +64,8 @@ var stars_chip_parts: Dictionary = {}
 var settings_button_shadow: Panel = null
 var settings_button: Control = null
 var settings_button_icon: TextureRect = null
+var daily_login_button: Control = null
+var daily_login_button_icon: TextureRect = null
 var level_label: Label = null
 var showcase_coin: Node2D = null
 var play_button: TextureButton = null
@@ -65,6 +75,8 @@ var shop_layer: CanvasLayer = null
 var shop_ui: ShopOverlay = null
 var profile_layer: CanvasLayer = null
 var profile_ui: ProfileOverlay = null
+var daily_login_layer: CanvasLayer = null
+var daily_login_ui: DailyLoginOverlay = null
 
 func _ready() -> void:
 	_apply_portrait_orientation()
@@ -137,6 +149,7 @@ func build_ui() -> void:
 	_bind_chip_click(life_button, _on_shop_pressed)
 	if life_parts.plus != null:
 		(life_parts.plus as Button).pressed.connect(_on_shop_pressed)
+		GameState.hook_button_sound(life_parts.plus as Button)
 	var stars_parts := HudTextureButtons.create_resource_chip(StarIconTexture, false)
 	stars_chip_parts = stars_parts
 	stars_button = stars_parts.panel
@@ -145,11 +158,17 @@ func build_ui() -> void:
 	_bind_chip_click(stars_button, _on_shop_pressed)
 	if stars_parts.plus != null:
 		(stars_parts.plus as Button).pressed.connect(_on_shop_pressed)
+		GameState.hook_button_sound(stars_parts.plus as Button)
 	var settings_parts := _build_icon_only_chip(SettingsIconTexture)
 	settings_button_shadow = settings_parts.shadow
 	settings_button = settings_parts.panel
 	settings_button_icon = settings_parts.icon
 	_bind_chip_click(settings_button, _open_settings)
+
+	var daily_login_parts := _build_icon_only_chip(DailyLoginIconTexture)
+	daily_login_button = daily_login_parts.panel
+	daily_login_button_icon = daily_login_parts.icon
+	daily_login_button.gui_input.connect(_on_daily_login_chip_input)
 
 	hud_root.add_child(profile_button_shadow)
 	hud_root.add_child(profile_button)
@@ -157,17 +176,17 @@ func build_ui() -> void:
 	hud_root.add_child(stars_button)
 	hud_root.add_child(settings_button)
 	hud_root.add_child(shop_button)
+	hud_root.add_child(daily_login_button)
 
 	level_label = Label.new()
 	level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	level_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	level_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	if LogoFont != null:
+	if LevelFont != null:
+		level_label.add_theme_font_override("font", LevelFont)
+	elif LogoFont != null:
 		level_label.add_theme_font_override("font", LogoFont)
-	level_label.add_theme_font_size_override("font_size", 72)
-	level_label.add_theme_color_override("font_color", Color(0.22, 0.42, 0.24))
-	level_label.add_theme_color_override("font_outline_color", Color(0.98, 0.99, 0.94, 0.9))
-	level_label.add_theme_constant_override("outline_size", 6)
+	_apply_level_label_style(1.0)
 	hud_root.add_child(level_label)
 
 	showcase_coin = CoinScene.instantiate()
@@ -179,9 +198,11 @@ func build_ui() -> void:
 	build_settings_dialog()
 	build_shop_dialog()
 	build_profile_editor()
+	build_daily_login_dialog()
 
 	play_button = HudTextureButtons.create_play()
 	play_button.pressed.connect(_on_play_pressed)
+	GameState.hook_button_sound(play_button)
 	play_button.z_index = 20
 	hud_root.add_child(play_button)
 
@@ -204,6 +225,21 @@ func build_shop_dialog() -> void:
 	add_child(shop_layer)
 	shop_ui = ShopScene.instantiate()
 	shop_layer.add_child(shop_ui)
+	if shop_ui.has_signal("combo_purchased") and not shop_ui.combo_purchased.is_connected(_on_shop_combo_purchased):
+		shop_ui.combo_purchased.connect(_on_shop_combo_purchased)
+	if shop_ui.has_signal("wildcard_purchased") and not shop_ui.wildcard_purchased.is_connected(_on_shop_wildcard_purchased):
+		shop_ui.wildcard_purchased.connect(_on_shop_wildcard_purchased)
+	if shop_ui.has_signal("stars_purchased") and not shop_ui.stars_purchased.is_connected(_on_shop_stars_purchased):
+		shop_ui.stars_purchased.connect(_on_shop_stars_purchased)
+
+func _on_shop_combo_purchased(_pack: Dictionary) -> void:
+	update_displays()
+
+func _on_shop_wildcard_purchased(_wildcard_type: String, _amount: int) -> void:
+	update_displays()
+
+func _on_shop_stars_purchased(_amount: int) -> void:
+	update_displays()
 
 func build_profile_editor() -> void:
 	profile_layer = CanvasLayer.new()
@@ -213,12 +249,24 @@ func build_profile_editor() -> void:
 	profile_layer.add_child(profile_ui)
 	profile_ui.profile_saved.connect(_on_profile_saved)
 
+func build_daily_login_dialog() -> void:
+	daily_login_layer = CanvasLayer.new()
+	daily_login_layer.layer = 102
+	add_child(daily_login_layer)
+	daily_login_ui = DailyLoginOverlay.new()
+	daily_login_layer.add_child(daily_login_ui)
+	if not daily_login_ui.rewards_changed.is_connected(_on_daily_login_rewards_changed):
+		daily_login_ui.rewards_changed.connect(_on_daily_login_rewards_changed)
+
+func _on_daily_login_rewards_changed() -> void:
+	update_displays()
+
 func _on_profile_saved() -> void:
 	update_displays()
 
 func update_displays() -> void:
 	if life_button_count_label != null:
-		life_button_count_label.text = str(GameState.lives)
+		life_button_count_label.text = GameState.get_life_count_text()
 	if not life_chip_parts.is_empty():
 		HudTextureButtons.set_resource_chip_value(life_chip_parts, GameState.get_life_chip_text())
 	if not stars_chip_parts.is_empty():
@@ -237,6 +285,7 @@ func update_displays() -> void:
 			SaveManager.get_avatar_texture(),
 			SaveManager.get_avatar_path()
 		)
+	_refresh_daily_login_lock()
 
 func _hud_pill_radius(scale: float) -> int:
 	return int(HUD_PILL_RADIUS * scale)
@@ -264,6 +313,19 @@ func create_hud_text_label(text: String, font_size: int) -> Label:
 	if LogoFont != null:
 		lbl.add_theme_font_override("font", LogoFont)
 	return lbl
+
+func _apply_level_label_style(ui_scale: float) -> void:
+	if level_label == null:
+		return
+	var s: float = maxf(ui_scale, 0.5)
+	level_label.add_theme_font_size_override("font_size", int(float(LEVEL_FONT_SIZE) * s))
+	level_label.add_theme_color_override("font_color", LEVEL_FILL)
+	level_label.add_theme_color_override("font_outline_color", LEVEL_OUTLINE)
+	level_label.add_theme_constant_override("outline_size", int(round(10.0 * s)))
+	level_label.add_theme_color_override("font_shadow_color", LEVEL_SHADOW)
+	level_label.add_theme_constant_override("shadow_offset_x", int(round(2.0 * s)))
+	level_label.add_theme_constant_override("shadow_offset_y", int(round(7.0 * s)))
+	level_label.add_theme_constant_override("shadow_outline_size", int(round(5.0 * s)))
 
 func layout_hud_pill_pair(shadow: Panel, panel: Control, pos: Vector2, size: Vector2, scale: float) -> void:
 	if panel != null:
@@ -349,7 +411,7 @@ func _build_lives_chip() -> Dictionary:
 	var lbl := create_hud_text_label(GameState.get_life_chip_text(), LOBBY_STAT_FONT_SIZE)
 	row.add_child(lbl)
 	if badge.count != null:
-		(badge.count as Label).text = str(GameState.lives)
+		(badge.count as Label).text = GameState.get_life_count_text()
 	return {
 		"shadow": shadow,
 		"panel": panel,
@@ -362,6 +424,7 @@ func _build_lives_chip() -> Dictionary:
 func _bind_chip_click(panel: Control, callback: Callable) -> void:
 	panel.gui_input.connect(func(event: InputEvent) -> void:
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			GameState.play_button_sound()
 			callback.call()
 	)
 
@@ -459,12 +522,12 @@ func layout_ui() -> void:
 
 	if level_label != null:
 		var level_w := cover.size.x * 0.72
-		var level_h := 120.0 * scale
+		var level_h := 150.0 * scale
 		var level_x := cover.position.x + (cover.size.x - level_w) * 0.5
 		var level_y := cover.position.y + cover.size.y * LEVEL_Y_RATIO
 		level_label.position = Vector2(level_x, level_y)
 		level_label.size = Vector2(level_w, level_h)
-		level_label.add_theme_font_size_override("font_size", int(72.0 * scale))
+		_apply_level_label_style(scale)
 
 	if showcase_coin != null:
 		var coin_x := cover.position.x + cover.size.x * PEDESTAL_COIN_X_RATIO
@@ -491,12 +554,19 @@ func layout_ui() -> void:
 		shop_y = viewport_size.y - shop_size.y - edge_margin * 2.0
 	layout_hud_pill_pair(null, shop_button, Vector2(shop_x, shop_y), shop_size, scale)
 
+	var daily_size := corner_size * DAILY_LOGIN_SIZE_RATIO
+	var daily_login_x := viewport_size.x - edge_margin - daily_size.x
+	var daily_login_y := row_y + corner_size.y + gap * 10
+	layout_hud_pill_pair(null, daily_login_button, Vector2(daily_login_x, daily_login_y), daily_size, scale)
+
 	if settings_ui != null:
 		settings_ui.layout_for_viewport(viewport_size)
 	if shop_ui != null:
 		shop_ui.layout_for_viewport(viewport_size)
 	if profile_ui != null:
 		profile_ui.layout_for_viewport(viewport_size)
+	if daily_login_ui != null:
+		daily_login_ui.layout_for_viewport(viewport_size)
 
 func _open_profile() -> void:
 	if profile_ui != null:
@@ -518,6 +588,34 @@ func _open_settings() -> void:
 	if settings_ui != null:
 		settings_ui.open()
 		settings_ui.layout_for_viewport(get_viewport_rect().size)
+
+func _is_daily_login_unlocked() -> bool:
+	return DailyLoginServiceScript.is_unlocked(GameState.player_level)
+
+func _refresh_daily_login_lock() -> void:
+	var unlocked := _is_daily_login_unlocked()
+	if daily_login_button != null:
+		daily_login_button.modulate = Color(1, 1, 1, 1) if unlocked else Color(0.55, 0.55, 0.55, 0.72)
+		daily_login_button.mouse_default_cursor_shape = (
+			Control.CURSOR_POINTING_HAND if unlocked else Control.CURSOR_ARROW
+		)
+	if daily_login_ui != null and daily_login_ui.is_open() and not unlocked:
+		daily_login_ui.close()
+
+func _on_daily_login_chip_input(event: InputEvent) -> void:
+	if not (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT):
+		return
+	if not _is_daily_login_unlocked():
+		return
+	GameState.play_button_sound()
+	_open_daily_login()
+
+func _open_daily_login() -> void:
+	if not _is_daily_login_unlocked():
+		return
+	if daily_login_ui != null:
+		daily_login_ui.open()
+		daily_login_ui.layout_for_viewport(get_viewport_rect().size)
 
 func create_panel(bg: Color, border: Color, radius: int) -> Panel:
 	var panel := Panel.new()

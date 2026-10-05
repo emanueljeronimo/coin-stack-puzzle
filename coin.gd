@@ -50,6 +50,7 @@ var is_wildcard := false
 var wildcard_original_row := -1
 var _transform_tween: Tween = null
 var _number_font: FontVariation = null
+var _number_root: Node2D = null
 
 func _ready() -> void:
 	input_pickable = false
@@ -59,6 +60,7 @@ func _ready() -> void:
 	if label:
 		label.z_index = 5
 		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_ensure_number_root()
 		_ensure_number_font()
 		center_number()
 	else:
@@ -66,8 +68,18 @@ func _ready() -> void:
 	configure_collision()
 	update_display()
 
-func _process(_delta: float) -> void:
-	center_number()
+
+func _process(_delta: float) -> void:center_number()
+
+func _ensure_number_root() -> void:
+	if label == null or _number_root != null:
+		return
+	_number_root = Node2D.new()
+	_number_root.name = "NumberRoot"
+	_number_root.z_index = 5
+	add_child(_number_root)
+	label.reparent(_number_root, false)
+	_number_root.scale = Vector2(NUMBER_WIDTH_SCALE, 1.0)
 
 func _ensure_number_font() -> void:
 	if label == null or _number_font != null:
@@ -80,7 +92,6 @@ func _ensure_number_font() -> void:
 	_number_font = FontVariation.new()
 	_number_font.base_font = base
 	_number_font.spacing_glyph = NUMBER_GLYPH_SPACING
-	_number_font.variation_transform = Transform2D(0.0, Vector2(NUMBER_WIDTH_SCALE, 1.0), 0.0, Vector2.ZERO)
 	label.add_theme_font_override("font", _number_font)
 
 func center_number() -> void:

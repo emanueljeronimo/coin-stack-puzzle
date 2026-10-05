@@ -40,4 +40,7 @@ func _test_reason_helpers() -> void:
 	if not AdjacentSlotPurchaseServiceScript.is_free_unlock("free_unlock"):
 		_fail("free_unlock_helper")
 		return
+	if AdjacentSlotPurchaseServiceScript.confirm_copy(600) != "¿Comprar ranura extra por 600?":
+		_fail("confirm_copy", AdjacentSlotPurchaseServiceScript.confirm_copy(600))
+		return
 	_ok("reason_helpers")

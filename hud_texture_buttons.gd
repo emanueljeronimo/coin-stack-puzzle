@@ -3,8 +3,8 @@ extends RefCounted
 
 const LongButtonTexture := preload("res://Imagenes/boton-largo.png")
 const RoundButtonTexture := preload("res://Imagenes/boton-redondo.png")
-const PlayPastelButtonTexture := preload("res://Imagenes/boton-jugar-ahora-pastel.png")
-const PlayButtonTexture := preload("res://Imagenes/boton-jugar_ahora.png")
+const PlayPastelButtonTexture := preload("res://Imagenes/boton-nuevo.png")
+const PlayButtonTexture := preload("res://Imagenes/boton-nuevo.png")
 const LogoFont := preload("res://Fonts/Chewy-Regular.ttf")
 const GameLivesServiceScript := preload("res://game_lives_service.gd")
 const SlotOverlayBgScript := preload("res://slot_overlay_bg.gd")

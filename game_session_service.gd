@@ -63,12 +63,12 @@ static func build_save_payload(state: Dictionary) -> Dictionary:
 		"next_free_slot_unlock_level": int(state.get("next_free_slot_unlock_level", 1)),
 		"temp_slot_actions_remaining": int(state.get("temp_slot_actions_remaining", 0)),
 		"lives": int(state.get("lives", 0)),
-		"gems": int(state.get("gems", 0)),
 		"player_stars": int(state.get("player_stars", 0)),
 	}
 
 static func parse_save_payload(data: Dictionary, defaults: Dictionary) -> Dictionary:
 	var parsed := defaults.duplicate(true)
+	parsed.erase("gems")
 	if data.is_empty():
 		return parsed
 	parsed["checkpoint_level"] = maxi(1, int(data.get("checkpoint_level", parsed["checkpoint_level"])))
@@ -81,7 +81,6 @@ static func parse_save_payload(data: Dictionary, defaults: Dictionary) -> Dictio
 	parsed["next_free_slot_unlock_level"] = int(data.get("next_free_slot_unlock_level", parsed["next_free_slot_unlock_level"]))
 	parsed["temp_slot_actions_remaining"] = maxi(0, int(data.get("temp_slot_actions_remaining", parsed["temp_slot_actions_remaining"])))
 	parsed["lives"] = int(data.get("lives", parsed["lives"]))
-	parsed["gems"] = int(data.get("gems", parsed["gems"]))
 	parsed["player_stars"] = int(data.get("player_stars", data.get("coins", parsed["player_stars"])))
 	var cp: Variant = data.get("checkpoint_snapshot", {})
 	if cp is Dictionary and not cp.is_empty():

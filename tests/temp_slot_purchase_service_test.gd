@@ -41,4 +41,7 @@ func _test_messages() -> void:
 	if TempSlotPurchaseServiceScript.message_for_rejection("insufficient_stars", 7, 3).is_empty():
 		_fail("insufficient_message")
 		return
+	if TempSlotPurchaseServiceScript.confirm_copy(200) != "¿Comprar ranura temporal por 200?":
+		_fail("confirm_copy", TempSlotPurchaseServiceScript.confirm_copy(200))
+		return
 	_ok("messages")

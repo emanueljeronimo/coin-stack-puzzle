@@ -23,6 +23,23 @@ const _UNLOCK_WALK_GUARD := 128
 static func is_coin_wildcard_value(value: int) -> bool:
 	return int(value) == COIN_WILDCARD_VALUE
 
+static func can_stack_receive_value(top_value: int, incoming_value: int, stack_full: bool) -> bool:
+	if stack_full:
+		return false
+	if is_coin_wildcard_value(incoming_value):
+		return true
+	if top_value < 0 or is_coin_wildcard_value(top_value):
+		return true
+	return top_value == incoming_value
+
+## Incoming dropped onto below. convert: "incoming" | "below". Empty if no match.
+static func attached_wildcard_resolution(below_value: int, incoming_value: int) -> Dictionary:
+	if is_coin_wildcard_value(incoming_value) and below_value >= 1:
+		return {"convert": "incoming", "value": below_value}
+	if is_coin_wildcard_value(below_value) and incoming_value >= 1:
+		return {"convert": "below", "value": incoming_value}
+	return {}
+
 static func coin_value_from_board_row(board_row_index: int) -> int:
 	return maxi(1, int(board_row_index) + 1)
 

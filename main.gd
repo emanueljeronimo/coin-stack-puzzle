@@ -311,8 +311,6 @@ var wildcard_unlock_granted := {
 	"glove": false,
 }
 var undo_snapshot: Dictionary = {}
-## Balance de gemas (reservado / futuro IAP); las compras en partida usan player_stars.
-var gems: int = 756
 ## Mock para compras de ranura extra adyacente (no es la ranura temporal).
 var player_stars: int = 1000000
 var adjacent_slot_next_price: int = ADJACENT_EXTRA_SLOT_BASE_PRICE
@@ -350,6 +348,17 @@ var adjacent_slot_offer_lbl_cost: Label = null
 var adjacent_slot_offer_cost_icon: TextureRect = null
 var adjacent_slot_star_error_label: Label = null
 var adjacent_slot_star_error_tween: Tween = null
+## Cartel confirmar compra de ranura temporal / extra.
+var slot_buy_overlay: ColorRect = null
+var slot_buy_card: Panel = null
+var slot_buy_margin: MarginContainer = null
+var slot_buy_vbox: VBoxContainer = null
+var slot_buy_icon: TextureRect = null
+var slot_buy_title_label: Label = null
+var slot_buy_accept_button: Control = null
+var slot_buy_cancel_button: Control = null
+var pending_slot_buy_kind: String = ""
+var _slot_buy_opened_at_msec: int = 0
 var stars_chip_shadow: Panel = null
 var stars_chip: Control = null
 var stars_chip_icon: TextureRect = null
@@ -365,13 +374,13 @@ var purchase_buy_button: Button = null
 var purchase_buy_center: CenterContainer = null
 var purchase_buy_content: HBoxContainer = null
 var purchase_buy_qty_label: Label = null
-var purchase_buy_gem_icon: TextureRect = null
+var purchase_buy_star_icon: TextureRect = null
 var purchase_buy_cost_label: Label = null
 var purchase_buy_pack_button: Button = null
 var purchase_buy_pack_center: CenterContainer = null
 var purchase_buy_pack_content: HBoxContainer = null
 var purchase_buy_pack_qty_label: Label = null
-var purchase_buy_pack_gem_icon: TextureRect = null
+var purchase_buy_pack_star_icon: TextureRect = null
 var purchase_buy_pack_cost_label: Label = null
 var purchase_close_button: Button = null
 var pending_purchase_type: String = ""
@@ -437,6 +446,7 @@ func _ready() -> void:
 	_apply_theme_ui_colors()
 	save_game()
 	configure_process_for_temp_slot()
+	_consume_pending_shop_temp_slots()
 	queue_redraw()
 	print_status()
 	GameState.start_board_music()
@@ -986,7 +996,6 @@ func collect_save_dict(_payload: Dictionary = {}) -> Dictionary:
 		"next_free_slot_unlock_level": next_free_slot_unlock_level,
 		"temp_slot_actions_remaining": temp_slot_actions_remaining,
 		"lives": GameState.lives,
-		"gems": gems,
 		"player_stars": player_stars,
 	})
 
@@ -1006,7 +1015,6 @@ func apply_save_dict(data: Dictionary) -> void:
 		"next_free_slot_unlock_level": GameRulesScript.initial_free_slot_unlock_level(get_cycle_base_level()),
 		"temp_slot_actions_remaining": temp_slot_actions_remaining,
 		"lives": lives,
-		"gems": gems,
 		"player_stars": player_stars,
 		"checkpoint_base_value": CHECKPOINT_BASE_VALUE,
 	})
@@ -1021,7 +1029,6 @@ func apply_save_dict(data: Dictionary) -> void:
 	next_free_slot_unlock_level = int(parsed.get("next_free_slot_unlock_level", next_free_slot_unlock_level))
 	temp_slot_actions_remaining = int(parsed.get("temp_slot_actions_remaining", temp_slot_actions_remaining))
 	lives = GameState.lives
-	gems = int(parsed.get("gems", gems))
 	player_stars = int(parsed.get("player_stars", player_stars))
 	runtime_snapshot = (parsed.get("runtime_snapshot", {}) as Dictionary).duplicate(true)
 	if not data.has("roll_value_floor") and not checkpoint_snapshot.has("roll_value_floor"):
@@ -1038,7 +1045,8 @@ func _input(event: InputEvent) -> void:
 		level_up_overlay,
 		wildcard_unlock_overlay,
 		no_moves_overlay,
-		purchase_overlay
+		purchase_overlay,
+		slot_buy_overlay
 	):
 		return
 	if MainInputRouterScript.is_left_click(event):
@@ -1061,9 +1069,11 @@ func _input(event: InputEvent) -> void:
 			return
 		if is_click_on_adjacent_extra_slot_offer(event.position):
 			try_purchase_adjacent_extra_slot()
+			get_viewport().set_input_as_handled()
 			return
 		if is_click_on_temp_slot_cell(event.position):
 			try_purchase_temp_slot()
+			get_viewport().set_input_as_handled()
 			return
 		if hammer_mode_active:
 			var hammer_stack = get_stack_at_point(event.position)
@@ -1094,6 +1104,7 @@ func handle_glove_click(mouse_pos: Vector2) -> void:
 			return
 		selected_stack = clicked_stack
 		selected_stack.set_selected(true)
+		GameState.play_coin_sound(int(selected_stack.top_block_size()))
 		queue_redraw()
 		print(MainMoveInteractionServiceScript.glove_prompt_pick_destination())
 		return
@@ -1103,6 +1114,7 @@ func handle_glove_click(mouse_pos: Vector2) -> void:
 	# No pisar undo_snapshot: se capturó al activar el guante (tablero + comodín previos).
 	var moved = selected_stack.move_top_block_to(clicked_stack, true)
 	if moved > 0:
+		GameState.play_coin_sound(int(moved))
 		_update_undo_button_state()
 		glove_mode_active = false
 		board_locked = true
@@ -1125,6 +1137,7 @@ func handle_click(mouse_pos: Vector2) -> void:
 			return
 		selected_stack = clicked_stack
 		selected_stack.set_selected(true)
+		GameState.play_coin_sound(int(selected_stack.top_block_size()))
 		queue_redraw()
 		return
 	if selected_stack == clicked_stack:
@@ -1133,6 +1146,7 @@ func handle_click(mouse_pos: Vector2) -> void:
 	var pre_move_snapshot := capture_board_snapshot()
 	var moved = selected_stack.move_top_block_to(clicked_stack)
 	if moved > 0:
+		GameState.play_coin_sound(int(moved))
 		undo_snapshot = pre_move_snapshot
 		_update_undo_button_state()
 		board_locked = true
@@ -1170,14 +1184,12 @@ func go_to_home() -> void:
 func _sync_player_resources_from_game_state() -> void:
 	lives = GameState.lives
 	player_stars = GameState.player_stars
-	gems = GameState.gems
 	checkpoint_level = maxi(1, GameState.player_level)
 	if GameState.checkpoint_snapshot is Dictionary and not GameState.checkpoint_snapshot.is_empty():
 		checkpoint_snapshot = GameState.checkpoint_snapshot.duplicate(true)
 
 func _push_player_resources_to_game_state() -> void:
 	GameState.player_stars = player_stars
-	GameState.gems = gems
 	GameState.player_level = checkpoint_level
 	GameState.checkpoint_snapshot = checkpoint_snapshot.duplicate(true)
 
@@ -1346,6 +1358,7 @@ func check_blocked_state() -> void:
 		level_up_overlay,
 		wildcard_unlock_overlay,
 		no_moves_overlay,
+		slot_buy_overlay,
 	]):
 		return
 	if has_pending_coin_animations():
@@ -1521,32 +1534,39 @@ func refresh_all_stack_layout() -> void:
 			stacks[i].normalize_coin_scales()
 
 func try_purchase_temp_slot() -> void:
+	_show_slot_buy_confirm("temp")
+
+func _try_open_temp_slot(cost_stars: int) -> bool:
 	var request := TempSlotPurchaseServiceScript.build_purchase_request(
-		player_stars,
+		player_stars if cost_stars > 0 else maxi(player_stars, cost_stars),
 		temp_slot_bonus_active,
 		has_active_temp_stack()
 	)
 	var rules := TempSlotPurchaseServiceScript.build_rules(
-		TEMP_SLOT_COST_STARS,
+		maxi(0, cost_stars),
 		TEMP_SLOT_DURATION_SEC,
 		GameRulesScript.TEMP_SLOT_ACTIONS_TO_CLOSE if GameRulesScript.TEMP_SLOT_CLOSE_BY_ACTIONS else 0
 	)
 	var economy := GameEconomyServiceScript.purchase_temp_slot(request, rules)
 	if not bool(economy.get("ok", false)):
-		var reason := str(economy.get("reason", ""))
-		var message := TempSlotPurchaseServiceScript.message_for_rejection(
-			reason,
-			int(economy.get("required", TEMP_SLOT_COST_STARS)),
-			int(economy.get("current", player_stars))
-		)
-		if not message.is_empty():
-			print(message)
-		return
+		if cost_stars > 0:
+			var reason := str(economy.get("reason", ""))
+			var message := TempSlotPurchaseServiceScript.message_for_rejection(
+				reason,
+				int(economy.get("required", TEMP_SLOT_COST_STARS)),
+				int(economy.get("current", player_stars))
+			)
+			if not message.is_empty():
+				print(message)
+		return false
 
 	if temp_slot_bonus_active and has_active_temp_stack():
-		print("Ya tenés una ranura temporal activa.")
-		return
-	player_stars = int(economy.get("player_stars", player_stars))
+		if cost_stars > 0:
+			print("Ya tenés una ranura temporal activa.")
+		return false
+	if cost_stars > 0:
+		player_stars = int(economy.get("player_stars", player_stars))
+		update_stars_display()
 	_clear_undo_snapshot()
 	temp_slot_bonus_active = bool(economy.get("temp_slot_bonus_active", true))
 	append_new_stack_node()
@@ -1562,12 +1582,27 @@ func try_purchase_temp_slot() -> void:
 		)
 	)
 	_temp_slot_timer_shown_sec = -1
-	update_stars_display()
 	configure_process_for_temp_slot()
 	_sync_slot_overlay_controls()
 	queue_redraw()
 	save_game()
 	print("Ranura temporal abierta por %.0f s." % TEMP_SLOT_DURATION_SEC)
+	return true
+
+func _consume_pending_temp_slot() -> void:
+	if SaveManager == null:
+		return
+	var pending: int = int(SaveManager.player_data.get("pending_temp_slots", 0))
+	SaveManager.player_data["pending_temp_slots"] = maxi(0, pending - 1)
+
+func _consume_pending_shop_temp_slots() -> void:
+	if SaveManager == null:
+		return
+	var pending: int = int(SaveManager.player_data.get("pending_temp_slots", 0))
+	if pending <= 0:
+		return
+	if _try_open_temp_slot(0):
+		_consume_pending_temp_slot()
 
 func close_temporary_slot() -> void:
 	if not temp_slot_bonus_active:
@@ -2266,6 +2301,7 @@ func _on_viewport_resized() -> void:
 	layout_no_moves_dialog_controls()
 	layout_level_up_dialog_controls()
 	layout_wildcard_unlock_dialog_controls()
+	layout_slot_buy_confirm_dialog()
 	_sync_slot_overlay_controls()
 	queue_redraw()
 
@@ -2352,6 +2388,7 @@ func _apply_dialog_cards_theme_colors() -> void:
 	_apply_cta_border_dialog_card(no_moves_card)
 	_apply_cta_border_dialog_card(level_up_card)
 	_apply_cta_border_dialog_card(wildcard_unlock_card)
+	_apply_cta_border_dialog_card(slot_buy_card)
 	_apply_settings_style_card(purchase_card, 30, 4)
 
 func _apply_purchase_dialog_theme_colors() -> void:
@@ -2769,6 +2806,10 @@ func is_click_on_adjacent_extra_slot_offer(mouse_pos: Vector2) -> bool:
 
 
 func try_purchase_adjacent_extra_slot() -> void:
+	_show_slot_buy_confirm("adjacent")
+
+
+func _execute_adjacent_slot_purchase() -> void:
 	_reconcile_future_free_slot_unlock_cursor()
 	var request := AdjacentSlotPurchaseServiceScript.build_purchase_request(
 		adjacent_offer_board_index,
@@ -3126,6 +3167,7 @@ func _bind_hud_chip_click(chip: Control, callback: Callable) -> void:
 		return
 	chip.gui_input.connect(func(event: InputEvent) -> void:
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			GameState.play_button_sound()
 			callback.call()
 	)
 
@@ -3142,8 +3184,38 @@ func _ensure_shop_ui() -> void:
 		add_child(shop_layer)
 	shop_ui = ShopOverlay.new()
 	shop_layer.add_child(shop_ui)
+	if not shop_ui.stars_purchased.is_connected(_on_shop_stars_purchased):
+		shop_ui.stars_purchased.connect(_on_shop_stars_purchased)
+	if not shop_ui.combo_purchased.is_connected(_on_shop_combo_purchased):
+		shop_ui.combo_purchased.connect(_on_shop_combo_purchased)
+	if not shop_ui.wildcard_purchased.is_connected(_on_shop_wildcard_purchased):
+		shop_ui.wildcard_purchased.connect(_on_shop_wildcard_purchased)
+
+func _on_shop_stars_purchased(_amount: int) -> void:
+	player_stars = GameState.player_stars
+	update_stars_display()
+
+func _on_shop_combo_purchased(pack: Dictionary) -> void:
+	player_stars = GameState.player_stars
+	update_stars_display()
+	lives = GameState.lives
+	update_life_display()
+	var wildcards: int = int(pack.get("wildcards", 0))
+	if wildcards > 0:
+		add_wildcard_use("mix", wildcards, false)
+	if int(pack.get("temp_slots", 0)) > 0:
+		if _try_open_temp_slot(0):
+			_consume_pending_temp_slot()
+
+func _on_shop_wildcard_purchased(wildcard_type: String, amount: int) -> void:
+	player_stars = GameState.player_stars
+	update_stars_display()
+	if amount > 0 and not wildcard_type.is_empty():
+		add_wildcard_use(wildcard_type, amount, false)
+	save_game()
 
 func _on_shop_pressed() -> void:
+	_push_player_resources_to_game_state()
 	if shop_ui == null:
 		_ensure_shop_ui()
 	if shop_ui != null:
@@ -3256,7 +3328,7 @@ func _build_lives_chip() -> Dictionary:
 	var lbl := create_hud_text_label(GameState.get_life_chip_text(), HUD_BOARD_STAT_FONT_SIZE)
 	row.add_child(lbl)
 	if badge.count != null:
-		(badge.count as Label).text = str(GameState.lives)
+		(badge.count as Label).text = GameState.get_life_count_text()
 	return {
 		"shadow": shadow,
 		"panel": panel,
@@ -3299,6 +3371,7 @@ func build_mock_ui() -> void:
 	_bind_hud_chip_click(life_chip, _on_shop_pressed)
 	if life_parts.plus != null:
 		(life_parts.plus as Button).pressed.connect(_on_shop_pressed)
+		GameState.hook_button_sound(life_parts.plus as Button)
 	var stars_parts := HudTextureButtons.create_resource_chip(StarIconTexture, false)
 	stars_chip_parts = stars_parts
 	stars_chip = stars_parts.panel
@@ -3307,6 +3380,7 @@ func build_mock_ui() -> void:
 	_bind_hud_chip_click(stars_chip, _on_shop_pressed)
 	if stars_parts.plus != null:
 		(stars_parts.plus as Button).pressed.connect(_on_shop_pressed)
+		GameState.hook_button_sound(stars_parts.plus as Button)
 	var settings_parts := _build_icon_only_chip(SettingsIconTexture)
 	settings_chip_shadow = settings_parts.shadow
 	settings_chip = settings_parts.panel
@@ -3393,6 +3467,8 @@ func build_mock_ui() -> void:
 	hud_layer.add_child(temp_slot_timer_label)
 
 	build_adjacent_slot_offer_ui()
+
+	build_slot_buy_confirm_dialog()
 
 	settings_layer = CanvasLayer.new()
 	settings_layer.layer = 100
@@ -3607,7 +3683,7 @@ func layout_mock_ui() -> void:
 func update_life_display() -> void:
 	lives = GameState.lives
 	if life_chip_count_label != null:
-		life_chip_count_label.text = str(lives)
+		life_chip_count_label.text = GameState.get_life_count_text()
 	if not life_chip_parts.is_empty():
 		HudTextureButtons.set_resource_chip_value(life_chip_parts, GameState.get_life_chip_text())
 
@@ -3822,9 +3898,9 @@ func consume_wildcard(wildcard_type: String) -> void:
 	_sync_wildcards_into_checkpoint_snapshot()
 	update_wildcard_badges()
 
-func add_wildcard_use(wildcard_type: String, amount: int = 1) -> void:
+func add_wildcard_use(wildcard_type: String, amount: int = 1, require_unlock: bool = true) -> void:
 	wildcard_counts = GameWildcardServiceScript.add_uses(
-		wildcard_counts, wildcard_type, amount, checkpoint_level, WILDCARD_UNLOCK_LEVEL
+		wildcard_counts, wildcard_type, amount, checkpoint_level, WILDCARD_UNLOCK_LEVEL, require_unlock
 	)
 	_sync_wildcards_into_checkpoint_snapshot()
 	update_wildcard_badges()
@@ -3892,11 +3968,6 @@ func update_wildcard_badges() -> void:
 			else:
 				action_count_labels[i].text = str(uses_left) if uses_left > 0 else "+"
 
-func update_gem_display() -> void:
-	## Reservado si más adelante volvés a mostrar gemas en el HUD.
-	pass
-
-
 func update_stars_display() -> void:
 	if not stars_chip_parts.is_empty():
 		HudTextureButtons.set_resource_chip_value(
@@ -3937,7 +4008,7 @@ func build_purchase_dialog() -> void:
 	purchase_buy_center = offer_one.center
 	purchase_buy_content = offer_one.content
 	purchase_buy_qty_label = offer_one.qty_label
-	purchase_buy_gem_icon = offer_one.gem_icon
+	purchase_buy_star_icon = offer_one.star_icon
 	purchase_buy_cost_label = offer_one.cost_label
 	purchase_card.add_child(purchase_buy_button)
 
@@ -3946,7 +4017,7 @@ func build_purchase_dialog() -> void:
 	purchase_buy_pack_center = offer_pack.center
 	purchase_buy_pack_content = offer_pack.content
 	purchase_buy_pack_qty_label = offer_pack.qty_label
-	purchase_buy_pack_gem_icon = offer_pack.gem_icon
+	purchase_buy_pack_star_icon = offer_pack.star_icon
 	purchase_buy_pack_cost_label = offer_pack.cost_label
 	purchase_card.add_child(purchase_buy_pack_button)
 
@@ -4054,7 +4125,7 @@ func layout_purchase_dialog_controls() -> void:
 		purchase_buy_center,
 		purchase_buy_content,
 		purchase_buy_qty_label,
-		purchase_buy_gem_icon,
+		purchase_buy_star_icon,
 		purchase_buy_cost_label,
 		Vector2(one_x, btn_y),
 		Vector2(btn_w, btn_h),
@@ -4065,7 +4136,7 @@ func layout_purchase_dialog_controls() -> void:
 		purchase_buy_pack_center,
 		purchase_buy_pack_content,
 		purchase_buy_pack_qty_label,
-		purchase_buy_pack_gem_icon,
+		purchase_buy_pack_star_icon,
 		purchase_buy_pack_cost_label,
 		Vector2(pack_x, btn_y),
 		Vector2(btn_w, btn_h),
@@ -4081,7 +4152,7 @@ func _layout_purchase_offer_button(
 	center: CenterContainer,
 	content: HBoxContainer,
 	qty_label: Label,
-	gem_icon: TextureRect,
+	star_icon: TextureRect,
 	cost_label: Label,
 	pos: Vector2,
 	size: Vector2,
@@ -4101,10 +4172,10 @@ func _layout_purchase_offer_button(
 		content.add_theme_constant_override("separation", int(10 * scale))
 	if qty_label != null:
 		qty_label.add_theme_font_size_override("font_size", int(36 * scale))
-	if gem_icon != null:
-		var gem_icon_size = 42.0 * scale
-		gem_icon.custom_minimum_size = Vector2(gem_icon_size, gem_icon_size)
-		gem_icon.size = Vector2(gem_icon_size, gem_icon_size)
+	if star_icon != null:
+		var star_icon_size := 42.0 * scale
+		star_icon.custom_minimum_size = Vector2(star_icon_size, star_icon_size)
+		star_icon.size = Vector2(star_icon_size, star_icon_size)
 	if cost_label != null:
 		cost_label.add_theme_font_size_override("font_size", int(40 * scale))
 
@@ -4325,6 +4396,148 @@ func layout_no_moves_dialog_controls() -> void:
 	_layout_dialog_gradient_button(no_moves_buy_button, btn_w, ui_scale, DIALOG_BTN_FONT_SIZE)
 	_layout_dialog_gradient_button(no_moves_ad_button, btn_w, ui_scale, DIALOG_BTN_FONT_SIZE)
 
+func build_slot_buy_confirm_dialog() -> void:
+	slot_buy_overlay = DialogBuilderServiceScript.create_modal_overlay(0.45, 330)
+	slot_buy_overlay.gui_input.connect(_on_slot_buy_dimmer_input)
+	hud_layer.add_child(slot_buy_overlay)
+
+	slot_buy_card = _create_dialog_card(false)
+	slot_buy_card.clip_contents = false
+	slot_buy_card.z_as_relative = false
+	slot_buy_card.z_index = 331
+	slot_buy_overlay.add_child(slot_buy_card)
+
+	slot_buy_margin = MarginContainer.new()
+	slot_buy_margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	slot_buy_margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	slot_buy_card.add_child(slot_buy_margin)
+
+	slot_buy_vbox = VBoxContainer.new()
+	slot_buy_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	slot_buy_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	slot_buy_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	slot_buy_vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	slot_buy_vbox.add_theme_constant_override("separation", 16)
+	slot_buy_margin.add_child(slot_buy_vbox)
+
+	slot_buy_icon = TextureRect.new()
+	slot_buy_icon.texture = StarIconTexture
+	slot_buy_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	slot_buy_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	slot_buy_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	slot_buy_icon.custom_minimum_size = Vector2(72, 72)
+	slot_buy_icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	slot_buy_vbox.add_child(slot_buy_icon)
+
+	slot_buy_title_label = create_label("¿Comprar?", 48, HudTextureButtons.BTN_TEXT_COLOR)
+	_style_dialog_title_label(slot_buy_title_label, 48)
+	slot_buy_title_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	slot_buy_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	slot_buy_title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	slot_buy_vbox.add_child(slot_buy_title_label)
+
+	slot_buy_accept_button = make_dialog_gradient_button("Aceptar")
+	_bind_hud_chip_click(slot_buy_accept_button, _on_slot_buy_accept_pressed)
+	slot_buy_vbox.add_child(slot_buy_accept_button)
+
+	slot_buy_cancel_button = make_dialog_gradient_button("Cancelar")
+	_bind_hud_chip_click(slot_buy_cancel_button, _on_slot_buy_cancel_pressed)
+	slot_buy_vbox.add_child(slot_buy_cancel_button)
+
+	_apply_cta_border_dialog_card(slot_buy_card)
+	layout_slot_buy_confirm_dialog()
+
+func layout_slot_buy_confirm_dialog() -> void:
+	if slot_buy_overlay == null or slot_buy_card == null:
+		return
+	var viewport_size: Vector2 = get_viewport_rect().size
+	if viewport_size.x < 2.0 or viewport_size.y < 2.0:
+		return
+	var ui_scale: float = DialogBuilderServiceScript.dialog_scale(viewport_size)
+	var card_w: float = minf(viewport_size.x * 0.86, 720.0 * ui_scale)
+	var pad: float = 32.0 * ui_scale
+	var sep: float = 18.0 * ui_scale
+	var icon_h: float = 80.0 * ui_scale
+	var title_h: float = 110.0 * ui_scale
+	var btn_h: float = DIALOG_BTN_HEIGHT * ui_scale * 0.72
+	var card_h: float = pad * 2.0 + icon_h + title_h + btn_h * 2.0 + sep * 3.0
+	var card_size := Vector2(card_w, card_h)
+	slot_buy_card.size = card_size
+	slot_buy_card.position = (viewport_size - card_size) * 0.5
+	if slot_buy_margin != null:
+		var m: int = int(round(pad))
+		slot_buy_margin.add_theme_constant_override("margin_left", m)
+		slot_buy_margin.add_theme_constant_override("margin_right", m)
+		slot_buy_margin.add_theme_constant_override("margin_top", m)
+		slot_buy_margin.add_theme_constant_override("margin_bottom", m)
+	if slot_buy_vbox != null:
+		slot_buy_vbox.add_theme_constant_override("separation", int(round(sep)))
+	if slot_buy_icon != null:
+		slot_buy_icon.custom_minimum_size = Vector2(icon_h, icon_h)
+	if slot_buy_title_label != null:
+		_style_dialog_title_label(slot_buy_title_label, int(42.0 * ui_scale))
+	var btn_w: float = card_size.x - pad * 2.0
+	_layout_dialog_gradient_button(slot_buy_accept_button, btn_w, ui_scale, DIALOG_BTN_FONT_SIZE)
+	_layout_dialog_gradient_button(slot_buy_cancel_button, btn_w, ui_scale, DIALOG_BTN_FONT_SIZE)
+
+func _show_slot_buy_confirm(kind: String) -> void:
+	if slot_buy_overlay == null:
+		return
+	pending_slot_buy_kind = kind
+	var title := ""
+	if kind == "temp":
+		title = TempSlotPurchaseServiceScript.confirm_copy(TEMP_SLOT_COST_STARS)
+	else:
+		title = AdjacentSlotPurchaseServiceScript.confirm_copy(adjacent_slot_next_price)
+	if slot_buy_title_label != null:
+		slot_buy_title_label.text = title
+	slot_buy_overlay.visible = true
+	slot_buy_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	slot_buy_overlay.move_to_front()
+	if hud_layer != null:
+		hud_layer.move_child(slot_buy_overlay, hud_layer.get_child_count() - 1)
+	layout_slot_buy_confirm_dialog()
+	_slot_buy_opened_at_msec = Time.get_ticks_msec()
+
+func _hide_slot_buy_confirm() -> void:
+	pending_slot_buy_kind = ""
+	if slot_buy_overlay != null:
+		slot_buy_overlay.visible = false
+
+func _on_slot_buy_cancel_pressed() -> void:
+	if DialogBuilderServiceScript.should_ignore_open_click(
+		_slot_buy_opened_at_msec,
+		Time.get_ticks_msec()
+	):
+		return
+	_hide_slot_buy_confirm()
+
+func _on_slot_buy_accept_pressed() -> void:
+	if DialogBuilderServiceScript.should_ignore_open_click(
+		_slot_buy_opened_at_msec,
+		Time.get_ticks_msec()
+	):
+		return
+	var kind: String = pending_slot_buy_kind
+	_hide_slot_buy_confirm()
+	if kind == "temp":
+		_try_open_temp_slot(TEMP_SLOT_COST_STARS)
+	elif kind == "adjacent":
+		_execute_adjacent_slot_purchase()
+
+func _on_slot_buy_dimmer_input(event: InputEvent) -> void:
+	if not (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT):
+		return
+	if DialogBuilderServiceScript.should_ignore_open_click(
+		_slot_buy_opened_at_msec,
+		Time.get_ticks_msec()
+	):
+		return
+	var mouse_event := event as InputEventMouseButton
+	if slot_buy_card != null and slot_buy_card.get_global_rect().has_point(mouse_event.global_position):
+		return
+	_hide_slot_buy_confirm()
+
 func show_no_moves_panel() -> void:
 	if no_moves_overlay == null:
 		return
@@ -4346,7 +4559,7 @@ func hide_no_moves_panel() -> void:
 
 ## Con vidas disponibles: solo "Reiniciar". Tras perder la última vida: comprar vidas o ver anuncio.
 func update_no_moves_buttons() -> void:
-	var has_lives := lives > 0
+	var has_lives := GameState.has_playable_life()
 	if no_moves_restart_button != null:
 		no_moves_restart_button.visible = has_lives
 	if no_moves_buy_button != null:
@@ -4372,7 +4585,7 @@ func _on_no_moves_restart_pressed() -> void:
 		return
 	lives = GameState.lives
 	update_life_display()
-	if lives <= 0:
+	if not GameState.has_playable_life():
 		# Se perdió la última vida: no se reinicia. El cartel pasa a ofrecer comprar vidas o ver anuncio.
 		update_no_moves_buttons()
 		layout_no_moves_dialog_controls()

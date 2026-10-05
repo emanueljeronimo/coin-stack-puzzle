@@ -33,6 +33,11 @@ func _test_blocking_rules() -> void:
 	if not MainInputRouterScript.should_block_board_input(null, null, overlay, null, null, null):
 		_fail("blocks_on_visible_overlay")
 		return
+	var slot_buy := ColorRect.new()
+	slot_buy.visible = true
+	if not MainInputRouterScript.should_block_board_input(null, null, null, null, null, null, slot_buy):
+		_fail("blocks_on_slot_buy_overlay")
+		return
 	_ok("blocking_rules")
 
 func _test_control_click_consumption() -> void:

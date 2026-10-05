@@ -1,6 +1,8 @@
 class_name DialogBuilderService
 extends RefCounted
 
+const OPEN_CLICK_GRACE_MSEC := 250
+
 static func create_modal_overlay(alpha: float, z_index: int) -> ColorRect:
 	var overlay := ColorRect.new()
 	overlay.color = Color(0.0, 0.0, 0.0, alpha)
@@ -14,3 +16,6 @@ static func create_modal_overlay(alpha: float, z_index: int) -> ColorRect:
 static func dialog_scale(viewport_size: Vector2, min_scale: float = 0.75, max_scale: float = 1.2) -> float:
 	var raw: float = minf(viewport_size.x / 1080.0, viewport_size.y / 1920.0)
 	return clampf(raw, min_scale, max_scale)
+
+static func should_ignore_open_click(opened_at_msec: int, now_msec: int, grace_msec: int = OPEN_CLICK_GRACE_MSEC) -> bool:
+	return now_msec - opened_at_msec < grace_msec

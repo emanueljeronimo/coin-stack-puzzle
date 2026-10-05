@@ -12,6 +12,7 @@ func _run() -> void:
 	print("=== dialog_builder_service test ===")
 	_test_modal_overlay()
 	_test_dialog_scale()
+	_test_should_ignore_open_click()
 	print("=== RESULT: %d passed, %d failed ===" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -46,3 +47,12 @@ func _test_dialog_scale() -> void:
 		_fail("dialog_scale_clamped", "out of range %f" % tiny)
 		return
 	_ok("dialog_scale")
+
+func _test_should_ignore_open_click() -> void:
+	if not DialogBuilderServiceScript.should_ignore_open_click(1000, 1100, 250):
+		_fail("ignore_within_grace")
+		return
+	if DialogBuilderServiceScript.should_ignore_open_click(1000, 1300, 250):
+		_fail("allow_after_grace")
+		return
+	_ok("should_ignore_open_click")

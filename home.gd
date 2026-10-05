@@ -1,12 +1,12 @@
 extends Control
 
 const LobbyScenePath := "res://Lobby.tscn"
-const COVER_PATH := "res://Imagenes/prototipo 1 portada.png"
-const PLAY_BUTTON_PATH := "res://Imagenes/boton-jugar_ahora.png"
+const COVER_PATH := "res://Imagenes/portada-nueva2.png"
+const PLAY_BUTTON_PATH := "res://Imagenes/boton-nuevo.png"
 
 const REF_WIDTH := 1080.0
 
-## Botón Jugar — imagen sobre la portada.
+## Boton Jugar — imagen sobre la portada.
 const PLAY_WIDTH_RATIO := 0.46
 const PLAY_BOTTOM_MARGIN := 0.0
 const PLAY_Y_DROP := 58.0
@@ -22,7 +22,7 @@ func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	cover_texture = _load_texture(COVER_PATH, "res://Imagenes/home-1.png")
-	play_button_texture = _load_texture(PLAY_BUTTON_PATH, "res://Imagenes/boton-jugar-ahora-pastel.png")
+	play_button_texture = _load_texture(PLAY_BUTTON_PATH, "res://Imagenes/boton-nuevo.png")
 	build_ui()
 	if not get_viewport().size_changed.is_connected(_on_viewport_resized):
 		get_viewport().size_changed.connect(_on_viewport_resized)
@@ -60,6 +60,7 @@ func build_ui() -> void:
 	play_button.focus_mode = Control.FOCUS_NONE
 	play_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	play_button.pressed.connect(_on_play_pressed)
+	GameState.hook_button_sound(play_button)
 	play_button.button_down.connect(_on_play_button_down)
 	play_button.button_up.connect(_on_play_button_up)
 	play_button.mouse_exited.connect(_on_play_button_up)

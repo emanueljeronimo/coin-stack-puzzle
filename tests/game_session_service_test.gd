@@ -72,13 +72,16 @@ func _test_parse_save_payload_fallbacks() -> void:
 		"next_free_slot_unlock_level": 4,
 		"temp_slot_actions_remaining": 0,
 		"lives": 5,
-		"gems": 10,
 		"player_stars": 999,
 		"checkpoint_base_value": 5,
+		"gems": 10,
 	}
 	var parsed := GameSessionServiceScript.parse_save_payload({}, defaults)
 	if int(parsed.get("max_value", 0)) != 5:
 		_fail("parse_fallback_max_value", str(parsed))
+		return
+	if parsed.has("gems"):
+		_fail("parse_drops_gems", str(parsed))
 		return
 	_ok("parse_payload_fallbacks")
 
@@ -94,7 +97,6 @@ func _test_parse_save_payload_with_data() -> void:
 		"next_free_slot_unlock_level": 4,
 		"temp_slot_actions_remaining": 0,
 		"lives": 5,
-		"gems": 10,
 		"player_stars": 999,
 		"checkpoint_base_value": 5,
 	}
@@ -110,7 +112,6 @@ func _test_parse_save_payload_with_data() -> void:
 		"temp_slot_actions_remaining": -3,
 		"coins": 1234,
 		"lives": 2,
-		"gems": 88,
 		"runtime_snapshot": {"foo": 1},
 	}, defaults)
 	if int(parsed.get("temp_slot_actions_remaining", 1)) != 0:

@@ -5,11 +5,11 @@ signal music_enabled_changed(enabled: bool)
 signal lives_changed
 
 const GameLivesServiceScript = preload("res://game_lives_service.gd")
+const UiSfxServiceScript = preload("res://ui_sfx_service.gd")
 
 ## Recursos del jugador compartidos entre Lobby y partida.
 const INITIAL_LIVES := 5
-const INITIAL_STARS := 100000
-const INITIAL_GEMS := 756
+const INITIAL_STARS := 3000
 
 const SETTINGS_PATH := "user://settings.cfg"
 const DEFAULT_BACKGROUND_THEME_ID := "fondo2-verde"
@@ -115,8 +115,8 @@ const UI_PALETTES_BY_THEME := {
 
 var lives: int = INITIAL_LIVES
 var next_free_life_unix: int = 0
+var unlimited_lives_until_unix: int = 0
 var player_stars: int = INITIAL_STARS
-var gems: int = INITIAL_GEMS
 var player_level: int = 1
 var username: String = ""
 var checkpoint_snapshot: Dictionary = {}
@@ -128,18 +128,33 @@ var vibration_enabled: bool = true
 var _background_textures: Dictionary = {}
 var _board_music_player: AudioStreamPlayer = null
 var _board_music_active: bool = false
+var _button_sfx_player: AudioStreamPlayer = null
+var _coin_sfx_player: AudioStreamPlayer = null
 var _life_hud_tick: float = 0.0
 
 func _ready() -> void:
 	load_settings()
 	_ensure_board_music_player()
+	_ensure_button_sfx_player()
+	_ensure_coin_sfx_player()
 
 func _process(delta: float) -> void:
+	var now: int = _now_unix()
+	if unlimited_lives_until_unix > 0:
+		_life_hud_tick += delta
+		if _life_hud_tick < 1.0:
+			return
+		_life_hud_tick = 0.0
+		var expired: bool = _expire_unlimited_if_needed(now)
+		lives_changed.emit()
+		if expired:
+			_persist_lives()
+		return
 	if lives >= GameLivesServiceScript.MAX_LIVES:
 		_life_hud_tick = 0.0
 		return
 	_life_hud_tick += delta
-	if next_free_life_unix > 0 and _now_unix() >= next_free_life_unix:
+	if next_free_life_unix > 0 and now >= next_free_life_unix:
 		refresh_lives(true)
 		_life_hud_tick = 0.0
 		return
@@ -153,8 +168,39 @@ func _now_unix() -> int:
 func get_life_regen_remaining() -> int:
 	return GameLivesServiceScript.remaining_seconds(lives, next_free_life_unix, _now_unix())
 
+func is_unlimited_lives() -> bool:
+	return GameLivesServiceScript.is_unlimited(unlimited_lives_until_unix, _now_unix())
+
+func has_playable_life() -> bool:
+	return is_unlimited_lives() or lives > 0
+
+func get_life_count_text() -> String:
+	if is_unlimited_lives():
+		return "∞"
+	return str(lives)
+
 func get_life_chip_text() -> String:
+	_expire_unlimited_if_needed(_now_unix())
+	if is_unlimited_lives():
+		return GameLivesServiceScript.format_countdown(
+			GameLivesServiceScript.unlimited_remaining(unlimited_lives_until_unix, _now_unix())
+		)
 	return GameLivesServiceScript.format_chip_text(lives, get_life_regen_remaining())
+
+func grant_unlimited_lives(extra_sec: int) -> void:
+	var now: int = _now_unix()
+	unlimited_lives_until_unix = GameLivesServiceScript.grant_unlimited(
+		unlimited_lives_until_unix,
+		now,
+		extra_sec
+	)
+	lives_changed.emit()
+	_persist_lives()
+
+func _expire_unlimited_if_needed(now: int) -> bool:
+	var before: int = unlimited_lives_until_unix
+	unlimited_lives_until_unix = GameLivesServiceScript.expire_unlimited(unlimited_lives_until_unix, now)
+	return unlimited_lives_until_unix != before
 
 func refresh_lives(persist: bool = false) -> bool:
 	var before_lives := lives
@@ -176,6 +222,8 @@ func migrate_life_timer(save_mtime: int) -> void:
 	lives_changed.emit()
 
 func spend_life() -> bool:
+	if is_unlimited_lives():
+		return true
 	var out := GameLivesServiceScript.on_spend(lives, next_free_life_unix, _now_unix())
 	if not bool(out.get("ok", false)):
 		return false
@@ -197,6 +245,7 @@ func _persist_lives() -> void:
 		return
 	SaveManager.player_data["lives"] = lives
 	SaveManager.player_data["next_free_life_unix"] = next_free_life_unix
+	SaveManager.player_data["unlimited_lives_until_unix"] = unlimited_lives_until_unix
 	SaveManager.save_game()
 
 func load_settings() -> void:
@@ -276,6 +325,58 @@ func set_sounds_enabled(enabled: bool) -> void:
 func set_vibration_enabled(enabled: bool) -> void:
 	vibration_enabled = enabled
 	save_settings()
+
+func play_button_sound() -> void:
+	_ensure_button_sfx_player()
+	if not UiSfxServiceScript.should_play_button(sounds_enabled, _button_sfx_player != null):
+		return
+	_button_sfx_player.play()
+
+func hook_button_sound(btn: BaseButton) -> void:
+	if btn == null:
+		return
+	if btn.pressed.is_connected(play_button_sound):
+		return
+	btn.pressed.connect(play_button_sound)
+
+func _ensure_button_sfx_player() -> void:
+	if _button_sfx_player != null:
+		return
+	if DisplayServer.get_name() == "headless":
+		return
+	var stream := load(UiSfxServiceScript.BUTTON_SFX_PATH) as AudioStream
+	if stream == null:
+		push_warning("No se pudo cargar el sonido de boton: %s" % UiSfxServiceScript.BUTTON_SFX_PATH)
+		return
+	stream = stream.duplicate()
+	UiSfxServiceScript.apply_oneshot_stream(stream)
+	_button_sfx_player = AudioStreamPlayer.new()
+	_button_sfx_player.name = "ButtonSfxPlayer"
+	_button_sfx_player.stream = stream
+	add_child(_button_sfx_player)
+
+func play_coin_sound(coin_count: int = 1) -> void:
+	_ensure_coin_sfx_player()
+	if not UiSfxServiceScript.should_play_button(sounds_enabled, _coin_sfx_player != null):
+		return
+	_coin_sfx_player.pitch_scale = UiSfxServiceScript.coin_sfx_pitch(coin_count)
+	_coin_sfx_player.play()
+
+func _ensure_coin_sfx_player() -> void:
+	if _coin_sfx_player != null:
+		return
+	if DisplayServer.get_name() == "headless":
+		return
+	var stream := load(UiSfxServiceScript.COIN_SFX_PATH) as AudioStream
+	if stream == null:
+		push_warning("No se pudo cargar el sonido de ficha: %s" % UiSfxServiceScript.COIN_SFX_PATH)
+		return
+	stream = stream.duplicate()
+	UiSfxServiceScript.apply_oneshot_stream(stream)
+	_coin_sfx_player = AudioStreamPlayer.new()
+	_coin_sfx_player.name = "CoinSfxPlayer"
+	_coin_sfx_player.stream = stream
+	add_child(_coin_sfx_player)
 
 ## Reproduce la música del tablero en loop mientras hay partida activa.
 func start_board_music() -> void:

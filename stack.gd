@@ -80,11 +80,9 @@ func free_slots() -> int:
 	return MAX_CAPACITY - _total_occupied_slots()
 
 func can_receive_value(value: int) -> bool:
-	if is_full():
-		return false
-	if GameRulesScript.is_coin_wildcard_value(value):
-		return true
-	return _effective_top_value_for_receive() in [-1, value]
+	return GameRulesScript.can_stack_receive_value(
+		_effective_top_value_for_receive(), value, is_full()
+	)
 
 func set_selected(selected: bool, animated: bool = true) -> void:
 	is_selected = selected
@@ -315,20 +313,39 @@ func get_row_value() -> int:
 		return -1
 	return GameRulesScript.coin_value_from_board_row(int(board.call("get_stack_board_row", idx)))
 
+func _apply_resolved_wildcard(coin_node: Node, resolved: int) -> void:
+	if coin_node == null or not is_instance_valid(coin_node) or resolved < 1:
+		return
+	if coin_node.has_method("is_wildcard_coin") and coin_node.is_wildcard_coin():
+		if coin_node.has_method("transform_wildcard"):
+			coin_node.transform_wildcard(resolved)
+			return
+	if coin_node.has_method("set_value"):
+		coin_node.set_value(resolved)
+
 func _resolve_attached_wildcard(moving_coin: Node) -> void:
 	if moving_coin == null or not is_instance_valid(moving_coin):
 		return
-	if not moving_coin.has_method("is_wildcard_coin") or not moving_coin.is_wildcard_coin():
-		return
-	# Pasa a ser el número de la ficha que quedó debajo (la pila destino).
 	if coins.size() < 2:
 		return
-	var dest_value := int(coins[coins.size() - 2])
-	if dest_value < 1:
+	var below_idx: int = coins.size() - 2
+	var incoming_idx: int = coins.size() - 1
+	var resolution: Dictionary = GameRulesScript.attached_wildcard_resolution(
+		int(coins[below_idx]), int(coins[incoming_idx])
+	)
+	if resolution.is_empty():
 		return
-	coins[-1] = dest_value
-	if moving_coin.has_method("transform_wildcard"):
-		moving_coin.transform_wildcard(dest_value)
+	var resolved: int = int(resolution.get("value", -1))
+	if resolved < 1:
+		return
+	var convert_which: String = str(resolution.get("convert", ""))
+	if convert_which == "incoming":
+		coins[incoming_idx] = resolved
+		_apply_resolved_wildcard(moving_coin, resolved)
+	elif convert_which == "below":
+		coins[below_idx] = resolved
+		if coin_nodes.size() >= 2:
+			_apply_resolved_wildcard(coin_nodes[below_idx], resolved)
 
 func get_coin_local_position(stack_count: int) -> Vector2:
 	# Apila desde arriba hacia abajo.

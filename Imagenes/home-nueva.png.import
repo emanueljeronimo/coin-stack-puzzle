@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://d3mkiknpwkr87"
-path="res://.godot/imported/prototipo 1 portada.png-42042c1be13b20767d9297108e63f2ce.ctex"
+uid="uid://bttukrqjex43g"
+path="res://.godot/imported/home-nueva.png-61e0fa1229621ff17ce56e22c9f2ef7b.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Imagenes/prototipo 1 portada.png"
-dest_files=["res://.godot/imported/prototipo 1 portada.png-42042c1be13b20767d9297108e63f2ce.ctex"]
+source_file="res://Imagenes/home-nueva.png"
+dest_files=["res://.godot/imported/home-nueva.png-61e0fa1229621ff17ce56e22c9f2ef7b.ctex"]
 
 [params]
 

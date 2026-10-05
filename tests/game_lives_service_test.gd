@@ -18,6 +18,7 @@ func _run() -> void:
 	_test_spend_keeps_running_timer()
 	_test_grant_to_max_clears_timer()
 	_test_chip_format()
+	_test_unlimited_lives()
 	_test_migrate_old_save()
 	print("=== RESULT: %d passed, %d failed ===" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
@@ -95,6 +96,33 @@ func _test_chip_format() -> void:
 		_fail("chip_countdown", GameLivesServiceScript.format_chip_text(3, 1787))
 		return
 	_ok("chip_format")
+
+func _test_unlimited_lives() -> void:
+	var now := 100_000
+	if GameLivesServiceScript.is_unlimited(0, now):
+		_fail("unlimited_off")
+		return
+	var until: int = GameLivesServiceScript.grant_unlimited(0, now, GameLivesServiceScript.UNLIMITED_HOUR_SEC)
+	if until != now + 3600:
+		_fail("grant_hour", str(until))
+		return
+	if not GameLivesServiceScript.is_unlimited(until, now):
+		_fail("unlimited_on")
+		return
+	if GameLivesServiceScript.unlimited_remaining(until, now) != 3600:
+		_fail("remaining_hour")
+		return
+	var stacked: int = GameLivesServiceScript.grant_unlimited(until, now, 3600)
+	if stacked != until + 3600:
+		_fail("stack_hour", str(stacked))
+		return
+	if GameLivesServiceScript.expire_unlimited(now - 1, now) != 0:
+		_fail("expire_past")
+		return
+	if GameLivesServiceScript.expire_unlimited(until, now) != until:
+		_fail("expire_keeps_active")
+		return
+	_ok("unlimited_lives")
 
 func _test_migrate_old_save() -> void:
 	var now := 1_000_000
