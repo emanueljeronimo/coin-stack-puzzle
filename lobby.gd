@@ -286,6 +286,8 @@ func update_displays() -> void:
 			SaveManager.get_avatar_path()
 		)
 	_refresh_daily_login_lock()
+	if daily_login_ui != null:
+		daily_login_ui.apply_pending_grants()
 
 func _hud_pill_radius(scale: float) -> int:
 	return int(HUD_PILL_RADIUS * scale)

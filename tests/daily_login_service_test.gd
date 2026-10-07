@@ -14,6 +14,8 @@ func _run() -> void:
 	_test_claim_chain()
 	_test_slots_and_rotation()
 	_test_level_unlock()
+	_test_unlocked_rotation()
+	_test_pending_grants()
 	print("=== RESULT: %d passed, %d failed ===" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -133,3 +135,37 @@ func _test_level_unlock() -> void:
 		_fail("unlocked_after_5")
 		return
 	_ok("level_unlock")
+
+func _test_unlocked_rotation() -> void:
+	if DailyLoginServiceScript.wildcard_for_day("2026-10-05", 5) != "mix":
+		_fail("level5_mix_a")
+		return
+	if DailyLoginServiceScript.wildcard_for_day("2026-10-06", 5) != "mix":
+		_fail("level5_mix_b")
+		return
+	var at_ten_a: String = DailyLoginServiceScript.wildcard_for_day("2026-10-05", 10)
+	var at_ten_b: String = DailyLoginServiceScript.wildcard_for_day("2026-10-06", 10)
+	if at_ten_a == at_ten_b:
+		_fail("level10_rotates", "%s %s" % [at_ten_a, at_ten_b])
+		return
+	if DailyLoginServiceScript.WILDCARD_TYPES.find(at_ten_a) < 0 or at_ten_a == "glove":
+		_fail("level10_pool", at_ten_a)
+		return
+	if DailyLoginServiceScript.wildcard_for_day("2026-10-07", 6) != "mix":
+		_fail("level6_not_glove")
+		return
+	_ok("unlocked_rotation")
+
+func _test_pending_grants() -> void:
+	var all_pending: Array = DailyLoginServiceScript.pending_grant_indexes(4, 0)
+	if all_pending.size() != 4:
+		_fail("pending_all", str(all_pending))
+		return
+	if not DailyLoginServiceScript.pending_grant_indexes(4, 4).is_empty():
+		_fail("pending_none")
+		return
+	var mid: Array = DailyLoginServiceScript.pending_grant_indexes(3, 1)
+	if mid.size() != 2 or int(mid[0]) != 1 or int(mid[1]) != 2:
+		_fail("pending_mid", str(mid))
+		return
+	_ok("pending_grants")

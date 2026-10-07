@@ -259,10 +259,7 @@ func set_position(pos: Vector2) -> void:
 
 
 func add_coins(amount: int) -> void:
-	var current: int = int(player_data.get("coins", 0))
-	player_data["coins"] = current + amount
-	if GameState != null:
-		GameState.player_stars = int(player_data["coins"])
+	_set_stars(_current_stars() + amount)
 	player_data_changed.emit()
 	save_game()
 
@@ -270,17 +267,27 @@ func add_coins(amount: int) -> void:
 func spend_coins(amount: int) -> bool:
 	if amount <= 0:
 		return false
-	var current: int = int(player_data.get("coins", 0))
-	if GameState != null:
-		current = int(GameState.player_stars)
+	var current: int = _current_stars()
 	if current < amount:
 		return false
-	player_data["coins"] = current - amount
-	if GameState != null:
-		GameState.player_stars = int(player_data["coins"])
+	_set_stars(current - amount)
 	player_data_changed.emit()
 	save_game()
 	return true
+
+
+func _current_stars() -> int:
+	if GameState != null:
+		return int(GameState.player_stars)
+	return int(player_data.get("coins", player_data.get("player_stars", 0)))
+
+
+func _set_stars(value: int) -> void:
+	var next: int = maxi(0, value)
+	player_data["coins"] = next
+	player_data["player_stars"] = next
+	if GameState != null:
+		GameState.player_stars = next
 
 
 func register_session_collector(collector: Callable) -> void:
@@ -383,7 +390,8 @@ func _sync_core_fields_to_player_data() -> void:
 	var level: int = int(player_data.get("checkpoint_level", player_data.get("level", GameState.player_level)))
 	player_data["level"] = level
 	player_data["checkpoint_level"] = level
-	player_data["coins"] = int(player_data.get("player_stars", GameState.player_stars))
+	player_data["coins"] = GameState.player_stars
+	player_data["player_stars"] = GameState.player_stars
 	player_data["lives"] = GameState.lives
 	player_data["next_free_life_unix"] = GameState.next_free_life_unix
 	player_data["unlimited_lives_until_unix"] = GameState.unlimited_lives_until_unix

@@ -28,6 +28,7 @@ var _grid: GridContainer = null
 var _slots: Array[Dictionary] = []
 var _close_menu_btn: Button = null
 var _opened_at_msec: int = 0
+var _applying_pending: bool = false
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -41,6 +42,7 @@ func _ready() -> void:
 func open() -> void:
 	if GameState != null and not DailyLoginServiceScript.is_unlocked(GameState.player_level):
 		return
+	apply_pending_grants()
 	_apply_theme_colors()
 	_refresh_slots()
 	layout_for_viewport(get_viewport_rect().size)
@@ -242,26 +244,67 @@ func _make_slot_cell(index: int) -> Dictionary:
 		"button": btn,
 	}
 
+func _player_level() -> int:
+	if GameState != null:
+		return GameState.player_level
+	return 1
+
+func _slot_defs(day_key: String) -> Array:
+	return DailyLoginServiceScript.slot_defs(day_key, _player_level())
+
 func _load_progress() -> Dictionary:
 	var today: String = DailyLoginServiceScript.local_day_key()
 	var saved_day := ""
 	var saved_claimed := 0
+	var saved_applied := 0
 	if SaveManager != null:
 		saved_day = str(SaveManager.player_data.get("daily_login_day", ""))
 		saved_claimed = int(SaveManager.player_data.get("daily_login_claimed", 0))
-	return DailyLoginServiceScript.synced_progress(saved_day, saved_claimed, today)
+		saved_applied = int(SaveManager.player_data.get("daily_login_applied", 0))
+	return DailyLoginServiceScript.synced_progress(saved_day, saved_claimed, today, saved_applied)
 
-func _save_progress(day_key: String, claimed: int) -> void:
+func _save_progress(day_key: String, claimed: int, applied: int = -1) -> void:
 	if SaveManager == null:
 		return
+	var applied_count: int = claimed if applied < 0 else applied
 	SaveManager.player_data["daily_login_day"] = day_key
 	SaveManager.player_data["daily_login_claimed"] = claimed
+	SaveManager.player_data["daily_login_applied"] = applied_count
 	SaveManager.save_game()
+
+func apply_pending_grants() -> bool:
+	if _applying_pending:
+		return false
+	if GameState != null and not DailyLoginServiceScript.is_unlocked(GameState.player_level):
+		return false
+	var progress: Dictionary = _load_progress()
+	var claimed: int = int(progress.get("claimed", 0))
+	var applied: int = int(progress.get("applied", 0))
+	var pending: Array = DailyLoginServiceScript.pending_grant_indexes(claimed, applied)
+	if pending.is_empty():
+		return false
+	_applying_pending = true
+	var defs: Array = _slot_defs(str(progress.get("day", "")))
+	var granted_any := false
+	for raw_index in pending:
+		var index: int = int(raw_index)
+		if index < 0 or index >= defs.size():
+			continue
+		var slot: Dictionary = defs[index] as Dictionary
+		if str(slot.get("kind", "")) == "unlimited_lives" and GameState != null and GameState.is_unlimited_lives():
+			continue
+		_apply_grant(slot)
+		granted_any = true
+	_save_progress(str(progress.get("day", "")), claimed, claimed)
+	_applying_pending = false
+	if granted_any:
+		rewards_changed.emit()
+	return granted_any
 
 func _refresh_slots() -> void:
 	var progress: Dictionary = _load_progress()
 	var claimed: int = int(progress.get("claimed", 0))
-	var defs: Array = DailyLoginServiceScript.slot_defs(str(progress.get("day", "")))
+	var defs: Array = _slot_defs(str(progress.get("day", "")))
 	for i in range(_slots.size()):
 		if i >= defs.size():
 			continue
@@ -314,14 +357,15 @@ func _on_slot_pressed(index: int) -> void:
 	var claimed: int = int(progress.get("claimed", 0))
 	if not DailyLoginServiceScript.can_claim(index, claimed):
 		return
-	var defs: Array = DailyLoginServiceScript.slot_defs(str(progress.get("day", "")))
+	var defs: Array = _slot_defs(str(progress.get("day", "")))
 	if index < 0 or index >= defs.size():
 		return
 	var result: Dictionary = DailyLoginServiceScript.claim(index, claimed)
 	if not bool(result.get("ok", false)):
 		return
 	_apply_grant(defs[index] as Dictionary)
-	_save_progress(str(progress.get("day", "")), int(result.get("claimed", claimed)))
+	var new_claimed: int = int(result.get("claimed", claimed))
+	_save_progress(str(progress.get("day", "")), new_claimed, new_claimed)
 	_refresh_slots()
 	rewards_changed.emit()
 

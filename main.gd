@@ -461,6 +461,7 @@ func _apply_portrait_orientation() -> void:
 func _exit_tree() -> void:
 	GameState.stop_board_music()
 	save_game()
+	SaveManager.register_session_collector(Callable())
 
 func _process(delta: float) -> void:
 	if temp_slot_time_remaining <= 0.0:
