@@ -202,15 +202,11 @@ func clear_all_coins() -> void:
 	queue_redraw()
 
 func _draw() -> void:
-	# Sin fondo de pila: solo feedback visual.
+	# Sin fondo de pila: la seleccion la marca el recuadro del slot en el tablero.
 	var outer_body = Rect2(
 		Vector2(-STACK_WIDTH / 2.0, -STACK_HEIGHT),
 		Vector2(STACK_WIDTH, STACK_HEIGHT)
 	)
-
-	# Highlight cuando está seleccionada
-	if is_selected:
-		draw_rect(outer_body.grow(4.0), Color(0.72, 0.90, 1.0, 0.45), false, 4.0)
 
 	# Flash temporal para feedback de fusion.
 	if flash_alpha > 0.01:
