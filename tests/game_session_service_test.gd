@@ -15,6 +15,7 @@ func _run() -> void:
 	_test_parse_save_payload_fallbacks()
 	_test_parse_save_payload_with_data()
 	_test_level_up_alert_persistence()
+	_test_refresh_checkpoint_snapshot()
 	print("=== RESULT: %d passed, %d failed ===" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -166,3 +167,15 @@ func _test_level_up_alert_persistence() -> void:
 		_fail("acked_banner_not_replayed", str(none))
 		return
 	_ok("level_up_alert_persistence")
+
+func _test_refresh_checkpoint_snapshot() -> void:
+	if not GameSessionServiceScript.should_refresh_checkpoint_snapshot(8, 7):
+		_fail("refresh_when_board_ahead")
+		return
+	if GameSessionServiceScript.should_refresh_checkpoint_snapshot(7, 7):
+		_fail("no_refresh_when_same")
+		return
+	if GameSessionServiceScript.should_refresh_checkpoint_snapshot(6, 7):
+		_fail("no_refresh_when_behind")
+		return
+	_ok("refresh_checkpoint_snapshot")

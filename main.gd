@@ -32,6 +32,7 @@ const PurchaseOfferFactoryScript = preload("res://purchase_offer_factory.gd")
 const HudLayoutServiceScript = preload("res://hud_layout_service.gd")
 const DialogVisibilityServiceScript = preload("res://dialog_visibility_service.gd")
 const MainFacadeScript = preload("res://main_facade.gd")
+const BoardTutorialServiceScript = preload("res://board_tutorial_service.gd")
 const SlotOverlayBgScript = preload("res://slot_overlay_bg.gd")
 const MixIconTexture = preload("res://Imagenes/icono-mezclar.png")
 const HammerIconTexture = preload("res://Imagenes/icono-martillo.png")
@@ -188,8 +189,7 @@ const BUY_LIVES_COST := 600
 const BUY_LIVES_AMOUNT := INITIAL_LIVES
 ## Vidas que otorga ver un anuncio (mock).
 const AD_LIVES_AMOUNT := 1
-## Sistema de niveles (checkpoints). Patrón por valor V (>=5): crear pila V, pila V >50%, completar pila V (=crear V+1).
-## N1=inicio (solo valores 1..4). N2=crear pila 5. N3=pila 5 >50%. N4=completar pila 5 → crear pila 6. Y así sucesivamente.
+## Sistema de niveles (checkpoints). Ciclo 1: un 4 = N2, un 5 = N3, un 6 = N4; despues mitad/completar.
 const CHECKPOINT_BASE_VALUE := 5
 ## "Mitad o más": la pila alcanza al menos la mitad de su capacidad en fichas de ese valor.
 const CHECKPOINT_HALF_THRESHOLD := STACK_CAPACITY / 2
@@ -213,6 +213,8 @@ var fusion_target_bonus_unlocked: bool = false
 var max_value: int = 5
 ## Piso del generador de fichas (ciclo 1: 1; tras ficha 15: 11; tras 25: 21; …).
 var roll_value_floor: int = 1
+## Tiradas de esta partida (0 = primera: solo 1-2).
+var board_deal_count: int = 0
 ## Ancla de checkpoints post-prestige si el nivel ya iba por delante del hito (0 = ciclo 1).
 var cycle_checkpoint_origin: int = 0
 ## Revisión de reglas de ciclo (cura el salto 21→23 de saves viejos).
@@ -267,6 +269,9 @@ var settings_chip: Control = null
 var settings_chip_icon: TextureRect = null
 var settings_ui: SettingsOverlay = null
 var shop_ui: ShopOverlay = null
+var tutorial_layer: CanvasLayer = null
+var tutorial_ui: BoardTutorialOverlay = null
+var _tutorial_step: String = ""
 var progress_container: Panel = null
 var progress_fill: TextureRect = null
 var progress_knob: Panel = null
@@ -447,6 +452,7 @@ func _ready() -> void:
 	save_game()
 	configure_process_for_temp_slot()
 	_consume_pending_shop_temp_slots()
+	_boot_board_tutorial()
 	queue_redraw()
 	print_status()
 	GameState.start_board_music()
@@ -596,18 +602,24 @@ func setup_board() -> void:
 	current_level = 1
 	max_value = CHECKPOINT_BASE_VALUE
 	roll_value_floor = 1
+	board_deal_count = 0
 	cycle_checkpoint_origin = 0
 	cycle_rules_revision = GameEngineScript.CYCLE_RULES_REVISION
 	active_stacks = INITIAL_PERMANENT_STACKS
 	reset_wildcard_state()
 	clear_board_stacks()
 	create_stack_nodes(active_stacks)
-	fill_board_initial_random()
+	if BoardTutorialServiceScript.should_start(_tutorial_is_saved_done(), checkpoint_level):
+		_fill_tutorial_board()
+		_set_tutorial_step(BoardTutorialServiceScript.STEP_MERGE, false)
+	else:
+		fill_board_initial_random()
 	refresh_fusion_target_bonus_unlock()
 	capture_checkpoint_snapshot()
 	_sync_slot_overlay_controls()
 	update_progress_bar(false)
 	_clear_undo_snapshot()
+	_refresh_tutorial_overlay()
 
 func _capture_stack_data() -> Array:
 	var stack_data: Array = []
@@ -657,6 +669,8 @@ func _clear_undo_snapshot() -> void:
 	_update_undo_button_state()
 
 func can_undo() -> bool:
+	if BoardTutorialServiceScript.is_active(_tutorial_step):
+		return false
 	if undo_snapshot.is_empty() or has_pending_coin_animations() or board_locked:
 		return false
 	if level_up_overlay != null and level_up_overlay.visible:
@@ -1133,6 +1147,15 @@ func handle_click(mouse_pos: Vector2) -> void:
 		print("Click fuera de pila.")
 		clear_selection()
 		return
+	var clicked_idx: int = stacks.find(clicked_stack)
+	if BoardTutorialServiceScript.is_active(_tutorial_step):
+		if selected_stack == null:
+			if not BoardTutorialServiceScript.can_select_stack(_tutorial_step, clicked_idx):
+				return
+		elif clicked_stack != selected_stack:
+			var from_idx: int = stacks.find(selected_stack)
+			if not BoardTutorialServiceScript.can_move(_tutorial_step, from_idx, clicked_idx):
+				return
 	if selected_stack == null:
 		if clicked_stack.is_empty():
 			return
@@ -1152,6 +1175,7 @@ func handle_click(mouse_pos: Vector2) -> void:
 		_update_undo_button_state()
 		board_locked = true
 		_consume_temp_slot_action()
+		_on_tutorial_merge_done()
 	if moved == 0:
 		print(MainMoveInteractionServiceScript.invalid_move_message())
 	clear_selection(false)
@@ -1182,6 +1206,102 @@ func go_to_home() -> void:
 	save_game()
 	SceneLoader.go_to(LobbyScenePath)
 
+func _tutorial_is_saved_done() -> bool:
+	if SaveManager == null:
+		return false
+	return bool(SaveManager.player_data.get("board_tutorial_done", false))
+
+func _fill_tutorial_board() -> void:
+	var rows: Array = BoardTutorialServiceScript.initial_stack_rows()
+	for i in range(mini(rows.size(), stacks.size())):
+		var stack: Node = stacks[i]
+		while not stack.is_empty():
+			stack.pop()
+		var row: Array = rows[i] as Array
+		for raw in row:
+			if stack.is_full():
+				break
+			stack.push(int(raw))
+
+func _set_tutorial_step(step: String, persist: bool) -> void:
+	_tutorial_step = step
+	if SaveManager != null:
+		SaveManager.player_data["board_tutorial_step"] = step
+		SaveManager.player_data["board_tutorial_done"] = step == BoardTutorialServiceScript.STEP_DONE
+		if persist:
+			SaveManager.save_game()
+	_refresh_tutorial_overlay()
+
+func _boot_board_tutorial() -> void:
+	var saved_done := _tutorial_is_saved_done()
+	var saved_step := ""
+	if SaveManager != null:
+		saved_step = str(SaveManager.player_data.get("board_tutorial_step", ""))
+	if BoardTutorialServiceScript.should_skip_for_progress(checkpoint_level):
+		_set_tutorial_step(BoardTutorialServiceScript.STEP_DONE, not saved_done)
+		return
+	if BoardTutorialServiceScript.is_active(_tutorial_step):
+		_refresh_tutorial_overlay()
+		return
+	if BoardTutorialServiceScript.is_active(saved_step):
+		_set_tutorial_step(saved_step, false)
+		return
+	if saved_done:
+		_tutorial_step = BoardTutorialServiceScript.STEP_DONE
+		_refresh_tutorial_overlay()
+		return
+	if BoardTutorialServiceScript.is_merge_layout(_capture_stack_data()):
+		_set_tutorial_step(BoardTutorialServiceScript.STEP_MERGE, false)
+		return
+	_set_tutorial_step(BoardTutorialServiceScript.STEP_DONE, true)
+
+func _on_tutorial_merge_done() -> void:
+	var next_step: String = BoardTutorialServiceScript.next_after_merge(_tutorial_step)
+	if next_step == _tutorial_step:
+		return
+	_set_tutorial_step(next_step, true)
+
+func _on_tutorial_roll_done() -> void:
+	var next_step: String = BoardTutorialServiceScript.next_after_roll(_tutorial_step)
+	if next_step == _tutorial_step:
+		return
+	_set_tutorial_step(next_step, true)
+
+func _build_tutorial_overlay() -> void:
+	tutorial_layer = CanvasLayer.new()
+	tutorial_layer.layer = 40
+	add_child(tutorial_layer)
+	tutorial_ui = BoardTutorialOverlay.new()
+	tutorial_layer.add_child(tutorial_ui)
+
+func _refresh_tutorial_overlay() -> void:
+	if tutorial_ui == null:
+		return
+	if not BoardTutorialServiceScript.is_active(_tutorial_step):
+		tutorial_ui.close()
+		return
+	var speech: String = BoardTutorialServiceScript.speech_for_step(_tutorial_step)
+	tutorial_ui.open_step(speech)
+	var viewport_size: Vector2 = get_viewport_rect().size
+	var layout_sc: float = get_layout_scale()
+	var bubble_center := Vector2(viewport_size.x * 0.5, viewport_size.y * 0.42)
+	var pointer_pos := Vector2(viewport_size.x * 0.5, viewport_size.y * 0.52)
+	if BoardTutorialServiceScript.pointer_is_stack(_tutorial_step) and stacks.size() > BoardTutorialServiceScript.MERGE_DEST:
+		var origin: Node = stacks[BoardTutorialServiceScript.MERGE_ORIGIN]
+		var dest: Node = stacks[BoardTutorialServiceScript.MERGE_DEST]
+		var origin_sc: float = origin.scale.y if origin is Node2D else 1.0
+		var coin_top_y: float = origin.global_position.y + StackScript.get_top_local_y() * origin_sc
+		bubble_center = Vector2(
+			(origin.global_position.x + dest.global_position.x) * 0.5,
+			coin_top_y - 86.0 * layout_sc
+		)
+		pointer_pos = Vector2(origin.global_position.x, coin_top_y - 8.0 * layout_sc)
+	elif cta_button != null:
+		var cta_rect: Rect2 = cta_button.get_global_rect()
+		pointer_pos = Vector2(cta_rect.position.x + cta_rect.size.x * 0.5, cta_rect.position.y + 4.0)
+		bubble_center = Vector2(pointer_pos.x, cta_rect.position.y - 90.0 * layout_sc)
+	tutorial_ui.layout_targets(viewport_size, bubble_center, pointer_pos)
+
 func _sync_player_resources_from_game_state() -> void:
 	lives = GameState.lives
 	player_stars = GameState.player_stars
@@ -1200,44 +1320,26 @@ func can_repartir() -> bool:
 			return true
 	return false
 
-func perform_roll() -> bool:
-	_clear_undo_snapshot()
-	var target_stacks: Array = []
-	var total_free_slots := 0
-	for stack in stacks:
-		var free = stack.free_slots() if stack.has_method("free_slots") else 0
-		if free > 0:
-			target_stacks.append(stack)
-			total_free_slots += free
-	if target_stacks.is_empty():
-		print("Sin espacio para tirada.")
-		save_game()
-		check_blocked_state()
-		return false
-
-	var max_roll_value = maxi(roll_value_floor, max_value - 1)
-	var values_to_roll: Array = GameTurnEngineScript.build_roll_values(
-		roll_value_floor,
-		max_roll_value,
-		func() -> int:
-			return randi_range(0, 2)
-	)
-
-	values_to_roll.shuffle()
-	var roll_count := GameTurnEngineScript.compute_roll_count(values_to_roll.size(), total_free_slots, true)
-	values_to_roll = GameTurnEngineScript.apply_round_wildcard(
-		values_to_roll,
-		roll_count,
-		GameRulesScript.WILDCARD_ROUND_CHANCE,
-		func() -> float:
-			return randf(),
-		func(n: int) -> int:
-			return randi() % maxi(1, n)
-	)
+func _place_roll_values(values: Array, roll_count: int, target_stacks: Array) -> void:
+	var dealt: Array = values.slice(0, mini(roll_count, values.size()))
+	if GameTurnEngineScript.should_group_early_rolls(checkpoint_level):
+		dealt = GameTurnEngineScript.cluster_roll_values(dealt)
+		var tops: Array = []
+		var frees: Array = []
+		for stack in target_stacks:
+			tops.append(int(stack.top_value()) if stack.has_method("top_value") else -1)
+			frees.append(int(stack.free_slots()) if stack.has_method("free_slots") else 0)
+		var dests: Array = GameTurnEngineScript.assign_grouped_rolls(dealt, tops, frees)
+		for i in range(dealt.size()):
+			var si := int(dests[i]) if i < dests.size() else -1
+			if si < 0 or si >= target_stacks.size():
+				continue
+			target_stacks[si].push(dealt[i])
+		return
 	var roll_assigned_by_stack: Dictionary = {}
 	for stack in target_stacks:
 		roll_assigned_by_stack[stack.get_instance_id()] = 0
-	for i in range(roll_count):
+	for i in range(dealt.size()):
 		var available_stacks: Array = []
 		for stack in target_stacks:
 			if not stack.is_full():
@@ -1255,12 +1357,76 @@ func perform_roll() -> bool:
 		if idx < 0:
 			break
 		var selected_stack = available_stacks[idx]
-		selected_stack.push(values_to_roll[i])
+		selected_stack.push(dealt[i])
 		var sid = selected_stack.get_instance_id()
 		roll_assigned_by_stack[sid] = int(roll_assigned_by_stack.get(sid, 0)) + 1
 
+func perform_roll() -> bool:
+	if BoardTutorialServiceScript.blocks_roll(_tutorial_step):
+		return false
+	_clear_undo_snapshot()
+	var target_stacks: Array = []
+	var total_free_slots := 0
+	for stack in stacks:
+		var free = stack.free_slots() if stack.has_method("free_slots") else 0
+		if free > 0:
+			target_stacks.append(stack)
+			total_free_slots += free
+	if target_stacks.is_empty():
+		print("Sin espacio para tirada.")
+		save_game()
+		check_blocked_state()
+		return false
+
+	var max_roll_value = maxi(roll_value_floor, max_value - 1)
+	var deal_max: int = GameTurnEngineScript.early_roll_value_max(
+		checkpoint_level,
+		board_deal_count,
+		roll_value_floor,
+		max_roll_value
+	)
+	var values_to_roll: Array = []
+	var roll_count := 0
+	if BoardTutorialServiceScript.uses_scripted_roll(_tutorial_step):
+		values_to_roll = BoardTutorialServiceScript.roll_values()
+		roll_count = mini(values_to_roll.size(), total_free_slots)
+	else:
+		values_to_roll = GameTurnEngineScript.build_roll_values(
+			roll_value_floor,
+			deal_max,
+			func() -> int:
+				return randi_range(0, 2)
+		)
+		values_to_roll.shuffle()
+		roll_count = GameTurnEngineScript.compute_level_roll_count(
+			checkpoint_level,
+			values_to_roll.size(),
+			total_free_slots,
+			true
+		)
+		values_to_roll = GameTurnEngineScript.pad_roll_values(
+			values_to_roll,
+			roll_count,
+			roll_value_floor,
+			deal_max
+		)
+		if not GameTurnEngineScript.should_group_early_rolls(checkpoint_level):
+			values_to_roll.shuffle()
+		values_to_roll = GameTurnEngineScript.apply_round_wildcard(
+			values_to_roll,
+			roll_count,
+			GameRulesScript.deal_wildcard_chance(checkpoint_level),
+			func() -> float:
+				return randf(),
+			func(n: int) -> int:
+				return randi() % maxi(1, n)
+		)
+	_place_roll_values(values_to_roll, roll_count, target_stacks)
+	board_deal_count += 1
+
 	board_locked = false
 	_consume_temp_slot_action()
+	_on_tutorial_roll_done()
 	resolve_board_after_action()
 	return true
 
@@ -1285,8 +1451,8 @@ func resolve_board_after_action(expected_revision: int = -1, skip_fusions: bool 
 	if not skip_fusions:
 		resolve_fusions()
 	check_level_up()
-	update_progress_bar(true)
 	var leveled_up := update_checkpoint_level()
+	update_progress_bar(true)
 	if leveled_up:
 		_force_progress_bar_display(1.0)
 	var level_alert_open := MainTurnResolutionServiceScript.level_alert_open(
@@ -1703,6 +1869,7 @@ func _apply_cycle_reset_meta(milestone_level: int, cycle_state: Dictionary) -> v
 		"roll_value_floor",
 		GameEngineScript.cycle_reset_roll_value_floor(milestone_level, CHECKPOINT_BASE_VALUE)
 	))
+	board_deal_count = 0
 	cycle_checkpoint_origin = int(cycle_state.get(
 		"cycle_checkpoint_origin",
 		GameEngineScript.cycle_checkpoint_origin(milestone_level, checkpoint_level)
@@ -1851,8 +2018,8 @@ func max_count_of_value(value: int) -> int:
 			best = cnt
 	return best
 
-## Calcula el nivel según las pilas: ≥5 de un valor, y otra vez al completar (10 / crear el siguiente).
-## 1-4 no suben. Un 8 suelto no cuenta como haber pasado los 5/6/7.
+## Calcula el nivel según las pilas. Ciclo 1: un 4 = 2; despues completar 10 (o la siguiente).
+## Un 8 suelto no cuenta como haber pasado los 4/5/6.
 func evaluate_checkpoint_level() -> int:
 	return ProgressionQueryServiceScript.evaluate_checkpoint_level(
 		GameEngineScript,
@@ -1893,10 +2060,7 @@ func get_checkpoint_level_description(level: int) -> String:
 ## Progreso hacia el siguiente checkpoint guardado (0..1).
 func get_current_level_progress() -> float:
 	var next_lvl := checkpoint_level + 1
-	var pct := get_progress_toward_checkpoint_level(next_lvl)
-	if evaluate_checkpoint_level() >= next_lvl:
-		pct = 1.0
-	return clampf(pct, 0.0, 1.0)
+	return clampf(get_progress_toward_checkpoint_level(next_lvl), 0.0, 1.0)
 
 func update_progress_bar(animated: bool = false) -> void:
 	if progress_fill == null or progress_container == null:
@@ -2001,6 +2165,8 @@ func update_checkpoint_level() -> bool:
 	var lvl := evaluate_checkpoint_level()
 	var decision := GameBoardEngineScript.decide_checkpoint_update(previous, lvl, cycle_milestone)
 	if not bool(decision.get("changed", false)):
+		if _refresh_checkpoint_snapshot_if_board_ahead():
+			save_game()
 		return false
 	checkpoint_level = int(decision.get("checkpoint_level", checkpoint_level))
 	var did_cycle_reset := bool(decision.get("did_cycle_reset", false))
@@ -2016,6 +2182,13 @@ func update_checkpoint_level() -> bool:
 			# Aplicar meta ya (evita re-disparar el hito), pero diferir el tablero nuevo.
 			_apply_cycle_reset_meta(cycle_milestone, cycle_state)
 			_pending_cycle_reset_milestone = cycle_milestone
+	# Encolar carteles ANTES de desbloquear comodines: el cartel de mix no debe
+	# ganarle al de nivel (Mezclar / Martillo / Guante).
+	for alert_lvl in range(previous + 1, checkpoint_level + 1):
+		if not _pending_level_up_alerts.has(alert_lvl):
+			_pending_level_up_alerts.append(alert_lvl)
+	if _pending_cycle_reset_milestone > 0 and _pending_level_up_alerts.is_empty():
+		_pending_level_up_alerts.append(checkpoint_level)
 	sync_wildcard_unlocks(previous)
 	# Tras un reset de ciclo no hay desbloqueo retroactivo de ranuras.
 	if not did_cycle_reset:
@@ -2027,15 +2200,7 @@ func update_checkpoint_level() -> bool:
 	GameState.player_level = checkpoint_level
 	GameState.checkpoint_snapshot = checkpoint_snapshot.duplicate(true)
 	print("Checkpoint alcanzado: nivel ", checkpoint_level, " (tablero guardado)")
-	# Encolar cada nivel saltado para no perder carteles (ej. 1→3 muestra 2 y 3).
-	for alert_lvl in range(previous + 1, checkpoint_level + 1):
-		if not _pending_level_up_alerts.has(alert_lvl):
-			_pending_level_up_alerts.append(alert_lvl)
-	# Prestige: el checkpoint a veces ya era el hito (ej. mitad de 11 → niv. 15)
-	# sin ficha 15; igual hay que mostrar cartel antes de renovar el tablero.
-	if _pending_cycle_reset_milestone > 0 and _pending_level_up_alerts.is_empty():
-		_pending_level_up_alerts.append(checkpoint_level)
-	call_deferred("_show_next_level_up_alert")
+	_show_next_level_up_alert()
 	save_game()
 	return true
 
@@ -2069,6 +2234,23 @@ func _show_next_level_up_alert() -> void:
 		settings_ui.close()
 	var alert_level: int = int(_pending_level_up_alerts.pop_front())
 	show_level_up_panel(alert_level)
+
+func _snapshot_highest_coin() -> int:
+	if checkpoint_snapshot.is_empty():
+		return 0
+	return GameEngineScript.highest_coin_in_stack_rows(checkpoint_snapshot.get("stacks", []))
+
+func _refresh_checkpoint_snapshot_if_board_ahead() -> bool:
+	if not GameSessionServiceScript.should_refresh_checkpoint_snapshot(
+		highest_coin_value_on_board(),
+		_snapshot_highest_coin()
+	):
+		return false
+	capture_checkpoint_snapshot()
+	GameState.player_level = checkpoint_level
+	GameState.checkpoint_snapshot = checkpoint_snapshot.duplicate(true)
+	print("Checkpoint actualizado: ficha ", highest_coin_value_on_board(), " (tablero guardado)")
+	return true
 
 ## Guarda tablero y progresión en el momento del checkpoint (para reinicio / save).
 func capture_checkpoint_snapshot() -> void:
@@ -3480,6 +3662,7 @@ func build_mock_ui() -> void:
 	settings_ui.restart_level_confirmed.connect(_on_settings_restart_confirmed)
 
 	_ensure_shop_ui()
+	_build_tutorial_overlay()
 
 	adjacent_slot_star_error_label = Label.new()
 	adjacent_slot_star_error_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -3680,6 +3863,7 @@ func layout_mock_ui() -> void:
 		settings_ui.layout_for_viewport(viewport_size)
 	if shop_ui != null:
 		shop_ui.layout_for_viewport(viewport_size)
+	_refresh_tutorial_overlay()
 
 func update_life_display() -> void:
 	lives = GameState.lives
@@ -3864,6 +4048,8 @@ func apply_hammer_on_stack(target_stack: Node) -> void:
 	resolve_board_after_action()
 
 func try_use_wildcard(wildcard_type: String) -> void:
+	if BoardTutorialServiceScript.blocks_tools(_tutorial_step):
+		return
 	if board_locked:
 		return
 	if not is_wildcard_unlocked(wildcard_type):

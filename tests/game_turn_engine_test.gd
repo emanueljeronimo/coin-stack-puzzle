@@ -12,6 +12,8 @@ func _run() -> void:
 	print("=== game_turn_engine test ===")
 	_test_roll_value_pool()
 	_test_roll_count_policy()
+	_test_early_roll_ramp()
+	_test_grouped_early_rolls()
 	_test_balanced_pick_policy()
 	_test_round_wildcard_once()
 	print("=== RESULT: %d passed, %d failed ===" % [_passed, _failed])
@@ -49,6 +51,57 @@ func _test_roll_count_policy() -> void:
 		_fail("roll_count_fill_all_when_disabled")
 		return
 	_ok("roll_count_policy")
+
+func _test_early_roll_ramp() -> void:
+	if GameTurnEngineScript.early_roll_target(1) <= GameTurnEngineScript.early_roll_target(3):
+		_fail("early_starts_higher")
+		return
+	if GameTurnEngineScript.early_roll_target(5) != 0:
+		_fail("early_ends_at_5")
+		return
+	var lv1: int = GameTurnEngineScript.compute_level_roll_count(1, 3, 20, true)
+	var lv5: int = GameTurnEngineScript.compute_level_roll_count(5, 3, 20, true)
+	if GameTurnEngineScript.early_roll_target(1) != 10:
+		_fail("level1_target_10", str(GameTurnEngineScript.early_roll_target(1)))
+		return
+	if GameTurnEngineScript.early_roll_target(3) != 6:
+		_fail("level3_target_6", str(GameTurnEngineScript.early_roll_target(3)))
+		return
+	if GameTurnEngineScript.early_roll_target(4) != 5:
+		_fail("level4_ramps_down", str(GameTurnEngineScript.early_roll_target(4)))
+		return
+	if lv1 < 10 or lv1 <= lv5:
+		_fail("level1_drops_more", "%d vs %d" % [lv1, lv5])
+		return
+	if lv5 != 3:
+		_fail("level5_uses_pool", str(lv5))
+		return
+	if GameTurnEngineScript.early_roll_value_max(1, 0, 1, 4) != 2:
+		_fail("first_deal_ones_twos", str(GameTurnEngineScript.early_roll_value_max(1, 0, 1, 4)))
+		return
+	if GameTurnEngineScript.early_roll_value_max(1, 1, 1, 4) != 3:
+		_fail("second_deal_threes", str(GameTurnEngineScript.early_roll_value_max(1, 1, 1, 4)))
+		return
+	if GameTurnEngineScript.early_roll_value_max(4, 3, 1, 5) != 5:
+		_fail("after_six_deals_fives", str(GameTurnEngineScript.early_roll_value_max(4, 3, 1, 5)))
+		return
+	if GameTurnEngineScript.early_pad_max(5, 1, 8) != 8:
+		_fail("late_uses_full_max", str(GameTurnEngineScript.early_pad_max(5, 1, 8)))
+		return
+	var padded: Array = GameTurnEngineScript.pad_roll_values([1, 2], 5, 1, 2)
+	if padded.size() != 5:
+		_fail("pad_pool", str(padded))
+		return
+	_ok("early_roll_ramp")
+
+func _test_grouped_early_rolls() -> void:
+	if GameTurnEngineScript.should_group_early_rolls(1):
+		_fail("no_auto_group_level_1")
+		return
+	if GameTurnEngineScript.should_group_early_rolls(3):
+		_fail("no_auto_group_level_3")
+		return
+	_ok("grouped_early_rolls")
 
 func _test_balanced_pick_policy() -> void:
 	var assigned := [0, 0, 0]

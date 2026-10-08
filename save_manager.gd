@@ -387,9 +387,11 @@ func _generate_random_username() -> String:
 func _sync_core_fields_to_player_data() -> void:
 	if GameState == null:
 		return
-	var level: int = int(player_data.get("checkpoint_level", player_data.get("level", GameState.player_level)))
+	var level: int = maxi(1, GameState.player_level)
 	player_data["level"] = level
 	player_data["checkpoint_level"] = level
+	if GameState.checkpoint_snapshot is Dictionary and not GameState.checkpoint_snapshot.is_empty():
+		player_data["checkpoint_snapshot"] = GameState.checkpoint_snapshot.duplicate(true)
 	player_data["coins"] = GameState.player_stars
 	player_data["player_stars"] = GameState.player_stars
 	player_data["lives"] = GameState.lives

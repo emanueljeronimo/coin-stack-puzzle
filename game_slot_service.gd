@@ -1,6 +1,8 @@
 extends RefCounted
 class_name GameSlotService
 
+const GameRulesScript = preload("res://game_rules.gd")
+
 static func consume_temp_action(temp_active: bool, actions_remaining: int) -> Dictionary:
 	if not temp_active:
 		return {
@@ -18,16 +20,10 @@ static func consume_temp_action(temp_active: bool, actions_remaining: int) -> Di
 		"should_close": actions_remaining <= 0,
 	}
 
-static func ensure_unlock_cursor(current_level: int, cycle_base_level: int, first_level_in_cycle: int) -> int:
-	const INTERVAL_3_FROM := 50
+static func ensure_unlock_cursor(current_level: int, cycle_base_level: int, _first_level_in_cycle: int) -> int:
 	if current_level > 0:
-		if current_level < INTERVAL_3_FROM and current_level % 2 != 0:
-			return current_level + 1
-		return current_level
-	var fallback := cycle_base_level + first_level_in_cycle
-	if fallback < INTERVAL_3_FROM and fallback % 2 != 0:
-		fallback += 1
-	return fallback
+		return GameRulesScript.normalize_free_slot_unlock_level(current_level)
+	return GameRulesScript.initial_free_slot_unlock_level(cycle_base_level)
 
 static func is_stale_unlock(previous_level: int, unlock_level: int) -> bool:
 	return unlock_level < previous_level

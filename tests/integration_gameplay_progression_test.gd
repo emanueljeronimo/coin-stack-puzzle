@@ -60,7 +60,8 @@ func _advance_checkpoint(
 	# Simula que llegaste a esa ficha paso a paso (un 8 implica 6 y 7).
 	# En un prestige a tiempo no rellenar 6–14: eso evalúa 21 y pisa el hito 15.
 	if fill_path:
-		for v in range(CHECKPOINT_BASE_VALUE + 1, highest_value):
+		var path_start := 4 if roll_value_floor <= 1 else CHECKPOINT_BASE_VALUE + 1
+		for v in range(path_start, highest_value):
 			if not counts.has(v):
 				counts[v] = 1
 	var eval_checkpoint := GameEngineScript.evaluate_checkpoint_from_piles(
@@ -141,7 +142,7 @@ func _test_progression_purchase_and_cycle_reset() -> void:
 		int(state.get("next_free_slot_unlock_level", 2))
 	)
 
-	state = _advance_checkpoint(state, 5, 5)
+	state = _advance_checkpoint(state, 4, 1)
 	if int(state.get("checkpoint_level", 0)) != 2:
 		_fail("progress_to_level_2", str(state))
 		return
@@ -149,11 +150,11 @@ func _test_progression_purchase_and_cycle_reset() -> void:
 		_fail("purchase_consumes_level_2_free", str(state))
 		return
 
-	state = _advance_checkpoint(state, 6, 5) # 5 seises = nivel 4
+	state = _advance_checkpoint(state, 6, 1) # ficha 6 = nivel 4
 	if int(state.get("checkpoint_level", 0)) != 4:
 		_fail("progress_to_level_4", str(state))
 		return
-	if int(state.get("active_stacks", 0)) != 7:
+	if int(state.get("active_stacks", 0)) != 8:
 		_fail("unlock_on_consumed_next_tier", str(state))
 		return
 
@@ -177,7 +178,7 @@ func _test_progression_purchase_and_cycle_reset() -> void:
 	_ok("progression_purchase_and_cycle_reset")
 
 func _test_first_cycle_levels_from_one_to_nine() -> void:
-	# Desde el 1: sube con ≥5 en una pila, y otra vez al completar. Los 4 no cuentan.
+	# Desde el 1: un 4 sube a 2; despues completar pila. Los 3 no cuentan.
 	var state := {
 		"checkpoint_level": 1,
 		"current_level": 1,
@@ -187,19 +188,19 @@ func _test_first_cycle_levels_from_one_to_nine() -> void:
 		"adjacent_slot_next_price": ADJACENT_BASE_PRICE,
 		"next_free_slot_unlock_level": GameRulesScript.initial_free_slot_unlock_level(0),
 	}
-	state = _advance_checkpoint(state, 4, 10)
+	state = _advance_checkpoint(state, 3, 10)
 	if int(state.get("checkpoint_level", 0)) != 1:
-		_fail("fours_stay_level_1", str(state))
+		_fail("threes_stay_level_1", str(state))
 		return
 	var steps: Array = [
-		[5, 5, 2],
-		[6, 1, 3],
+		[4, 1, 2],
+		[5, 1, 3],
+		[6, 1, 4],
 		[6, 5, 4],
 		[7, 1, 5],
-		[7, 5, 6],
-		[8, 1, 7],
-		[8, 5, 8],
-		[9, 1, 9],
+		[7, 5, 5],
+		[8, 1, 6],
+		[8, 5, 6],
 	]
 	for step in steps:
 		var coin := int(step[0])
@@ -284,39 +285,39 @@ func _test_free_unlock_applies_immediately_on_level_threshold() -> void:
 		"next_free_slot_unlock_level": GameRulesScript.initial_free_slot_unlock_level(0),
 	}
 
-	# Nivel 2: formar la 5 abre ranura.
-	state = _advance_checkpoint(state, 5, 5)
+	# Nivel 2: crear el 4 abre la primera ranura.
+	state = _advance_checkpoint(state, 4, 1)
 	if int(state.get("checkpoint_level", 0)) != 2:
 		_fail("immediate_unlock_level_2", str(state))
 		return
 	if int(state.get("active_stacks", 0)) != 6:
 		_fail("immediate_unlock_slot_on_level_2", str(state))
 		return
-	if int(state.get("next_free_slot_unlock_level", 0)) != 4:
+	if int(state.get("next_free_slot_unlock_level", 0)) != 3:
 		_fail("immediate_unlock_cursor_after_2", str(state))
 		return
 
-	# Nivel 3: mitad de pila (un 6) no abre ranura.
-	state = _advance_checkpoint(state, 6, 1)
+	# Nivel 3: el 5 abre ranura.
+	state = _advance_checkpoint(state, 5, 1)
 	if int(state.get("checkpoint_level", 0)) != 3:
 		_fail("immediate_unlock_level_3", str(state))
 		return
-	if int(state.get("active_stacks", 0)) != 6:
-		_fail("immediate_unlock_no_slot_on_level_3", str(state))
+	if int(state.get("active_stacks", 0)) != 7:
+		_fail("immediate_unlock_slot_on_level_3", str(state))
 		return
 	if int(state.get("next_free_slot_unlock_level", 0)) != 4:
-		_fail("immediate_unlock_cursor_stays_4", str(state))
+		_fail("immediate_unlock_cursor_after_3", str(state))
 		return
 
-	# Nivel 4: pila completa abre ranura.
-	state = _advance_checkpoint(state, 6, 5)
+	# Nivel 4: el 6 abre ranura; la siguiente es cada 3 (7).
+	state = _advance_checkpoint(state, 6, 1)
 	if int(state.get("checkpoint_level", 0)) != 4:
 		_fail("immediate_unlock_level_4", str(state))
 		return
-	if int(state.get("active_stacks", 0)) != 7:
+	if int(state.get("active_stacks", 0)) != 8:
 		_fail("immediate_unlock_slot_granted", str(state))
 		return
-	if int(state.get("next_free_slot_unlock_level", 0)) != 6:
+	if int(state.get("next_free_slot_unlock_level", 0)) != 7:
 		_fail("immediate_unlock_cursor_advanced", str(state))
 		return
 
@@ -339,7 +340,7 @@ func _test_reconcile_missing_free_unlock_state() -> void:
 	if int(state.get("active_stacks", 0)) != 6:
 		_fail("reconcile_missing_unlock_slot", str(state))
 		return
-	if int(state.get("next_free_slot_unlock_level", 0)) != 6:
+	if int(state.get("next_free_slot_unlock_level", 0)) != 7:
 		_fail("reconcile_missing_unlock_cursor", str(state))
 		return
 

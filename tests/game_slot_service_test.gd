@@ -47,9 +47,17 @@ func _test_temp_action_close_sequence() -> void:
 	_ok("temp_action_close_sequence")
 
 func _test_unlock_cursor() -> void:
-	var keep := GameSlotServiceScript.ensure_unlock_cursor(7, 15, 2)
-	if keep != 8:
+	var keep := GameSlotServiceScript.ensure_unlock_cursor(19, 15, 2)
+	if keep != 20:
 		_fail("unlock_cursor_keep", str(keep))
+		return
+	var early := GameSlotServiceScript.ensure_unlock_cursor(3, 0, 2)
+	if early != 3:
+		_fail("unlock_cursor_keeps_early_3", str(early))
+		return
+	var seven := GameSlotServiceScript.ensure_unlock_cursor(7, 0, 2)
+	if seven != 7:
+		_fail("unlock_cursor_keeps_early_7", str(seven))
 		return
 	var init := GameSlotServiceScript.ensure_unlock_cursor(0, 15, 2)
 	if init != 18:

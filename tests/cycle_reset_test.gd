@@ -84,12 +84,15 @@ func _test_roll_ranges() -> void:
 	_ok("roll_ranges_post_reset")
 
 func _test_evaluate_mapping() -> void:
-	# Ciclo 1: 5 cincos → nivel 2; un 5 suelto no cuenta.
-	if GameEngineScript.evaluate_checkpoint_level(5, 1, 1, CHECKPOINT_BASE_VALUE, 5, BOARD_CYCLE_LEVELS) != 1:
+	# Ciclo 1: un 4 = 2; un 5 = 3.
+	if GameEngineScript.evaluate_checkpoint_level(4, 1, 1, CHECKPOINT_BASE_VALUE, 5, BOARD_CYCLE_LEVELS) != 2:
+		_fail("c1_one4", str(GameEngineScript.evaluate_checkpoint_level(4, 1, 1, CHECKPOINT_BASE_VALUE, 5, BOARD_CYCLE_LEVELS)))
+		return
+	if GameEngineScript.evaluate_checkpoint_level(5, 1, 1, CHECKPOINT_BASE_VALUE, 5, BOARD_CYCLE_LEVELS) != 3:
 		_fail("c1_one5", str(GameEngineScript.evaluate_checkpoint_level(5, 1, 1, CHECKPOINT_BASE_VALUE, 5, BOARD_CYCLE_LEVELS)))
 		return
-	if GameEngineScript.evaluate_checkpoint_level(5, 5, 1, CHECKPOINT_BASE_VALUE, 5, BOARD_CYCLE_LEVELS) != 2:
-		_fail("c1_half5")
+	if GameEngineScript.evaluate_checkpoint_level(5, 5, 1, CHECKPOINT_BASE_VALUE, 5, BOARD_CYCLE_LEVELS) != 3:
+		_fail("c1_five_fives")
 		return
 	# Tras reset @15 (floor 11), fichas 11-14 se quedan en el hito.
 	var origin15 := GameEngineScript.cycle_checkpoint_origin(15, 15)

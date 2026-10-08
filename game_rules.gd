@@ -9,10 +9,22 @@ const ENABLE_FUSION_CREATE_BONUS := false
 const FUSION_OUTPUT_COUNT := 2
 ## Una sola tirada por repartida: 10% de chance de incluir exactamente 1 comodin.
 const WILDCARD_ROUND_CHANCE := 0.10
+## El comodin de mazo no aparece hasta este checkpoint.
+const WILDCARD_ROUND_UNLOCK_LEVEL := 10
 const COIN_WILDCARD_VALUE := 0
+
+static func deal_wildcard_chance(checkpoint_level: int) -> float:
+	if checkpoint_level < WILDCARD_ROUND_UNLOCK_LEVEL:
+		return 0.0
+	return WILDCARD_ROUND_CHANCE
 
 const ADJACENT_SLOT_FREE_FIRST_LEVEL := 2
 const ADJACENT_SLOT_FREE_LEVEL_INTERVAL := 2
+## Primer ciclo: 2 (ficha 4), 3 (ficha 5), 4 (ficha 6) y despues cada 3.
+const EARLY_EXTRA_FREE_SLOT_LEVEL := 3
+const EARLY_SLOT_BURST_LAST_LEVEL := 4
+const EARLY_SLOT_THEN_INTERVAL := 3
+const FIRST_CYCLE_UNLOCK_CAP := 15
 ## Desde este nivel (inclusive) el gratis pasa a cada 3; desde 100, cada 4.
 const ADJACENT_SLOT_INTERVAL_3_FROM_LEVEL := 50
 const ADJACENT_SLOT_INTERVAL_4_FROM_LEVEL := 100
@@ -46,8 +58,28 @@ static func coin_value_from_board_row(board_row_index: int) -> int:
 static func even_free_slot_unlock_level(level: int) -> int:
 	return normalize_free_slot_unlock_level(level)
 
+static func is_first_cycle_unlock_level(level: int) -> bool:
+	if level == ADJACENT_SLOT_FREE_FIRST_LEVEL or level == EARLY_EXTRA_FREE_SLOT_LEVEL:
+		return true
+	if level == EARLY_SLOT_BURST_LAST_LEVEL:
+		return true
+	if level > EARLY_SLOT_BURST_LAST_LEVEL and level < FIRST_CYCLE_UNLOCK_CAP:
+		return (level - EARLY_SLOT_BURST_LAST_LEVEL) % EARLY_SLOT_THEN_INTERVAL == 0
+	return false
+
 static func normalize_free_slot_unlock_level(level: int) -> int:
 	var v := maxi(level, ADJACENT_SLOT_FREE_FIRST_LEVEL)
+	if v < FIRST_CYCLE_UNLOCK_CAP:
+		if v <= ADJACENT_SLOT_FREE_FIRST_LEVEL:
+			return ADJACENT_SLOT_FREE_FIRST_LEVEL
+		if v == EARLY_EXTRA_FREE_SLOT_LEVEL:
+			return v
+		if v <= EARLY_SLOT_BURST_LAST_LEVEL:
+			return EARLY_SLOT_BURST_LAST_LEVEL
+		var cursor := EARLY_SLOT_BURST_LAST_LEVEL
+		while cursor < v:
+			cursor += EARLY_SLOT_THEN_INTERVAL
+		return cursor
 	if v < ADJACENT_SLOT_INTERVAL_3_FROM_LEVEL and v % 2 != 0:
 		v += 1
 	return v
@@ -63,6 +95,14 @@ static func initial_free_slot_unlock_level(cycle_base_level: int) -> int:
 	return normalize_free_slot_unlock_level(cycle_base_level + ADJACENT_SLOT_FREE_FIRST_LEVEL)
 
 static func next_free_slot_unlock_level(current_unlock_level: int) -> int:
+	if current_unlock_level == ADJACENT_SLOT_FREE_FIRST_LEVEL:
+		return EARLY_EXTRA_FREE_SLOT_LEVEL
+	if current_unlock_level == EARLY_EXTRA_FREE_SLOT_LEVEL:
+		return EARLY_SLOT_BURST_LAST_LEVEL
+	if current_unlock_level == EARLY_SLOT_BURST_LAST_LEVEL:
+		return EARLY_SLOT_BURST_LAST_LEVEL + EARLY_SLOT_THEN_INTERVAL
+	if current_unlock_level < FIRST_CYCLE_UNLOCK_CAP and current_unlock_level > EARLY_SLOT_BURST_LAST_LEVEL:
+		return current_unlock_level + EARLY_SLOT_THEN_INTERVAL
 	var base := normalize_free_slot_unlock_level(current_unlock_level)
 	if current_unlock_level < ADJACENT_SLOT_INTERVAL_3_FROM_LEVEL and current_unlock_level % 2 != 0:
 		return base
@@ -75,6 +115,14 @@ static func previous_free_slot_unlock_level(unlock_level: int) -> int:
 	var n := normalize_free_slot_unlock_level(unlock_level)
 	if n <= ADJACENT_SLOT_FREE_FIRST_LEVEL:
 		return n
+	if n == EARLY_EXTRA_FREE_SLOT_LEVEL:
+		return ADJACENT_SLOT_FREE_FIRST_LEVEL
+	if n == EARLY_SLOT_BURST_LAST_LEVEL:
+		return EARLY_EXTRA_FREE_SLOT_LEVEL
+	if n > EARLY_SLOT_BURST_LAST_LEVEL and n < FIRST_CYCLE_UNLOCK_CAP:
+		if n == EARLY_SLOT_BURST_LAST_LEVEL + EARLY_SLOT_THEN_INTERVAL:
+			return EARLY_SLOT_BURST_LAST_LEVEL
+		return n - EARLY_SLOT_THEN_INTERVAL
 	if n > ADJACENT_SLOT_INTERVAL_4_FROM_LEVEL:
 		return n - ADJACENT_SLOT_FREE_INTERVAL_LATE
 	if n == ADJACENT_SLOT_INTERVAL_4_FROM_LEVEL:

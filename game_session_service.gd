@@ -33,6 +33,9 @@ static func build_runtime_snapshot(state: Dictionary) -> Dictionary:
 		"stacks": rows,
 	}
 
+static func should_refresh_checkpoint_snapshot(board_highest: int, snapshot_highest: int) -> bool:
+	return board_highest > snapshot_highest
+
 static func build_checkpoint_snapshot(state: Dictionary) -> Dictionary:
 	return {
 		"checkpoint_level": int(state.get("checkpoint_level", 1)),

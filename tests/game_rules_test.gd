@@ -14,6 +14,7 @@ func _run() -> void:
 	_test_normalize_temp_state()
 	_test_wildcard_stack_receive()
 	_test_attached_wildcard_resolution()
+	_test_deal_wildcard_unlock()
 	print("=== RESULT: %d passed, %d failed ===" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -36,6 +37,33 @@ func _test_unlock_levels() -> void:
 		return
 	if GameRulesScript.initial_free_slot_unlock_level(0) != 2:
 		_fail("first_unlock_cycle1", str(GameRulesScript.initial_free_slot_unlock_level(0)))
+		return
+	if GameRulesScript.next_free_slot_unlock_level(2) != 3:
+		_fail("next_after_2_is_3", str(GameRulesScript.next_free_slot_unlock_level(2)))
+		return
+	if GameRulesScript.next_free_slot_unlock_level(3) != 4:
+		_fail("next_after_3_is_4", str(GameRulesScript.next_free_slot_unlock_level(3)))
+		return
+	if GameRulesScript.next_free_slot_unlock_level(4) != 7:
+		_fail("next_after_4_is_7", str(GameRulesScript.next_free_slot_unlock_level(4)))
+		return
+	if GameRulesScript.next_free_slot_unlock_level(7) != 10:
+		_fail("next_after_7_is_10", str(GameRulesScript.next_free_slot_unlock_level(7)))
+		return
+	if GameRulesScript.previous_free_slot_unlock_level(3) != 2:
+		_fail("previous_3_is_2", str(GameRulesScript.previous_free_slot_unlock_level(3)))
+		return
+	if GameRulesScript.previous_free_slot_unlock_level(4) != 3:
+		_fail("previous_4_is_3", str(GameRulesScript.previous_free_slot_unlock_level(4)))
+		return
+	if GameRulesScript.previous_free_slot_unlock_level(7) != 4:
+		_fail("previous_7_is_4", str(GameRulesScript.previous_free_slot_unlock_level(7)))
+		return
+	if GameRulesScript.first_future_free_slot_unlock_level(0, 2) != 3:
+		_fail("future_after_level_2", str(GameRulesScript.first_future_free_slot_unlock_level(0, 2)))
+		return
+	if GameRulesScript.first_future_free_slot_unlock_level(0, 4) != 7:
+		_fail("future_after_level_4", str(GameRulesScript.first_future_free_slot_unlock_level(0, 4)))
 		return
 	if GameRulesScript.first_future_free_slot_unlock_level(15, 15) != 18:
 		_fail("future_at_milestone", str(GameRulesScript.first_future_free_slot_unlock_level(15, 15)))
@@ -201,3 +229,12 @@ func _test_attached_wildcard_resolution() -> void:
 		_fail("two_wildcards_no_convert")
 		return
 	_ok("attached_wildcard_resolution")
+
+func _test_deal_wildcard_unlock() -> void:
+	if GameRulesScript.deal_wildcard_chance(9) != 0.0:
+		_fail("locked_before_10")
+		return
+	if GameRulesScript.deal_wildcard_chance(10) != GameRulesScript.WILDCARD_ROUND_CHANCE:
+		_fail("unlocks_at_10")
+		return
+	_ok("deal_wildcard_unlock")

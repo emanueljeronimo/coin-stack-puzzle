@@ -63,12 +63,13 @@ static func cycle_reset_max_value(milestone_level: int) -> int:
 	return milestone_level
 
 ## Ficha de portada: no mostrar un objetivo que todavía no existe en el tablero.
-## Tras prestige, max_value viejo=16 + tablero 11-14 no debe exhibir un 16.
+## Primera visita (sin fichas) = 1. Tras prestige, max_value viejo=16 + tablero 11-14 no debe exhibir un 16.
 static func cover_showcase_coin_value(max_value: int, highest_board_coin: int) -> int:
+	if highest_board_coin <= 0:
+		return 1
 	var objective := maxi(1, max_value)
-	if highest_board_coin > 0:
-		objective = mini(objective, highest_board_coin + 1)
-	return maxi(5, maxi(objective, highest_board_coin))
+	objective = mini(objective, highest_board_coin + 1)
+	return maxi(1, maxi(objective, highest_board_coin))
 
 ## Ancla de niveles si prestigiaste con el checkpoint ya por delante del hito.
 ## Prestige en 15 → 15 (crear 15 otra vez = 16). Prestige en 21 → 20 (crear 16 = 23).
@@ -167,10 +168,10 @@ static func healed_display_checkpoint(
 		level = int(rs.get("checkpoint_level", level))
 	var highest := int(data.get("highest_board_coin", 0))
 	if rs is Dictionary:
-		highest = maxi(highest, _highest_coin_in_stack_rows(rs.get("stacks", [])))
+		highest = maxi(highest, highest_coin_in_stack_rows(rs.get("stacks", [])))
 	var snap: Variant = data.get("checkpoint_snapshot", {})
 	if highest <= 0 and snap is Dictionary:
-		highest = _highest_coin_in_stack_rows(snap.get("stacks", []))
+		highest = highest_coin_in_stack_rows(snap.get("stacks", []))
 	var milestone := cycle_base_level(roll_value_floor, checkpoint_base_value, board_cycle_levels)
 	var healed := heal_legacy_cycle_progress({
 		"milestone_level": milestone,
@@ -184,7 +185,7 @@ static func healed_display_checkpoint(
 	}, checkpoint_base_value)
 	return maxi(1, int(healed.get("checkpoint_level", level)))
 
-static func _highest_coin_in_stack_rows(rows: Variant) -> int:
+static func highest_coin_in_stack_rows(rows: Variant) -> int:
 	var best := 0
 	if not rows is Array:
 		return 0
@@ -222,10 +223,74 @@ static func checkpoint_walk_start(cycle_base: int, origin: int) -> int:
 		return origin
 	return cycle_base
 
-## Nivel según pilas reales: +1 si hay ≥5 de V en una pila, +1 al completar V
-## (10 iguales o ya existe V+1). Un 8 suelto no cuenta como haber pasado 5/6/7.
-## min_level: no re-exigir 25/26 si el checkpoint ya los contó; si no, al fusionar
-## 27s desaparecen y el cartel del 46 espera a Repartir.
+## Ciclo 1: un 4 = nivel 2. Despues, un nivel por pila completada (10 o la siguiente).
+## Un 8 suelto no salta la cadena.
+## min_level: no re-exigir 25/26 si el checkpoint ya los conto.
+
+static func first_cycle_start_coin(checkpoint_base_value: int) -> int:
+	return maxi(1, checkpoint_base_value - 1)
+
+static func uses_first_cycle_complete_only(roll_value_floor: int) -> bool:
+	return roll_value_floor <= 1
+
+## Nivel 2: crear un 4. Desde el 3: llenar 10 de la pila actual (o ya esta la siguiente).
+static func first_cycle_progress_toward(
+	target_level: int,
+	max_count_for_value: Callable,
+	stack_capacity: int,
+	checkpoint_base_value: int
+) -> float:
+	if target_level < 2:
+		return 0.0
+	var four := first_cycle_start_coin(checkpoint_base_value)
+	if target_level == 2:
+		return clampf(float(int(max_count_for_value.call(four))), 0.0, 1.0)
+	var fill_coin := four + (target_level - 3)
+	var cap := maxi(1, stack_capacity)
+	if int(max_count_for_value.call(fill_coin + 1)) >= 1:
+		return 1.0
+	return clampf(float(int(max_count_for_value.call(fill_coin))) / float(cap), 0.0, 1.0)
+
+static func evaluate_first_cycle_complete_only(
+	max_count_for_value: Callable,
+	checkpoint_base_value: int,
+	min_level: int = 0
+) -> int:
+	var four := first_cycle_start_coin(checkpoint_base_value)
+	var walk_min := maxi(0, min_level)
+	var has_four := int(max_count_for_value.call(four)) >= 1
+	var has_five := int(max_count_for_value.call(four + 1)) >= 1
+	if walk_min < 2 and not has_four and not has_five:
+		return maxi(1, min_level) if min_level > 0 else 1
+	var level := 2
+	var local_v := four
+	var guard := 0
+	while guard < 128:
+		guard += 1
+		var pile := int(max_count_for_value.call(local_v))
+		var next_pile := int(max_count_for_value.call(local_v + 1))
+		var completed := pile >= 10 or next_pile >= 1
+		var complete_level := level + 1
+		if walk_min >= complete_level:
+			level = complete_level
+			local_v += 1
+			continue
+		if not completed:
+			break
+		level = complete_level
+		local_v += 1
+	return maxi(level, min_level) if min_level > 0 else level
+
+static func pile_half_threshold(
+	local_v: int,
+	checkpoint_base_value: int,
+	checkpoint_half_threshold: int,
+	roll_value_floor: int
+) -> int:
+	if roll_value_floor <= 1 and local_v == checkpoint_base_value:
+		return 1
+	return checkpoint_half_threshold
+
 static func evaluate_checkpoint_from_piles(
 	max_count_for_value: Callable,
 	roll_value_floor: int,
@@ -235,10 +300,17 @@ static func evaluate_checkpoint_from_piles(
 	cycle_origin: int = 0,
 	min_level: int = 0
 ) -> int:
+	if uses_first_cycle_complete_only(roll_value_floor):
+		return evaluate_first_cycle_complete_only(
+			max_count_for_value,
+			checkpoint_base_value,
+			min_level
+		)
 	var offset := cycle_coin_offset(roll_value_floor, checkpoint_base_value, board_cycle_levels)
 	var cycle_base := cycle_base_level(roll_value_floor, checkpoint_base_value, board_cycle_levels)
 	var origin := effective_cycle_origin(cycle_origin, cycle_base)
 	var level := checkpoint_walk_start(cycle_base, origin)
+	var walk_min := min_level
 	var local_v := checkpoint_base_value
 	var guard := 0
 	while guard < 128:
@@ -247,18 +319,25 @@ static func evaluate_checkpoint_from_piles(
 		var pile := int(max_count_for_value.call(coin))
 		var next_pile := int(max_count_for_value.call(coin + 1))
 		var completed := pile >= 10 or next_pile >= 1
-		var has_half := pile >= checkpoint_half_threshold or completed
+		var half_need := pile_half_threshold(
+			local_v,
+			checkpoint_base_value,
+			checkpoint_half_threshold,
+			roll_value_floor
+		)
+		var has_half := pile >= half_need or completed
 		var half_level := level + 1
 		var complete_level := level + 2
-		# El checkpoint ya pagó este valor (p. ej. 45 = mitad de 27). No pedir
+		# El checkpoint ya pago este valor (p. ej. 45 = mitad de 27). No pedir
 		# otra vez 25/26 que se fusionaron.
-		if min_level >= complete_level:
+		if walk_min >= complete_level:
 			level = complete_level
 			local_v += 1
 			continue
-		if min_level >= half_level:
+		if walk_min >= half_level:
 			if not completed:
-				return maxi(half_level, min_level)
+				level = half_level
+				break
 			level = complete_level
 			local_v += 1
 			continue
@@ -308,6 +387,13 @@ static func progress_toward_checkpoint_level(
 ) -> float:
 	if target_level <= 1:
 		return 0.0
+	if uses_first_cycle_complete_only(roll_value_floor):
+		return first_cycle_progress_toward(
+			target_level,
+			max_count_for_value,
+			stack_capacity,
+			checkpoint_base_value
+		)
 	var offset := cycle_coin_offset(roll_value_floor, checkpoint_base_value, board_cycle_levels)
 	var cycle_base := cycle_base_level(roll_value_floor, checkpoint_base_value, board_cycle_levels)
 	var origin := effective_cycle_origin(cycle_origin, cycle_base)
@@ -319,8 +405,13 @@ static func progress_toward_checkpoint_level(
 	var local_v := checkpoint_base_value + int(steps / 2)
 	var v := local_v + offset
 	if steps % 2 == 0:
-		var need := checkpoint_half_threshold
-		return clampf(float(int(max_count_for_value.call(v))) / float(need), 0.0, 1.0)
+		var need := pile_half_threshold(
+			local_v,
+			checkpoint_base_value,
+			checkpoint_half_threshold,
+			roll_value_floor
+		)
+		return clampf(float(int(max_count_for_value.call(v))) / float(maxi(1, need)), 0.0, 1.0)
 	var pile := int(max_count_for_value.call(v))
 	if int(max_count_for_value.call(v + 1)) >= 1 or pile >= stack_capacity:
 		return 1.0
@@ -335,6 +426,11 @@ static func checkpoint_level_description(
 ) -> String:
 	if level <= 1:
 		return ""
+	if uses_first_cycle_complete_only(roll_value_floor) and level == 2:
+		return "Pila %d" % first_cycle_start_coin(checkpoint_base_value)
+	if uses_first_cycle_complete_only(roll_value_floor) and level >= 3:
+		var complete_coin := first_cycle_start_coin(checkpoint_base_value) + (level - 3)
+		return "Completaste la pila %d" % complete_coin
 	var offset := cycle_coin_offset(roll_value_floor, checkpoint_base_value, board_cycle_levels)
 	var cycle_base := cycle_base_level(roll_value_floor, checkpoint_base_value, board_cycle_levels)
 	var origin := effective_cycle_origin(cycle_origin, cycle_base)

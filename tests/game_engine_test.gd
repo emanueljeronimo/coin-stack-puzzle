@@ -14,6 +14,7 @@ func _run() -> void:
 	_test_checkpoint_eval()
 	_test_legacy_cycle_heal()
 	_test_descriptions()
+	_test_first_cycle_progress()
 	_test_cover_showcase()
 	print("=== RESULT: %d passed, %d failed ===" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
@@ -91,36 +92,51 @@ func _eval_piles(counts: Dictionary, roll_floor: int = 1, origin: int = 0, min_l
 	)
 
 func _test_checkpoint_eval() -> void:
-	# Un 5 suelto no sube. 5 cincos en una pila = nivel 2. Completar 5s (un 6) = 3.
-	if _eval_piles({5: 1}) != 1:
-		_fail("one_five_stays_level_1", str(_eval_piles({5: 1})))
+	# Ciclo 1: un 4 = 2. Despues completar pila: un 5 = 3, un 6 = 4, un 7 = 5.
+	if _eval_piles({4: 1}) != 2:
+		_fail("one_four_is_level_2", str(_eval_piles({4: 1})))
 		return
-	if _eval_piles({5: 5}) != 2:
-		_fail("half_5_is_level_2", str(_eval_piles({5: 5})))
+	if _eval_piles({4: 10}) != 3:
+		_fail("ten_fours_is_level_3", str(_eval_piles({4: 10})))
 		return
-	if _eval_piles({6: 1}) != 3:
-		_fail("complete_5_is_level_3", str(_eval_piles({6: 1})))
+	if _eval_piles({5: 1}) != 3:
+		_fail("one_five_is_level_3", str(_eval_piles({5: 1})))
 		return
-	if _eval_piles({4: 10}) != 1:
-		_fail("fours_stay_level_1")
+	if _eval_piles({5: 5}) != 3:
+		_fail("five_fives_stay_level_3", str(_eval_piles({5: 5})))
 		return
-	if _eval_piles({6: 5}) != 4:
-		_fail("half_6_is_level_4", str(_eval_piles({6: 5})))
+	if _eval_piles({5: 1, 6: 1}) != 4:
+		_fail("one_six_is_level_4", str(_eval_piles({5: 1, 6: 1})))
 		return
-	if _eval_piles({6: 1, 7: 1}) != 5:
-		_fail("complete_6_is_level_5", str(_eval_piles({6: 1, 7: 1})))
+	if _eval_piles({3: 10}) != 1:
+		_fail("threes_stay_level_1")
 		return
-	if _eval_piles({6: 1, 7: 5}) != 6:
-		_fail("half_7_is_level_6", str(_eval_piles({6: 1, 7: 5})))
+	if _eval_piles({6: 5}, 1, 0, 3) != 4:
+		_fail("sixes_from_level_3", str(_eval_piles({6: 5}, 1, 0, 3)))
 		return
-	if _eval_piles({6: 1, 7: 1, 8: 1}) != 7:
-		_fail("complete_7_is_level_7", str(_eval_piles({6: 1, 7: 1, 8: 1})))
+	if _eval_piles({6: 1, 7: 1}, 1, 0, 4) != 5:
+		_fail("one_seven_is_level_5", str(_eval_piles({6: 1, 7: 1}, 1, 0, 4)))
 		return
-	if _eval_piles({6: 1, 7: 1, 8: 5}) != 8:
-		_fail("half_8_is_level_8", str(_eval_piles({6: 1, 7: 1, 8: 5})))
+	if _eval_piles({7: 2}, 1, 0, 4) != 5:
+		_fail("fused_sevens_from_level_4", str(_eval_piles({7: 2}, 1, 0, 4)))
 		return
-	if _eval_piles({6: 1, 7: 1, 8: 1, 9: 1}) != 9:
-		_fail("complete_8_is_level_9", str(_eval_piles({6: 1, 7: 1, 8: 1, 9: 1})))
+	if _eval_piles({8: 5}, 1, 0, 5) != 6:
+		_fail("fused_eights_from_level_5", str(_eval_piles({8: 5}, 1, 0, 5)))
+		return
+	if _eval_piles({7: 1}) != 1:
+		_fail("stray_seven_stays_level_1", str(_eval_piles({7: 1})))
+		return
+	if _eval_piles({7: 5}, 1, 0, 5) != 5:
+		_fail("five_sevens_stay_level_5", str(_eval_piles({7: 5}, 1, 0, 5)))
+		return
+	if _eval_piles({7: 1, 8: 1}, 1, 0, 5) != 6:
+		_fail("one_eight_is_level_6", str(_eval_piles({7: 1, 8: 1}, 1, 0, 5)))
+		return
+	if _eval_piles({8: 5}, 1, 0, 6) != 6:
+		_fail("five_eights_stay_level_6", str(_eval_piles({8: 5}, 1, 0, 6)))
+		return
+	if _eval_piles({8: 1, 9: 1}, 1, 0, 6) != 7:
+		_fail("one_nine_is_level_7", str(_eval_piles({8: 1, 9: 1}, 1, 0, 6)))
 		return
 	# Un 8 suelto, sin 5/6/7, no salta al 8/9.
 	if _eval_piles({8: 5}) != 1:
@@ -287,17 +303,60 @@ func _test_legacy_cycle_heal() -> void:
 	_ok("legacy_cycle_heal")
 
 func _test_descriptions() -> void:
-	var d2 := GameEngineScript.checkpoint_level_description(2, 5, 15)
-	if d2.find("mitad") < 0 or d2.find("5") < 0:
+	var d2 := GameEngineScript.checkpoint_level_description(2, 5, 15, 0, 1)
+	if d2.find("4") < 0:
 		_fail("desc_level_2", d2)
 		return
-	var d3 := GameEngineScript.checkpoint_level_description(3, 5, 15)
-	if d3.find("Completaste") < 0 or d3.find("5") < 0:
+	var d3 := GameEngineScript.checkpoint_level_description(3, 5, 15, 0, 1)
+	if d3.find("4") < 0:
 		_fail("desc_level_3", d3)
+		return
+	var d4 := GameEngineScript.checkpoint_level_description(4, 5, 15, 0, 1)
+	if d4.find("5") < 0:
+		_fail("desc_level_4", d4)
 		return
 	_ok("descriptions")
 
+func _progress(counts: Dictionary, target_level: int) -> float:
+	return GameEngineScript.progress_toward_checkpoint_level(
+		target_level,
+		0,
+		func(v: int) -> int: return int(counts.get(v, 0)),
+		10,
+		1,
+		5,
+		5,
+		15
+	)
+
+func _test_first_cycle_progress() -> void:
+	if _progress({4: 1}, 2) < 1.0:
+		_fail("progress_to_2_with_four", str(_progress({4: 1}, 2)))
+		return
+	var half_fours: float = _progress({4: 5}, 3)
+	if half_fours < 0.49 or half_fours > 0.51:
+		_fail("progress_to_3_half_fours", str(half_fours))
+		return
+	if _progress({5: 1}, 3) < 1.0:
+		_fail("progress_to_3_with_five", str(_progress({5: 1}, 3)))
+		return
+	var half_sixes: float = _progress({6: 5}, 5)
+	if half_sixes < 0.49 or half_sixes > 0.51:
+		_fail("progress_to_5_half_sixes", str(half_sixes))
+		return
+	if _progress({7: 1}, 5) < 1.0:
+		_fail("progress_to_5_with_seven", str(_progress({7: 1}, 5)))
+		return
+	_ok("first_cycle_progress")
+
 func _test_cover_showcase() -> void:
+	# Primera visita: save nuevo con max_value=5 pero sin fichas.
+	if GameEngineScript.cover_showcase_coin_value(5, 0) != 1:
+		_fail("cover_first_visit", str(GameEngineScript.cover_showcase_coin_value(5, 0)))
+		return
+	if GameEngineScript.cover_showcase_coin_value(0, 0) != 1:
+		_fail("cover_empty", str(GameEngineScript.cover_showcase_coin_value(0, 0)))
+		return
 	# Arranque: objetivo 5, tablero 1-4.
 	if GameEngineScript.cover_showcase_coin_value(5, 4) != 5:
 		_fail("cover_start", str(GameEngineScript.cover_showcase_coin_value(5, 4)))
