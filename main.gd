@@ -33,6 +33,7 @@ const HudLayoutServiceScript = preload("res://hud_layout_service.gd")
 const DialogVisibilityServiceScript = preload("res://dialog_visibility_service.gd")
 const MainFacadeScript = preload("res://main_facade.gd")
 const BoardTutorialServiceScript = preload("res://board_tutorial_service.gd")
+const LevelUpRewardServiceScript = preload("res://level_up_reward_service.gd")
 const SlotOverlayBgScript = preload("res://slot_overlay_bg.gd")
 const MixIconTexture = preload("res://Imagenes/icono-mezclar.png")
 const HammerIconTexture = preload("res://Imagenes/icono-martillo.png")
@@ -159,9 +160,9 @@ const WILDCARD_PACK_AMOUNT := 3
 const WILDCARD_PACK_COST_STARS := 500
 ## Nivel de checkpoint para desbloquear cada comodín (ver barra de progreso).
 const WILDCARD_UNLOCK_LEVEL := {
-	"mix": 5,
-	"hammer": 10,
-	"glove": 15,
+	"mix": 4,
+	"hammer": 9,
+	"glove": 14,
 }
 const WILDCARD_LOCKED_MODULATE := Color(0.70, 0.70, 0.70, 0.82)
 const TEMP_SLOT_COST_STARS := 200
@@ -189,7 +190,7 @@ const BUY_LIVES_COST := 600
 const BUY_LIVES_AMOUNT := INITIAL_LIVES
 ## Vidas que otorga ver un anuncio (mock).
 const AD_LIVES_AMOUNT := 1
-## Sistema de niveles (checkpoints). Ciclo 1: un 4 = N2, un 5 = N3, un 6 = N4; despues mitad/completar.
+## Sistema de niveles (checkpoints). Ciclo 1: un 4 = N2, completar 4/5/6 = N3/N4/N5; desde N6 mitad/completar.
 const CHECKPOINT_BASE_VALUE := 5
 ## "Mitad o más": la pila alcanza al menos la mitad de su capacidad en fichas de ese valor.
 const CHECKPOINT_HALF_THRESHOLD := STACK_CAPACITY / 2
@@ -406,7 +407,11 @@ var level_up_margin: MarginContainer = null
 var level_up_vbox: VBoxContainer = null
 var level_up_title_label: Label = null
 var level_up_subtitle_label: Label = null
+var level_up_claim_button: Control = null
+var level_up_ad_button: Control = null
 var level_up_continue_button: Control = null
+var _level_up_stars_claimed := false
+var _level_up_show_reward := false
 ## Cartel al desbloquear un comodín.
 var wildcard_unlock_overlay: ColorRect = null
 var wildcard_unlock_card: Panel = null
@@ -4480,6 +4485,35 @@ func make_dialog_gradient_button(text: String, font_size: int = DIALOG_BTN_FONT_
 	btn.set_meta("label", lbl)
 	return btn
 
+func _make_dialog_star_button(text: String) -> Control:
+	var btn := HudTextureButtons.create_gradient_pill()
+	btn.focus_mode = Control.FOCUS_NONE
+	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	btn.custom_minimum_size = Vector2(0, DIALOG_BTN_HEIGHT)
+	btn.set_meta("compact", false)
+	var content := HBoxContainer.new()
+	content.set_anchors_preset(Control.PRESET_FULL_RECT)
+	content.offset_left = 18
+	content.offset_right = -18
+	content.alignment = BoxContainer.ALIGNMENT_CENTER
+	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.add_theme_constant_override("separation", 14)
+	btn.add_child(content)
+	var icon := TextureRect.new()
+	icon.texture = StarIconTexture
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	content.add_child(icon)
+	var lbl := HudTextureButtons.create_button_label(text, DIALOG_BTN_FONT_SIZE)
+	lbl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	content.add_child(lbl)
+	btn.set_meta("label", lbl)
+	btn.set_meta("star_icon", icon)
+	return btn
+
 func _layout_dialog_gradient_button(btn: Control, btn_w: float, scale: float, font_size: int) -> void:
 	if btn == null:
 		return
@@ -4494,6 +4528,12 @@ func _layout_dialog_gradient_button(btn: Control, btn_w: float, scale: float, fo
 	var lbl: Label = btn.get_meta("label")
 	if lbl != null:
 		lbl.add_theme_font_size_override("font_size", int(font_size * scale))
+	if btn.has_meta("star_icon"):
+		var star_icon: TextureRect = btn.get_meta("star_icon")
+		if star_icon != null:
+			var icon_side := btn_h * 0.52
+			star_icon.custom_minimum_size = Vector2(icon_side, icon_side)
+			star_icon.size = Vector2(icon_side, icon_side)
 
 func build_no_moves_dialog() -> void:
 	no_moves_overlay = DialogBuilderServiceScript.create_modal_overlay(0.45, 320)
@@ -4832,6 +4872,16 @@ func build_level_up_dialog() -> void:
 	level_up_subtitle_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	level_up_vbox.add_child(level_up_subtitle_label)
 
+	level_up_claim_button = _make_dialog_star_button("10")
+	_bind_hud_chip_click(level_up_claim_button, _on_level_up_continue_pressed)
+	level_up_claim_button.visible = false
+	level_up_vbox.add_child(level_up_claim_button)
+
+	level_up_ad_button = _make_dialog_star_button("Duplicar")
+	_bind_hud_chip_click(level_up_ad_button, _on_level_up_ad_pressed)
+	level_up_ad_button.visible = false
+	level_up_vbox.add_child(level_up_ad_button)
+
 	level_up_continue_button = make_dialog_gradient_button("Continuar", DIALOG_COMPACT_BTN_FONT_SIZE, true)
 	_bind_hud_chip_click(level_up_continue_button, _on_level_up_continue_pressed)
 	level_up_vbox.add_child(level_up_continue_button)
@@ -4845,19 +4895,20 @@ func layout_level_up_dialog_controls() -> void:
 	if viewport_size.x < 2.0 or viewport_size.y < 2.0:
 		return
 	var scale = DialogBuilderServiceScript.dialog_scale(viewport_size)
-	# Título + "Nivel N" + Continuar (sin explicación larga).
-	var card_size = Vector2(min(viewport_size.x * 0.88, 720.0 * scale), 420.0 * scale)
+	var show_reward := _level_up_show_reward
+	var card_h: float = 760.0 * scale if show_reward else 480.0 * scale
+	var card_size = Vector2(min(viewport_size.x * 0.92, 860.0 * scale), card_h)
 	level_up_card.size = card_size
 	level_up_card.position = (viewport_size - card_size) * 0.5
 	level_up_card.visible = true
 
 	if level_up_margin != null:
-		level_up_margin.add_theme_constant_override("margin_left", int(40 * scale))
-		level_up_margin.add_theme_constant_override("margin_right", int(40 * scale))
-		level_up_margin.add_theme_constant_override("margin_top", int(40 * scale))
-		level_up_margin.add_theme_constant_override("margin_bottom", int(36 * scale))
+		level_up_margin.add_theme_constant_override("margin_left", int(44 * scale))
+		level_up_margin.add_theme_constant_override("margin_right", int(44 * scale))
+		level_up_margin.add_theme_constant_override("margin_top", int(44 * scale))
+		level_up_margin.add_theme_constant_override("margin_bottom", int(40 * scale))
 	if level_up_vbox != null:
-		level_up_vbox.add_theme_constant_override("separation", int(18 * scale))
+		level_up_vbox.add_theme_constant_override("separation", int(22 * scale))
 	if level_up_title_label != null:
 		_style_dialog_title_label(level_up_title_label, int(DIALOG_TITLE_FONT_SIZE * scale))
 		level_up_title_label.visible = true
@@ -4865,9 +4916,13 @@ func layout_level_up_dialog_controls() -> void:
 		_style_dialog_title_label(level_up_subtitle_label, int(DIALOG_SUBTITLE_FONT_SIZE * scale))
 		level_up_subtitle_label.visible = true
 	if level_up_continue_button != null:
-		level_up_continue_button.visible = true
+		level_up_continue_button.visible = not show_reward
 	var btn_w: float = _dialog_inner_button_width(card_size.x)
-	_layout_dialog_gradient_button(level_up_continue_button, btn_w, scale, DIALOG_COMPACT_BTN_FONT_SIZE)
+	if show_reward:
+		_layout_dialog_gradient_button(level_up_claim_button, btn_w, scale, 56)
+		_layout_dialog_gradient_button(level_up_ad_button, btn_w, scale, 56)
+	else:
+		_layout_dialog_gradient_button(level_up_continue_button, btn_w, scale, DIALOG_COMPACT_BTN_FONT_SIZE)
 
 func show_level_up_panel(level: int) -> void:
 	if level_up_overlay == null:
@@ -4881,6 +4936,17 @@ func show_level_up_panel(level: int) -> void:
 		level_up_title_label.text = "¡Subiste de nivel!"
 	if level_up_subtitle_label != null:
 		level_up_subtitle_label.text = "Nivel %d" % level
+	_level_up_stars_claimed = false
+	_level_up_show_reward = LevelUpRewardServiceScript.should_grant(level)
+	if level_up_claim_button != null:
+		level_up_claim_button.visible = _level_up_show_reward
+		var claim_lbl: Label = level_up_claim_button.get_meta("label")
+		if claim_lbl != null:
+			claim_lbl.text = str(LevelUpRewardServiceScript.base_stars(level))
+	if level_up_ad_button != null:
+		level_up_ad_button.visible = _level_up_show_reward
+	if level_up_continue_button != null:
+		level_up_continue_button.visible = not _level_up_show_reward
 	_force_progress_bar_display(1.0)
 	_visible_level_up_alert = level
 	_level_up_opened_at_msec = Time.get_ticks_msec()
@@ -4900,14 +4966,24 @@ func hide_level_up_panel() -> void:
 		board_locked = false
 	update_progress_bar(false)
 
-func _on_level_up_continue_pressed() -> void:
-	if Time.get_ticks_msec() - _level_up_opened_at_msec < 250:
+func _claim_level_up_stars(doubled: bool) -> void:
+	if _level_up_stars_claimed:
 		return
+	var amount := LevelUpRewardServiceScript.claim_stars(_visible_level_up_alert, doubled)
+	_level_up_stars_claimed = true
+	if amount <= 0:
+		return
+	player_stars += amount
+	if GameState != null:
+		GameState.player_stars = player_stars
+	update_stars_display()
+
+func _finish_level_up_alert() -> void:
 	if _visible_level_up_alert > 0:
 		_last_acked_checkpoint_level = maxi(_last_acked_checkpoint_level, _visible_level_up_alert)
 	hide_level_up_panel()
 	save_game()
-	# Si saltó varios niveles, mostrar el siguiente cartel antes de comodines/bloqueo.
+	# Si salto varios niveles, mostrar el siguiente cartel antes de comodines/bloqueo.
 	if not _pending_level_up_alerts.is_empty():
 		_show_next_level_up_alert()
 		return
@@ -4916,6 +4992,19 @@ func _on_level_up_continue_pressed() -> void:
 		return
 	try_show_wildcard_unlock_panel()
 	check_blocked_state()
+
+func _on_level_up_ad_pressed() -> void:
+	if Time.get_ticks_msec() - _level_up_opened_at_msec < 250:
+		return
+	# Mock: ver un anuncio duplica las estrellas de la subida.
+	_claim_level_up_stars(true)
+	_finish_level_up_alert()
+
+func _on_level_up_continue_pressed() -> void:
+	if Time.get_ticks_msec() - _level_up_opened_at_msec < 250:
+		return
+	_claim_level_up_stars(false)
+	_finish_level_up_alert()
 
 func build_wildcard_unlock_dialog() -> void:
 	wildcard_unlock_overlay = DialogBuilderServiceScript.create_modal_overlay(0.40, 315)

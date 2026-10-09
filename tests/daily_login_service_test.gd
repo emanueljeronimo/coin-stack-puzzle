@@ -122,17 +122,17 @@ func _test_slots_and_rotation() -> void:
 	_ok("slots_and_rotation")
 
 func _test_level_unlock() -> void:
-	if DailyLoginServiceScript.unlock_level() != 5:
+	if DailyLoginServiceScript.unlock_level() != 4:
 		_fail("unlock_level", str(DailyLoginServiceScript.unlock_level()))
 		return
-	if DailyLoginServiceScript.is_unlocked(4):
-		_fail("locked_at_4")
+	if DailyLoginServiceScript.is_unlocked(3):
+		_fail("locked_at_3")
+		return
+	if not DailyLoginServiceScript.is_unlocked(4):
+		_fail("unlocked_at_4")
 		return
 	if not DailyLoginServiceScript.is_unlocked(5):
-		_fail("unlocked_at_5")
-		return
-	if not DailyLoginServiceScript.is_unlocked(6):
-		_fail("unlocked_after_5")
+		_fail("unlocked_after_4")
 		return
 	_ok("level_unlock")
 

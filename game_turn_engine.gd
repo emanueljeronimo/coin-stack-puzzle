@@ -25,6 +25,11 @@ const EARLY_GROUP_LEVELS := 0
 const EARLY_GROUP_CHUNK := 4
 
 ## Hasta el 3, entre el playtest facil y el recorte; no se agrupan por color.
+const EARLY_DOUBLE_DEAL_UNTIL_LEVEL := 6
+
+static func should_double_early_deals(checkpoint_level: int) -> bool:
+	return checkpoint_level >= 1 and checkpoint_level <= EARLY_DOUBLE_DEAL_UNTIL_LEVEL
+
 static func early_roll_target(checkpoint_level: int) -> int:
 	match checkpoint_level:
 		1:
@@ -69,6 +74,8 @@ static func compute_level_roll_count(
 	var base: int = compute_roll_count(pool_size, total_free_slots, keep_one_free_if_possible)
 	var early: int = early_roll_target(checkpoint_level)
 	var wanted: int = maxi(base, early)
+	if should_double_early_deals(checkpoint_level):
+		wanted *= 2
 	var cap: int = total_free_slots
 	if keep_one_free_if_possible and total_free_slots >= 2:
 		cap = total_free_slots - 1

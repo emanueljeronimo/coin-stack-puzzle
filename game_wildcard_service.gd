@@ -6,9 +6,9 @@ class_name GameWildcardService
 const TYPES := ["mix", "hammer", "glove"]
 const INITIAL_USES := 3
 const UNLOCK_LEVEL := {
-	"mix": 5,
-	"hammer": 10,
-	"glove": 15,
+	"mix": 4,
+	"hammer": 9,
+	"glove": 14,
 }
 
 static func normalize_counts(raw: Variant) -> Dictionary:

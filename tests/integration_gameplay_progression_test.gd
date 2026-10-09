@@ -198,9 +198,9 @@ func _test_first_cycle_levels_from_one_to_nine() -> void:
 		[6, 1, 4],
 		[6, 5, 4],
 		[7, 1, 5],
-		[7, 5, 5],
-		[8, 1, 6],
-		[8, 5, 6],
+		[7, 5, 6],
+		[8, 1, 7],
+		[8, 5, 8],
 	]
 	for step in steps:
 		var coin := int(step[0])

@@ -46,6 +46,7 @@ TEST_SCRIPTS=(
   "res://tests/shop_catalog_service_test.gd"
   "res://tests/daily_login_service_test.gd"
   "res://tests/board_tutorial_service_test.gd"
+  "res://tests/level_up_reward_service_test.gd"
   "res://tests/slot_overlay_builder_test.gd"
   "res://tests/temp_slot_purchase_service_test.gd"
   "res://tests/adjacent_slot_purchase_service_test.gd"

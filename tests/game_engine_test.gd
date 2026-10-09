@@ -92,7 +92,7 @@ func _eval_piles(counts: Dictionary, roll_floor: int = 1, origin: int = 0, min_l
 	)
 
 func _test_checkpoint_eval() -> void:
-	# Ciclo 1: un 4 = 2. Despues completar pila: un 5 = 3, un 6 = 4, un 7 = 5.
+	# Ciclo 1: un 4 = 2. Completar 4/5/6 = 3/4/5. Desde el 6: mitad + completar.
 	if _eval_piles({4: 1}) != 2:
 		_fail("one_four_is_level_2", str(_eval_piles({4: 1})))
 		return
@@ -120,23 +120,23 @@ func _test_checkpoint_eval() -> void:
 	if _eval_piles({7: 2}, 1, 0, 4) != 5:
 		_fail("fused_sevens_from_level_4", str(_eval_piles({7: 2}, 1, 0, 4)))
 		return
-	if _eval_piles({8: 5}, 1, 0, 5) != 6:
+	if _eval_piles({7: 5}, 1, 0, 5) != 6:
+		_fail("five_sevens_is_level_6", str(_eval_piles({7: 5}, 1, 0, 5)))
+		return
+	if _eval_piles({8: 5}, 1, 0, 5) != 8:
 		_fail("fused_eights_from_level_5", str(_eval_piles({8: 5}, 1, 0, 5)))
 		return
 	if _eval_piles({7: 1}) != 1:
 		_fail("stray_seven_stays_level_1", str(_eval_piles({7: 1})))
 		return
-	if _eval_piles({7: 5}, 1, 0, 5) != 5:
-		_fail("five_sevens_stay_level_5", str(_eval_piles({7: 5}, 1, 0, 5)))
+	if _eval_piles({7: 1, 8: 1}, 1, 0, 5) != 7:
+		_fail("one_eight_is_level_7", str(_eval_piles({7: 1, 8: 1}, 1, 0, 5)))
 		return
-	if _eval_piles({7: 1, 8: 1}, 1, 0, 5) != 6:
-		_fail("one_eight_is_level_6", str(_eval_piles({7: 1, 8: 1}, 1, 0, 5)))
+	if _eval_piles({8: 5}, 1, 0, 6) != 8:
+		_fail("five_eights_is_level_8", str(_eval_piles({8: 5}, 1, 0, 6)))
 		return
-	if _eval_piles({8: 5}, 1, 0, 6) != 6:
-		_fail("five_eights_stay_level_6", str(_eval_piles({8: 5}, 1, 0, 6)))
-		return
-	if _eval_piles({8: 1, 9: 1}, 1, 0, 6) != 7:
-		_fail("one_nine_is_level_7", str(_eval_piles({8: 1, 9: 1}, 1, 0, 6)))
+	if _eval_piles({8: 1, 9: 1}, 1, 0, 6) != 9:
+		_fail("one_nine_is_level_9", str(_eval_piles({8: 1, 9: 1}, 1, 0, 6)))
 		return
 	# Un 8 suelto, sin 5/6/7, no salta al 8/9.
 	if _eval_piles({8: 5}) != 1:
@@ -315,6 +315,14 @@ func _test_descriptions() -> void:
 	if d4.find("5") < 0:
 		_fail("desc_level_4", d4)
 		return
+	var d6 := GameEngineScript.checkpoint_level_description(6, 5, 15, 0, 1)
+	if d6.find("7") < 0 or d6.find("mitad") < 0:
+		_fail("desc_level_6", d6)
+		return
+	var d7 := GameEngineScript.checkpoint_level_description(7, 5, 15, 0, 1)
+	if d7.find("7") < 0 or d7.find("Completaste") < 0:
+		_fail("desc_level_7", d7)
+		return
 	_ok("descriptions")
 
 func _progress(counts: Dictionary, target_level: int) -> float:
@@ -346,6 +354,20 @@ func _test_first_cycle_progress() -> void:
 		return
 	if _progress({7: 1}, 5) < 1.0:
 		_fail("progress_to_5_with_seven", str(_progress({7: 1}, 5)))
+		return
+	var half_sevens: float = _progress({7: 2}, 6)
+	if half_sevens < 0.39 or half_sevens > 0.41:
+		_fail("progress_to_6_two_sevens", str(half_sevens))
+		return
+	if _progress({7: 5}, 6) < 1.0:
+		_fail("progress_to_6_five_sevens", str(_progress({7: 5}, 6)))
+		return
+	if _progress({8: 1}, 6) < 1.0:
+		_fail("progress_to_6_with_eight", str(_progress({8: 1}, 6)))
+		return
+	var complete_sevens: float = _progress({7: 5}, 7)
+	if complete_sevens < 0.49 or complete_sevens > 0.51:
+		_fail("progress_to_7_five_sevens", str(complete_sevens))
 		return
 	_ok("first_cycle_progress")
 

@@ -34,10 +34,10 @@ func _fail(name: String, detail: String = "") -> void:
 
 func _test_first_unlock_grants_initial_uses() -> void:
 	var synced := GameWildcardServiceScript.sync_unlocks(
-		5,
+		4,
 		{"mix": 0, "hammer": 0, "glove": 0},
 		{"mix": false, "hammer": false, "glove": false},
-		4
+		3
 	)
 	var counts: Dictionary = synced.get("wildcard_counts", {})
 	if int(counts.get("mix", 0)) != GameWildcardServiceScript.INITIAL_USES:
@@ -67,7 +67,7 @@ func _test_restore_does_not_regrant_when_granted() -> void:
 	if int(counts.get("hammer", -1)) != 1:
 		_fail("keep_hammer", str(counts))
 		return
-	# glove aún no granted y nivel >= 15? 12 < 15 → sigue 0
+	# glove aun no granted y nivel >= 14? 12 < 14 → sigue 0
 	if int(counts.get("glove", -1)) != 0:
 		_fail("glove_still_locked", str(counts))
 		return
@@ -92,7 +92,7 @@ func _test_restore_keeps_spent_counts() -> void:
 
 func _test_locked_wildcards_stay_zero() -> void:
 	var synced := GameWildcardServiceScript.sync_unlocks(
-		4,
+		3,
 		{"mix": 9, "hammer": 9, "glove": 9},
 		{"mix": true, "hammer": true, "glove": true},
 		-1
