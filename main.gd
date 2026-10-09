@@ -35,6 +35,7 @@ const MainFacadeScript = preload("res://main_facade.gd")
 const BoardTutorialServiceScript = preload("res://board_tutorial_service.gd")
 const LevelUpRewardServiceScript = preload("res://level_up_reward_service.gd")
 const SlotOverlayBgScript = preload("res://slot_overlay_bg.gd")
+const RainbowLabelShader = preload("res://rainbow_label.gdshader")
 const MixIconTexture = preload("res://Imagenes/icono-mezclar.png")
 const HammerIconTexture = preload("res://Imagenes/icono-martillo.png")
 const GloveIconTexture = preload("res://Imagenes/icono-mano.png")
@@ -126,13 +127,14 @@ const PROGRESS_PERCENT_FONT_SIZE := 26
 const DIALOG_BTN_HEIGHT := 118.0
 const DIALOG_BTN_RADIUS := 36
 const DIALOG_TITLE_FONT_SIZE := 72
+const LEVEL_UP_TITLE_FONT_SIZE := 96
 const DIALOG_SUBTITLE_FONT_SIZE := 52
 const DIALOG_BTN_FONT_SIZE := 42
 const DIALOG_COMPACT_BTN_WIDTH_RATIO := 0.52
 const DIALOG_COMPACT_BTN_HEIGHT_RATIO := 0.70
 const DIALOG_COMPACT_BTN_FONT_SIZE := 50
 const WILDCARD_UNLOCK_CARD_HEIGHT := 520.0
-const WILDCARD_UNLOCK_TITLE_FONT_SIZE := 54
+const WILDCARD_UNLOCK_TITLE_FONT_SIZE := 80
 const MENU_CARD_INNER_BTN_WIDTH_RATIO := 0.68
 const MENU_CARD_WIDTH_MAX := 920.0
 ## Botón Repartir, deshacer y comodines.
@@ -407,6 +409,7 @@ var level_up_margin: MarginContainer = null
 var level_up_vbox: VBoxContainer = null
 var level_up_title_label: Label = null
 var level_up_subtitle_label: Label = null
+var level_up_button_row: HBoxContainer = null
 var level_up_claim_button: Control = null
 var level_up_ad_button: Control = null
 var level_up_continue_button: Control = null
@@ -2550,6 +2553,77 @@ func _settings_card_colors() -> Dictionary:
 		Color(0.42, 0.28, 0.58, 0.95)
 	)
 
+## Carteles de nivel/comodín: borde grueso oscuro + sombra, como los chips candy.
+func _apply_candy_dialog_card(card: Panel, ui_scale: float = 1.0) -> void:
+	if card == null:
+		return
+	var colors: Dictionary = UiThemeServiceScript.candy_dialog_colors(GameState.get_ui_palette())
+	var radius: int = int(clampf(38.0 * ui_scale, 30.0, 48.0))
+	var border_w: int = int(clampf(10.0 * ui_scale, 8.0, 14.0))
+	card.add_theme_stylebox_override(
+		"panel",
+		UiStyleUtils.candy_dialog_style(
+			colors.bg,
+			colors.border,
+			colors.shadow,
+			radius,
+			border_w
+		)
+	)
+	HudTextureButtons.apply_optional_rainbow_fill(card, radius, card.size, border_w)
+
+func _apply_candy_button_frame(btn: Control, radius: int, border_w: int, btn_size: Vector2) -> void:
+	if btn == null:
+		return
+	btn.clip_contents = false
+	var frame: Panel = null
+	if btn.has_meta("candy_frame_panel"):
+		frame = btn.get_meta("candy_frame_panel")
+	if frame == null:
+		frame = Panel.new()
+		frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		frame.set_anchors_preset(Control.PRESET_FULL_RECT)
+		frame.offset_left = 0
+		frame.offset_top = 0
+		frame.offset_right = 0
+		frame.offset_bottom = 0
+		btn.add_child(frame)
+		btn.set_meta("candy_frame_panel", frame)
+	btn.move_child(frame, 0)
+	var colors: Dictionary = UiThemeServiceScript.candy_dialog_colors(GameState.get_ui_palette())
+	var style := StyleBoxFlat.new()
+	style.bg_color = colors.border
+	style.draw_center = true
+	style.anti_aliasing = true
+	style.set_border_width_all(0)
+	style.set_corner_radius_all(radius)
+	frame.add_theme_stylebox_override("panel", style)
+	if not btn.has_meta("pill_bg"):
+		return
+	var bg: TextureRect = btn.get_meta("pill_bg")
+	if bg == null:
+		return
+	var inset := float(border_w)
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.offset_left = inset
+	bg.offset_top = inset
+	bg.offset_right = -inset
+	bg.offset_bottom = -inset
+	var inner := Vector2(
+		maxf(btn_size.x - inset * 2.0, 4.0),
+		maxf(btn_size.y - inset * 2.0, 4.0)
+	)
+	var inner_radius: int = maxi(radius - border_w, 8)
+	if bg.has_method("configure"):
+		var palette: Dictionary = GameState.get_ui_palette()
+		bg.configure(
+			inner_radius,
+			palette.get("grad_a", Color(0.62, 0.82, 0.97, 0.94)),
+			palette.get("grad_b", Color(0.98, 0.68, 0.84, 0.94)),
+			palette.get("grad_c", Color(0.66, 0.88, 0.68, 0.94)),
+			inner
+		)
+
 ## Fondo de cartel + borde del color del CTA (Continuar / botón on del tema).
 func _apply_cta_border_dialog_card(card: Panel, radius: int = 30, border_w: int = 5) -> void:
 	if card == null:
@@ -2562,6 +2636,7 @@ func _apply_cta_border_dialog_card(card: Panel, radius: int = 30, border_w: int 
 		"panel",
 		make_flat_style(card_bg, border, radius, border_w)
 	)
+	HudTextureButtons.apply_optional_rainbow_fill(card, radius, card.size, border_w)
 
 func _apply_settings_style_card(card: Panel, radius: int = 30, border_w: int = 4) -> void:
 	if card == null:
@@ -2571,11 +2646,12 @@ func _apply_settings_style_card(card: Panel, radius: int = 30, border_w: int = 4
 		"panel",
 		make_flat_style(colors.bg, colors.border, radius, border_w)
 	)
+	HudTextureButtons.apply_optional_rainbow_fill(card, radius, card.size, border_w)
 
 func _apply_dialog_cards_theme_colors() -> void:
 	_apply_cta_border_dialog_card(no_moves_card)
-	_apply_cta_border_dialog_card(level_up_card)
-	_apply_cta_border_dialog_card(wildcard_unlock_card)
+	_apply_candy_dialog_card(level_up_card)
+	_apply_candy_dialog_card(wildcard_unlock_card)
 	_apply_cta_border_dialog_card(slot_buy_card)
 	_apply_settings_style_card(purchase_card, 30, 4)
 
@@ -4458,14 +4534,45 @@ func _create_dialog_card(clip_contents: bool = true) -> Panel:
 	_apply_settings_style_card(card)
 	return card
 
-func _style_dialog_title_label(lbl: Label, font_size: int) -> void:
-	if UiFont != null:
+func _heavy_dialog_font() -> Font:
+	if UiFont == null:
+		return null
+	var variation := FontVariation.new()
+	variation.base_font = UiFont
+	variation.variation_embolden = 0.65
+	return variation
+
+func _apply_rainbow_label(lbl: Label, span_px: float) -> void:
+	if lbl == null:
+		return
+	var mat: ShaderMaterial = lbl.material as ShaderMaterial
+	if mat == null or mat.shader != RainbowLabelShader:
+		mat = ShaderMaterial.new()
+		mat.shader = RainbowLabelShader
+		lbl.material = mat
+	mat.set_shader_parameter("span_px", maxf(span_px, 1.0))
+
+func _style_dialog_title_label(lbl: Label, font_size: int, relief: bool = false, heavy: bool = false) -> void:
+	if heavy:
+		var heavy_font: Font = _heavy_dialog_font()
+		if heavy_font != null:
+			lbl.add_theme_font_override("font", heavy_font)
+		elif UiFont != null:
+			lbl.add_theme_font_override("font", UiFont)
+	elif UiFont != null:
 		lbl.add_theme_font_override("font", UiFont)
 	lbl.add_theme_font_size_override("font_size", font_size)
 	var p: Dictionary = GameState.get_ui_palette()
 	lbl.add_theme_color_override("font_color", p.get("settings_title", HudTextureButtons.BTN_TEXT_COLOR))
 	lbl.add_theme_color_override("font_outline_color", Color(0.22, 0.20, 0.24, 0.78))
-	lbl.add_theme_constant_override("outline_size", 5)
+	lbl.add_theme_constant_override("outline_size", 12 if heavy else (8 if relief else 5))
+	if relief:
+		lbl.add_theme_color_override("font_shadow_color", Color(0.16, 0.10, 0.18, 0.55))
+		lbl.add_theme_constant_override("shadow_offset_x", 2)
+		lbl.add_theme_constant_override("shadow_offset_y", maxi(int(round(float(font_size) * 0.08)), 4))
+	else:
+		lbl.add_theme_constant_override("shadow_offset_x", 0)
+		lbl.add_theme_constant_override("shadow_offset_y", 0)
 
 func make_dialog_gradient_button(text: String, font_size: int = DIALOG_BTN_FONT_SIZE, compact: bool = false) -> Control:
 	var btn := HudTextureButtons.create_gradient_pill()
@@ -4492,6 +4599,8 @@ func _make_dialog_star_button(text: String) -> Control:
 	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	btn.custom_minimum_size = Vector2(0, DIALOG_BTN_HEIGHT)
 	btn.set_meta("compact", false)
+	btn.set_meta("height_ratio", 0.78)
+	btn.set_meta("use_candy_frame", true)
 	var content := HBoxContainer.new()
 	content.set_anchors_preset(Control.PRESET_FULL_RECT)
 	content.offset_left = 18
@@ -4519,21 +4628,28 @@ func _layout_dialog_gradient_button(btn: Control, btn_w: float, scale: float, fo
 		return
 	var compact: bool = btn.get_meta("compact", false)
 	var width_ratio: float = DIALOG_COMPACT_BTN_WIDTH_RATIO if compact else 1.0
-	var height_ratio: float = DIALOG_COMPACT_BTN_HEIGHT_RATIO if compact else 1.0
+	var height_ratio: float = DIALOG_COMPACT_BTN_HEIGHT_RATIO if compact else float(btn.get_meta("height_ratio", 1.0))
 	var actual_w: float = btn_w * width_ratio
 	var btn_h: float = DIALOG_BTN_HEIGHT * scale * height_ratio
 	btn.custom_minimum_size = Vector2(actual_w, btn_h)
-	var radius := int(DIALOG_BTN_RADIUS * scale * (height_ratio if compact else 1.0))
+	btn.size = Vector2(actual_w, btn_h)
+	var radius := int(DIALOG_BTN_RADIUS * scale * height_ratio)
 	HudTextureButtons.apply_gradient_pill_style(btn, radius, Vector2(actual_w, btn_h))
 	var lbl: Label = btn.get_meta("label")
 	if lbl != null:
 		lbl.add_theme_font_size_override("font_size", int(font_size * scale))
+		if bool(btn.get_meta("use_candy_frame", false)):
+			lbl.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 1.0))
+			lbl.add_theme_constant_override("outline_size", int(clampf(round(7.0 * scale), 6.0, 10.0)))
 	if btn.has_meta("star_icon"):
 		var star_icon: TextureRect = btn.get_meta("star_icon")
 		if star_icon != null:
-			var icon_side := btn_h * 0.52
+			var icon_side := btn_h * 0.72
 			star_icon.custom_minimum_size = Vector2(icon_side, icon_side)
 			star_icon.size = Vector2(icon_side, icon_side)
+	if bool(btn.get_meta("use_candy_frame", false)):
+		var border_w: int = int(clampf(5.0 * scale, 4.0, 7.0))
+		_apply_candy_button_frame(btn, radius, border_w, Vector2(actual_w, btn_h))
 
 func build_no_moves_dialog() -> void:
 	no_moves_overlay = DialogBuilderServiceScript.create_modal_overlay(0.45, 320)
@@ -4860,29 +4976,38 @@ func build_level_up_dialog() -> void:
 	level_up_vbox.add_theme_constant_override("separation", 20)
 	level_up_margin.add_child(level_up_vbox)
 
-	level_up_title_label = create_label("¡Subiste de nivel!", DIALOG_TITLE_FONT_SIZE, HudTextureButtons.BTN_TEXT_COLOR)
-	_style_dialog_title_label(level_up_title_label, DIALOG_TITLE_FONT_SIZE)
+	level_up_title_label = create_label("¡Subiste de nivel!", LEVEL_UP_TITLE_FONT_SIZE, HudTextureButtons.BTN_TEXT_COLOR)
+	_style_dialog_title_label(level_up_title_label, LEVEL_UP_TITLE_FONT_SIZE, true, true)
 	level_up_title_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	level_up_title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	level_up_vbox.add_child(level_up_title_label)
 
 	level_up_subtitle_label = create_label("Nivel 2", DIALOG_SUBTITLE_FONT_SIZE, HudTextureButtons.BTN_TEXT_COLOR)
-	_style_dialog_title_label(level_up_subtitle_label, DIALOG_SUBTITLE_FONT_SIZE)
+	_style_dialog_title_label(level_up_subtitle_label, DIALOG_SUBTITLE_FONT_SIZE, true, true)
 	level_up_subtitle_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	level_up_subtitle_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	level_up_vbox.add_child(level_up_subtitle_label)
 
+	level_up_button_row = HBoxContainer.new()
+	level_up_button_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	level_up_button_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	level_up_button_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	level_up_button_row.add_theme_constant_override("separation", 18)
+	level_up_button_row.visible = false
+	level_up_vbox.add_child(level_up_button_row)
+
 	level_up_claim_button = _make_dialog_star_button("10")
 	_bind_hud_chip_click(level_up_claim_button, _on_level_up_continue_pressed)
 	level_up_claim_button.visible = false
-	level_up_vbox.add_child(level_up_claim_button)
+	level_up_button_row.add_child(level_up_claim_button)
 
 	level_up_ad_button = _make_dialog_star_button("Duplicar")
 	_bind_hud_chip_click(level_up_ad_button, _on_level_up_ad_pressed)
 	level_up_ad_button.visible = false
-	level_up_vbox.add_child(level_up_ad_button)
+	level_up_button_row.add_child(level_up_ad_button)
 
 	level_up_continue_button = make_dialog_gradient_button("Continuar", DIALOG_COMPACT_BTN_FONT_SIZE, true)
+	level_up_continue_button.set_meta("use_candy_frame", true)
 	_bind_hud_chip_click(level_up_continue_button, _on_level_up_continue_pressed)
 	level_up_vbox.add_child(level_up_continue_button)
 
@@ -4896,33 +5021,40 @@ func layout_level_up_dialog_controls() -> void:
 		return
 	var scale = DialogBuilderServiceScript.dialog_scale(viewport_size)
 	var show_reward := _level_up_show_reward
-	var card_h: float = 760.0 * scale if show_reward else 480.0 * scale
+	var card_h: float = 560.0 * scale if show_reward else 480.0 * scale
 	var card_size = Vector2(min(viewport_size.x * 0.92, 860.0 * scale), card_h)
 	level_up_card.size = card_size
 	level_up_card.position = (viewport_size - card_size) * 0.5
 	level_up_card.visible = true
 
 	if level_up_margin != null:
-		level_up_margin.add_theme_constant_override("margin_left", int(44 * scale))
-		level_up_margin.add_theme_constant_override("margin_right", int(44 * scale))
-		level_up_margin.add_theme_constant_override("margin_top", int(44 * scale))
-		level_up_margin.add_theme_constant_override("margin_bottom", int(40 * scale))
+		level_up_margin.add_theme_constant_override("margin_left", int(40 * scale))
+		level_up_margin.add_theme_constant_override("margin_right", int(40 * scale))
+		level_up_margin.add_theme_constant_override("margin_top", int(18 * scale))
+		level_up_margin.add_theme_constant_override("margin_bottom", int(36 * scale))
 	if level_up_vbox != null:
-		level_up_vbox.add_theme_constant_override("separation", int(22 * scale))
+		level_up_vbox.add_theme_constant_override("separation", int(16 * scale))
+	_apply_candy_dialog_card(level_up_card, scale)
 	if level_up_title_label != null:
-		_style_dialog_title_label(level_up_title_label, int(DIALOG_TITLE_FONT_SIZE * scale))
+		_style_dialog_title_label(level_up_title_label, int(LEVEL_UP_TITLE_FONT_SIZE * scale), true, true)
 		level_up_title_label.visible = true
+		_apply_rainbow_label(level_up_title_label, card_size.x - 80.0 * scale)
 	if level_up_subtitle_label != null:
-		_style_dialog_title_label(level_up_subtitle_label, int(DIALOG_SUBTITLE_FONT_SIZE * scale))
+		_style_dialog_title_label(level_up_subtitle_label, int(DIALOG_SUBTITLE_FONT_SIZE * scale), true, true)
 		level_up_subtitle_label.visible = true
+		_apply_rainbow_label(level_up_subtitle_label, card_size.x * 0.55)
+	if level_up_button_row != null:
+		level_up_button_row.visible = show_reward
+		level_up_button_row.add_theme_constant_override("separation", int(18 * scale))
 	if level_up_continue_button != null:
 		level_up_continue_button.visible = not show_reward
-	var btn_w: float = _dialog_inner_button_width(card_size.x)
+	var inner_w: float = _dialog_inner_button_width(card_size.x)
 	if show_reward:
-		_layout_dialog_gradient_button(level_up_claim_button, btn_w, scale, 56)
-		_layout_dialog_gradient_button(level_up_ad_button, btn_w, scale, 56)
+		var pair_w: float = (inner_w - 18.0 * scale) * 0.5
+		_layout_dialog_gradient_button(level_up_claim_button, pair_w, scale, 48)
+		_layout_dialog_gradient_button(level_up_ad_button, pair_w, scale, 44)
 	else:
-		_layout_dialog_gradient_button(level_up_continue_button, btn_w, scale, DIALOG_COMPACT_BTN_FONT_SIZE)
+		_layout_dialog_gradient_button(level_up_continue_button, inner_w, scale, DIALOG_COMPACT_BTN_FONT_SIZE)
 
 func show_level_up_panel(level: int) -> void:
 	if level_up_overlay == null:
@@ -4945,6 +5077,8 @@ func show_level_up_panel(level: int) -> void:
 			claim_lbl.text = str(LevelUpRewardServiceScript.base_stars(level))
 	if level_up_ad_button != null:
 		level_up_ad_button.visible = _level_up_show_reward
+	if level_up_button_row != null:
+		level_up_button_row.visible = _level_up_show_reward
 	if level_up_continue_button != null:
 		level_up_continue_button.visible = not _level_up_show_reward
 	_force_progress_bar_display(1.0)
@@ -5012,6 +5146,7 @@ func build_wildcard_unlock_dialog() -> void:
 	dialog_layer.add_child(wildcard_unlock_overlay)
 
 	wildcard_unlock_card = _create_dialog_card(false)
+	wildcard_unlock_card.clip_contents = false
 	wildcard_unlock_card.z_as_relative = false
 	wildcard_unlock_card.z_index = 316
 	wildcard_unlock_overlay.add_child(wildcard_unlock_card)
@@ -5023,31 +5158,37 @@ func build_wildcard_unlock_dialog() -> void:
 
 	wildcard_unlock_vbox = VBoxContainer.new()
 	wildcard_unlock_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	wildcard_unlock_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	wildcard_unlock_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	wildcard_unlock_vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	wildcard_unlock_vbox.add_theme_constant_override("separation", 20)
+	wildcard_unlock_vbox.add_theme_constant_override("separation", 16)
 	wildcard_unlock_margin.add_child(wildcard_unlock_vbox)
 
 	wildcard_unlock_title_label = create_label(
 		"Desbloqueado: comodín Mezclar", WILDCARD_UNLOCK_TITLE_FONT_SIZE, HudTextureButtons.BTN_TEXT_COLOR
 	)
-	_style_dialog_title_label(wildcard_unlock_title_label, WILDCARD_UNLOCK_TITLE_FONT_SIZE)
+	_style_dialog_title_label(wildcard_unlock_title_label, WILDCARD_UNLOCK_TITLE_FONT_SIZE, true, true)
 	wildcard_unlock_title_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	wildcard_unlock_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	wildcard_unlock_title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	wildcard_unlock_vbox.add_child(wildcard_unlock_title_label)
 
 	wildcard_unlock_subtitle_label = create_label(
 		"", DIALOG_SUBTITLE_FONT_SIZE, HudTextureButtons.BTN_TEXT_COLOR
 	)
-	_style_dialog_title_label(wildcard_unlock_subtitle_label, DIALOG_SUBTITLE_FONT_SIZE)
+	_style_dialog_title_label(wildcard_unlock_subtitle_label, DIALOG_SUBTITLE_FONT_SIZE, true, true)
 	wildcard_unlock_subtitle_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	wildcard_unlock_subtitle_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	wildcard_unlock_subtitle_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	wildcard_unlock_vbox.add_child(wildcard_unlock_subtitle_label)
 
 	wildcard_unlock_continue_button = make_dialog_gradient_button("Continuar", DIALOG_COMPACT_BTN_FONT_SIZE, true)
+	wildcard_unlock_continue_button.set_meta("use_candy_frame", true)
+	wildcard_unlock_continue_button.set_meta("height_ratio", 0.78)
 	_bind_hud_chip_click(wildcard_unlock_continue_button, _on_wildcard_unlock_continue_pressed)
 	wildcard_unlock_vbox.add_child(wildcard_unlock_continue_button)
 
-	_apply_cta_border_dialog_card(wildcard_unlock_card)
+	_apply_candy_dialog_card(wildcard_unlock_card)
 	layout_wildcard_unlock_dialog_controls()
 
 func layout_wildcard_unlock_dialog_controls() -> void:
@@ -5057,23 +5198,26 @@ func layout_wildcard_unlock_dialog_controls() -> void:
 	if viewport_size.x < 2.0 or viewport_size.y < 2.0:
 		return
 	var ui_scale: float = DialogBuilderServiceScript.dialog_scale(viewport_size)
-	var card_w: float = minf(viewport_size.x * 0.86, 720.0 * ui_scale)
-	var card_h: float = WILDCARD_UNLOCK_CARD_HEIGHT * ui_scale
+	var card_w: float = minf(viewport_size.x * 0.92, 860.0 * ui_scale)
+	var card_h: float = 520.0 * ui_scale
 	var card_size := Vector2(card_w, card_h)
 	wildcard_unlock_card.size = card_size
 	wildcard_unlock_card.position = (viewport_size - card_size) * 0.5
 
 	if wildcard_unlock_margin != null:
-		wildcard_unlock_margin.add_theme_constant_override("margin_left", int(36 * ui_scale))
-		wildcard_unlock_margin.add_theme_constant_override("margin_right", int(36 * ui_scale))
-		wildcard_unlock_margin.add_theme_constant_override("margin_top", int(36 * ui_scale))
-		wildcard_unlock_margin.add_theme_constant_override("margin_bottom", int(32 * ui_scale))
+		wildcard_unlock_margin.add_theme_constant_override("margin_left", int(40 * ui_scale))
+		wildcard_unlock_margin.add_theme_constant_override("margin_right", int(40 * ui_scale))
+		wildcard_unlock_margin.add_theme_constant_override("margin_top", int(18 * ui_scale))
+		wildcard_unlock_margin.add_theme_constant_override("margin_bottom", int(36 * ui_scale))
 	if wildcard_unlock_vbox != null:
-		wildcard_unlock_vbox.add_theme_constant_override("separation", int(14 * ui_scale))
+		wildcard_unlock_vbox.add_theme_constant_override("separation", int(16 * ui_scale))
+	_apply_candy_dialog_card(wildcard_unlock_card, ui_scale)
 	if wildcard_unlock_title_label != null:
-		_style_dialog_title_label(wildcard_unlock_title_label, int(WILDCARD_UNLOCK_TITLE_FONT_SIZE * ui_scale))
+		_style_dialog_title_label(wildcard_unlock_title_label, int(WILDCARD_UNLOCK_TITLE_FONT_SIZE * ui_scale), true, true)
+		_apply_rainbow_label(wildcard_unlock_title_label, card_size.x - 80.0 * ui_scale)
 	if wildcard_unlock_subtitle_label != null:
-		_style_dialog_title_label(wildcard_unlock_subtitle_label, int(40 * ui_scale))
+		_style_dialog_title_label(wildcard_unlock_subtitle_label, int(DIALOG_SUBTITLE_FONT_SIZE * ui_scale), true, true)
+		_apply_rainbow_label(wildcard_unlock_subtitle_label, card_size.x * 0.72)
 	var btn_w: float = _dialog_inner_button_width(card_size.x)
 	_layout_dialog_gradient_button(wildcard_unlock_continue_button, btn_w, ui_scale, DIALOG_COMPACT_BTN_FONT_SIZE)
 

@@ -8,11 +8,13 @@ const PlayButtonTexture := preload("res://Imagenes/boton-nuevo.png")
 const LogoFont := preload("res://Fonts/Chewy-Regular.ttf")
 const GameLivesServiceScript := preload("res://game_lives_service.gd")
 const SlotOverlayBgScript := preload("res://slot_overlay_bg.gd")
+const UiThemeServiceScript := preload("res://ui_theme_service.gd")
 
 const PILL_GRAD_CELESTE := Color(0.62, 0.82, 0.97, 0.94)
 const PILL_GRAD_ROSA := Color(0.98, 0.68, 0.84, 0.94)
 const PILL_GRAD_VERDE := Color(0.66, 0.88, 0.68, 0.94)
 const PILL_BG_META := "pill_bg"
+const RAINBOW_BG_META := "rainbow_fill_bg"
 const RoundedClipShader = preload("res://rounded_clip.gdshader")
 
 const BTN_TEXT_COLOR := Color(0.88, 0.86, 0.83)
@@ -328,6 +330,73 @@ static func make_candy_style(bg: Color, border: Color, radius: int, border_width
 	style.set_corner_radius_all(radius)
 	return style
 
+static func apply_optional_rainbow_fill(
+	host: Control,
+	radius: int,
+	host_size: Vector2,
+	border_w: int = 3
+) -> void:
+	if host == null:
+		return
+	var palette: Dictionary = GameState.get_ui_palette()
+	var rainbow: bool = UiThemeServiceScript.uses_rainbow_ui(palette)
+	var bg: TextureRect = null
+	if host.has_meta(RAINBOW_BG_META):
+		bg = host.get_meta(RAINBOW_BG_META)
+	if not rainbow:
+		if bg != null:
+			bg.visible = false
+		return
+	if bg == null:
+		bg = SlotOverlayBgScript.new()
+		bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		host.add_child(bg)
+		host.set_meta(RAINBOW_BG_META, bg)
+	# Button dibuja el texto en el padre: el degradé tiene que ir detrás.
+	# Panel usa hijos Label: el degradé queda al fondo del arbol.
+	bg.show_behind_parent = host is Button
+	bg.z_index = -1
+	if bg.get_parent() == host:
+		host.move_child(bg, 0)
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.offset_left = float(border_w)
+	bg.offset_top = float(border_w)
+	bg.offset_right = float(-border_w)
+	bg.offset_bottom = float(-border_w)
+	bg.visible = true
+	var inner := Vector2(
+		maxf(host_size.x - float(border_w) * 2.0, 2.0),
+		maxf(host_size.y - float(border_w) * 2.0, 2.0)
+	)
+	var inner_radius: int = maxi(radius - border_w, 4)
+	bg.configure(
+		inner_radius,
+		palette.get("grad_a", PILL_GRAD_CELESTE),
+		palette.get("grad_b", PILL_GRAD_ROSA),
+		palette.get("grad_c", PILL_GRAD_VERDE),
+		inner
+	)
+	_make_host_fill_transparent(host)
+
+
+static func _make_host_fill_transparent(host: Control) -> void:
+	if host is Panel:
+		_make_style_border_only(host, "panel")
+		return
+	if host is Button:
+		for style_name in ["normal", "hover", "pressed", "focus", "disabled"]:
+			_make_style_border_only(host, style_name)
+
+
+static func _make_style_border_only(host: Control, style_name: String) -> void:
+	var style: StyleBox = host.get_theme_stylebox(style_name)
+	if style == null or not (style is StyleBoxFlat):
+		return
+	var flat := (style as StyleBoxFlat).duplicate() as StyleBoxFlat
+	flat.draw_center = false
+	host.add_theme_stylebox_override(style_name, flat)
+
+
 static func apply_candy_button_style(btn: Control, btn_size: Vector2, scale: float = 1.0) -> void:
 	if btn == null:
 		return
@@ -338,6 +407,7 @@ static func apply_candy_button_style(btn: Control, btn_size: Vector2, scale: flo
 		"panel",
 		make_candy_style(colors.fill, colors.border, radius, border_w)
 	)
+	apply_optional_rainbow_fill(btn, radius, btn_size, border_w)
 
 static func style_candy_label(lbl: Label, scale: float = 1.0) -> void:
 	if lbl == null:

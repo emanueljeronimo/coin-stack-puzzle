@@ -147,7 +147,7 @@ func layout_for_viewport(viewport_size: Vector2) -> void:
 		theme_grid.add_theme_constant_override("h_separation", int(gap))
 		theme_grid.add_theme_constant_override("v_separation", int(gap))
 	var grid_w := card_w - float(outer_pad) * 2.0 - float(well_pad) * 2.0
-	var cell_w := (grid_w - gap * 2.0) / 3.0
+	var cell_w := (grid_w - gap * 3.0) / 4.0
 	# Miniaturas casi a todo el ancho de cada celda (sin tope chico).
 	var preview_side := cell_w * 0.92
 	var option_h := preview_side + 12.0 * scale
@@ -158,7 +158,7 @@ func layout_for_viewport(viewport_size: Vector2) -> void:
 		for child in option.get_children():
 			if child is TextureButton:
 				(child as TextureButton).custom_minimum_size = Vector2(preview_side, preview_side)
-	var theme_rows := ceili(float(maxi(theme_option_roots.size(), 1)) / 3.0)
+	var theme_rows := ceili(float(maxi(theme_option_roots.size(), 1)) / 4.0)
 	var grid_h := option_h * float(theme_rows) + gap * float(maxi(theme_rows - 1, 0))
 	var themes_h := grid_h + float(well_pad) * 2.0
 	if themes_well != null:
@@ -292,7 +292,7 @@ func _build_ui() -> void:
 	themes_well.add_child(themes_margin)
 
 	theme_grid = GridContainer.new()
-	theme_grid.columns = 3
+	theme_grid.columns = 4
 	theme_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	theme_grid.add_theme_constant_override("h_separation", 10)
 	theme_grid.add_theme_constant_override("v_separation", 10)
@@ -508,6 +508,24 @@ func _apply_theme_colors() -> void:
 	for i in range(_toggle_btns.size()):
 		_apply_toggle_style(_toggle_btns[i], _toggle_btns[i].button_pressed)
 	_refresh_theme_selection()
+	_apply_rainbow_ui_fills()
+
+func _apply_rainbow_ui_fills() -> void:
+	if card != null:
+		HudTextureButtons.apply_optional_rainbow_fill(card, 30, card.size, 4)
+	if _confirm_card != null:
+		HudTextureButtons.apply_optional_rainbow_fill(_confirm_card, 30, _confirm_card.size, 5)
+	if _close_menu_btn != null:
+		HudTextureButtons.apply_optional_rainbow_fill(_close_menu_btn, 22, _close_menu_btn.size, 3)
+	if _restart_btn != null:
+		HudTextureButtons.apply_optional_rainbow_fill(_restart_btn, 22, _restart_btn.size, 3)
+	if _confirm_salir_btn != null:
+		HudTextureButtons.apply_optional_rainbow_fill(_confirm_salir_btn, 22, _confirm_salir_btn.size, 3)
+	if _confirm_atras_btn != null:
+		HudTextureButtons.apply_optional_rainbow_fill(_confirm_atras_btn, 22, _confirm_atras_btn.size, 3)
+	for btn in _toggle_btns:
+		if btn != null:
+			HudTextureButtons.apply_optional_rainbow_fill(btn, 14, btn.size, 3)
 
 func _add_toggle_row(
 	parent: VBoxContainer,
@@ -601,6 +619,7 @@ func _apply_toggle_style(btn: Button, is_on: bool) -> void:
 			14,
 			text_marble
 		)
+	HudTextureButtons.apply_optional_rainbow_fill(btn, 14, btn.size, 3)
 
 func _build_theme_option(theme: Dictionary) -> Panel:
 	var theme_id := str(theme.get("id", ""))

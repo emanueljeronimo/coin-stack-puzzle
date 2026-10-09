@@ -97,23 +97,23 @@ func layout_for_viewport(viewport_size: Vector2) -> void:
 	if main_vbox != null:
 		main_vbox.add_theme_constant_override("separation", sep)
 
-	var header_h := 64.0 * scale
+	var header_h := 76.0 * scale
 	if header != null:
 		header.custom_minimum_size = Vector2(0, header_h)
 	if title_label != null:
-		title_label.add_theme_font_size_override("font_size", int(52 * scale))
-		title_label.add_theme_constant_override("outline_size", int(8 * scale))
+		title_label.add_theme_font_size_override("font_size", int(66 * scale))
+		title_label.add_theme_constant_override("outline_size", int(9 * scale))
 	if close_btn != null:
 		var close_side := 64.0 * scale
 		close_btn.custom_minimum_size = Vector2(close_side, close_side)
-		close_btn.add_theme_font_size_override("font_size", int(36 * scale))
+		close_btn.add_theme_font_size_override("font_size", int(44 * scale))
 		close_btn.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
 		close_btn.offset_left = -close_side
 		close_btn.offset_top = -close_side * 0.5
 		close_btn.offset_right = 0
 		close_btn.offset_bottom = close_side * 0.5
 
-	var tabs_h := 64.0 * scale
+	var tabs_h := 76.0 * scale
 	if tabs_row != null:
 		tabs_row.custom_minimum_size = Vector2(0, tabs_h)
 		tabs_row.add_theme_constant_override("separation", int(10.0 * scale))
@@ -121,7 +121,7 @@ func layout_for_viewport(viewport_size: Vector2) -> void:
 		if btn == null:
 			continue
 		btn.custom_minimum_size = Vector2(0, tabs_h)
-		btn.add_theme_font_size_override("font_size", int(28 * scale))
+		btn.add_theme_font_size_override("font_size", int(36 * scale))
 
 	var well_pad := int(14.0 * scale)
 	if content_margin != null:
@@ -132,7 +132,7 @@ func layout_for_viewport(viewport_size: Vector2) -> void:
 	for lbl in _placeholder_labels:
 		if lbl == null:
 			continue
-		lbl.add_theme_font_size_override("font_size", int(36 * scale))
+		lbl.add_theme_font_size_override("font_size", int(44 * scale))
 		lbl.add_theme_constant_override("outline_size", int(6 * scale))
 
 	var content_h := 560.0 * scale
@@ -142,7 +142,7 @@ func layout_for_viewport(viewport_size: Vector2) -> void:
 	var footer_h := 80.0 * scale
 	if _close_menu_btn != null:
 		_close_menu_btn.custom_minimum_size = Vector2(0, footer_h)
-		_close_menu_btn.add_theme_font_size_override("font_size", int(40 * scale))
+		_close_menu_btn.add_theme_font_size_override("font_size", int(50 * scale))
 
 	var card_h := (
 		header_h
@@ -192,7 +192,7 @@ func _build_ui() -> void:
 	header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	main_vbox.add_child(header)
 
-	title_label = _make_outlined_label("Tienda", 46)
+	title_label = _make_outlined_label("Tienda", 58)
 	title_label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
@@ -260,7 +260,7 @@ func _build_ui() -> void:
 	_set_active_tab(ShopTabServiceScript.TAB_STARS)
 
 func _build_placeholder_page(copy: String) -> Control:
-	var page := _make_outlined_label(copy, 36)
+	var page := _make_outlined_label(copy, 44)
 	page.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	page.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	page.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -350,12 +350,12 @@ func _make_resource_column(wildcard_type: String, packs: Array) -> Dictionary:
 	icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	vbox.add_child(icon)
 
-	var title := _make_outlined_label(title_text, 42)
+	var title := _make_outlined_label(title_text, 50)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	vbox.add_child(title)
 
-	var lock := _make_outlined_label("Nivel %d" % ShopCatalogServiceScript.unlock_level_for_type(wildcard_type), 22)
+	var lock := _make_outlined_label("Nivel %d" % ShopCatalogServiceScript.unlock_level_for_type(wildcard_type), 26)
 	lock.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lock.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	lock.visible = false
@@ -410,7 +410,7 @@ func _make_resource_offer_button(pack: Dictionary) -> Dictionary:
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	center.add_child(row)
 
-	var qty := _make_outlined_label(str(amount), 32)
+	var qty := _make_outlined_label(str(amount), 38)
 	qty.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	row.add_child(qty)
 
@@ -422,7 +422,7 @@ func _make_resource_offer_button(pack: Dictionary) -> Dictionary:
 	cost_icon.custom_minimum_size = Vector2(32, 32)
 	row.add_child(cost_icon)
 
-	var cost := _make_outlined_label(ShopCatalogServiceScript.format_amount(star_cost), 32)
+	var cost := _make_outlined_label(ShopCatalogServiceScript.format_amount(star_cost), 38)
 	cost.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	row.add_child(cost)
 
@@ -478,7 +478,7 @@ func _make_combo_card(pack: Dictionary) -> Dictionary:
 	vbox.add_theme_constant_override("separation", 8)
 	margin.add_child(vbox)
 
-	var title := _make_outlined_label(str(pack.get("title", "")), 34)
+	var title := _make_outlined_label(str(pack.get("title", "")), 46)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	vbox.add_child(title)
@@ -505,7 +505,7 @@ func _make_combo_card(pack: Dictionary) -> Dictionary:
 		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		icon.custom_minimum_size = Vector2(42, 42)
 		row.add_child(icon)
-		var lbl := _make_outlined_label(line_texts[i], 28)
+		var lbl := _make_outlined_label(line_texts[i], 36)
 		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 		lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(lbl)
@@ -561,14 +561,14 @@ func _make_star_offer_row(pack: Dictionary) -> Dictionary:
 	amount_box.add_theme_constant_override("separation", 2)
 	row.add_child(amount_box)
 
-	var amount_lbl := _make_outlined_label(ShopCatalogServiceScript.format_amount(amount), 36)
+	var amount_lbl := _make_outlined_label(ShopCatalogServiceScript.format_amount(amount), 46)
 	amount_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	amount_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	amount_box.add_child(amount_lbl)
 
 	var badge: Label = null
 	if favorite:
-		badge = _make_outlined_label("Favorita", 20)
+		badge = _make_outlined_label("Favorita", 26)
 		badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 		amount_box.add_child(badge)
 
@@ -599,21 +599,21 @@ func _layout_star_offers(ui_scale: float) -> void:
 		var badge: Label = row.get("badge") as Label
 		var buy: Button = row.get("buy") as Button
 		var favorite: bool = bool(row.get("favorite", false))
-		var row_h: float = (102.0 if favorite else 88.0) * s
+		var row_h: float = (114.0 if favorite else 100.0) * s
 		if root != null:
 			root.custom_minimum_size = Vector2(0, row_h)
 		if icon != null:
 			icon.custom_minimum_size = Vector2(70.0 * s, 70.0 * s)
 		if amount_lbl != null:
-			amount_lbl.add_theme_font_size_override("font_size", int(36.0 * s))
-			amount_lbl.add_theme_constant_override("outline_size", int(6.0 * s))
+			amount_lbl.add_theme_font_size_override("font_size", int(46.0 * s))
+			amount_lbl.add_theme_constant_override("outline_size", int(7.0 * s))
 		if badge != null:
-			badge.add_theme_font_size_override("font_size", int(20.0 * s))
-			badge.add_theme_constant_override("outline_size", int(4.0 * s))
+			badge.add_theme_font_size_override("font_size", int(26.0 * s))
+			badge.add_theme_constant_override("outline_size", int(5.0 * s))
 			badge.add_theme_color_override("font_color", FAVORITE_GOLD)
 		if buy != null:
-			buy.custom_minimum_size = Vector2(180.0 * s, 62.0 * s)
-			buy.add_theme_font_size_override("font_size", int(34.0 * s))
+			buy.custom_minimum_size = Vector2(180.0 * s, 72.0 * s)
+			buy.add_theme_font_size_override("font_size", int(42.0 * s))
 
 func _layout_resource_offers(ui_scale: float) -> void:
 	var s: float = maxf(ui_scale, 0.5)
@@ -638,11 +638,11 @@ func _layout_resource_offers(ui_scale: float) -> void:
 		if icon != null:
 			icon.custom_minimum_size = Vector2(96.0 * s, 96.0 * s)
 		if title != null:
-			title.add_theme_font_size_override("font_size", int(40.0 * s))
-			title.add_theme_constant_override("outline_size", int(6.0 * s))
+			title.add_theme_font_size_override("font_size", int(50.0 * s))
+			title.add_theme_constant_override("outline_size", int(7.0 * s))
 		if lock != null:
-			lock.add_theme_font_size_override("font_size", int(20.0 * s))
-			lock.add_theme_constant_override("outline_size", int(4.0 * s))
+			lock.add_theme_font_size_override("font_size", int(26.0 * s))
+			lock.add_theme_constant_override("outline_size", int(5.0 * s))
 		var offers: Array = column.get("offers", []) as Array
 		for offer_n in offers:
 			if not (offer_n is Dictionary):
@@ -653,13 +653,13 @@ func _layout_resource_offers(ui_scale: float) -> void:
 			var cost: Label = offer.get("cost") as Label
 			var cost_icon: TextureRect = offer.get("cost_icon") as TextureRect
 			if buy != null:
-				buy.custom_minimum_size = Vector2(0, 70.0 * s)
+				buy.custom_minimum_size = Vector2(0, 80.0 * s)
 			if qty != null:
-				qty.add_theme_font_size_override("font_size", int(30.0 * s))
-				qty.add_theme_constant_override("outline_size", int(5.0 * s))
+				qty.add_theme_font_size_override("font_size", int(38.0 * s))
+				qty.add_theme_constant_override("outline_size", int(6.0 * s))
 			if cost != null:
-				cost.add_theme_font_size_override("font_size", int(30.0 * s))
-				cost.add_theme_constant_override("outline_size", int(5.0 * s))
+				cost.add_theme_font_size_override("font_size", int(38.0 * s))
+				cost.add_theme_constant_override("outline_size", int(6.0 * s))
 			if cost_icon != null:
 				cost_icon.custom_minimum_size = Vector2(30.0 * s, 30.0 * s)
 
@@ -675,8 +675,8 @@ func _layout_combo_offers(ui_scale: float) -> void:
 		if root != null:
 			root.custom_minimum_size = Vector2(0, 360.0 * s)
 		if title != null:
-			title.add_theme_font_size_override("font_size", int(36.0 * s))
-			title.add_theme_constant_override("outline_size", int(6.0 * s))
+			title.add_theme_font_size_override("font_size", int(46.0 * s))
+			title.add_theme_constant_override("outline_size", int(7.0 * s))
 			title.add_theme_color_override("font_color", FAVORITE_GOLD)
 		var icons: Array = card_row.get("line_icons", []) as Array
 		for icon_n in icons:
@@ -687,11 +687,11 @@ func _layout_combo_offers(ui_scale: float) -> void:
 		for lbl_n in labels:
 			var lbl: Label = lbl_n as Label
 			if lbl != null:
-				lbl.add_theme_font_size_override("font_size", int(28.0 * s))
-				lbl.add_theme_constant_override("outline_size", int(5.0 * s))
+				lbl.add_theme_font_size_override("font_size", int(36.0 * s))
+				lbl.add_theme_constant_override("outline_size", int(6.0 * s))
 		if buy != null:
-			buy.custom_minimum_size = Vector2(0, 64.0 * s)
-			buy.add_theme_font_size_override("font_size", int(34.0 * s))
+			buy.custom_minimum_size = Vector2(0, 74.0 * s)
+			buy.add_theme_font_size_override("font_size", int(42.0 * s))
 
 func _style_star_offer_rows(
 	_palette: Dictionary,
@@ -974,7 +974,7 @@ func _build_buy_confirm() -> void:
 		_confirm_icons_row.add_child(icon)
 		_confirm_icon_nodes.append(icon)
 
-	_confirm_title = _make_outlined_label("¿Comprar?", 42)
+	_confirm_title = _make_outlined_label("¿Comprar?", 52)
 	_confirm_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_confirm_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	vbox.add_child(_confirm_title)
@@ -1041,8 +1041,8 @@ func _layout_buy_confirm() -> void:
 	var pad: float = 32.0 * s
 	var sep: float = 18.0 * s
 	var icon_h: float = 80.0 * s
-	var title_h: float = 110.0 * s
-	var btn_h: float = 76.0 * s
+	var title_h: float = 128.0 * s
+	var btn_h: float = 86.0 * s
 	if _confirm_accept_btn != null:
 		btn_h = maxf(btn_h, _confirm_accept_btn.custom_minimum_size.y)
 	var card_w: float = minf(vp.x * 0.86, 720.0 * s)
@@ -1055,14 +1055,14 @@ func _layout_buy_confirm() -> void:
 		if icon != null:
 			icon.custom_minimum_size = Vector2(icon_h, icon_h)
 	if _confirm_title != null:
-		_confirm_title.add_theme_font_size_override("font_size", int(42.0 * s))
-		_confirm_title.add_theme_constant_override("outline_size", int(7.0 * s))
+		_confirm_title.add_theme_font_size_override("font_size", int(52.0 * s))
+		_confirm_title.add_theme_constant_override("outline_size", int(8.0 * s))
 	if _confirm_accept_btn != null:
 		_confirm_accept_btn.custom_minimum_size = Vector2(0, btn_h)
-		_confirm_accept_btn.add_theme_font_size_override("font_size", int(38.0 * s))
+		_confirm_accept_btn.add_theme_font_size_override("font_size", int(46.0 * s))
 	if _confirm_cancel_btn != null:
 		_confirm_cancel_btn.custom_minimum_size = Vector2(0, btn_h)
-		_confirm_cancel_btn.add_theme_font_size_override("font_size", int(38.0 * s))
+		_confirm_cancel_btn.add_theme_font_size_override("font_size", int(46.0 * s))
 	var margin: MarginContainer = null
 	for child in _confirm_card.get_children():
 		if child is MarginContainer:
@@ -1111,7 +1111,7 @@ func _make_tab_button(text: String) -> Button:
 	btn.custom_minimum_size = Vector2(0, 56)
 	if LogoFont != null:
 		btn.add_theme_font_override("font", LogoFont)
-	btn.add_theme_font_size_override("font_size", 28)
+	btn.add_theme_font_size_override("font_size", 36)
 	GameState.hook_button_sound(btn)
 	return btn
 
@@ -1158,7 +1158,7 @@ func _make_action_button(text: String) -> Button:
 	btn.custom_minimum_size = Vector2(0, 64)
 	if LogoFont != null:
 		btn.add_theme_font_override("font", LogoFont)
-	btn.add_theme_font_size_override("font_size", 34)
+	btn.add_theme_font_size_override("font_size", 42)
 	GameState.hook_button_sound(btn)
 	return btn
 
@@ -1230,6 +1230,19 @@ func _apply_theme_colors() -> void:
 		text_marble
 	)
 	_refresh_tab_styles()
+	_apply_rainbow_ui_fills()
+
+func _apply_rainbow_ui_fills() -> void:
+	if card != null:
+		HudTextureButtons.apply_optional_rainbow_fill(card, 30, card.size, 4)
+	if _confirm_card != null:
+		HudTextureButtons.apply_optional_rainbow_fill(_confirm_card, 30, _confirm_card.size, 5)
+	if _close_menu_btn != null:
+		HudTextureButtons.apply_optional_rainbow_fill(_close_menu_btn, 22, _close_menu_btn.size, 3)
+	if _confirm_accept_btn != null:
+		HudTextureButtons.apply_optional_rainbow_fill(_confirm_accept_btn, 22, _confirm_accept_btn.size, 3)
+	if _confirm_cancel_btn != null:
+		HudTextureButtons.apply_optional_rainbow_fill(_confirm_cancel_btn, 22, _confirm_cancel_btn.size, 3)
 
 func _on_dimmer_input(event: InputEvent) -> void:
 	if not (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT):

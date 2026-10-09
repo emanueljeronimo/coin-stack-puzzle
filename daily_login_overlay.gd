@@ -503,3 +503,17 @@ func _apply_theme_colors() -> void:
 			_apply_button_style(btn, btn_on, btn_border, 16, text_marble)
 		else:
 			_apply_button_style(btn, btn_off, card_border.darkened(0.2), 16, text_marble)
+	_apply_rainbow_ui_fills()
+
+func _apply_rainbow_ui_fills() -> void:
+	if card != null:
+		HudTextureButtons.apply_optional_rainbow_fill(card, 30, card.size, 4)
+	if _close_menu_btn != null:
+		HudTextureButtons.apply_optional_rainbow_fill(_close_menu_btn, 22, _close_menu_btn.size, 3)
+	for ui in _slots:
+		var root: Panel = ui.get("root") as Panel
+		var btn: Button = ui.get("button") as Button
+		if root != null:
+			HudTextureButtons.apply_optional_rainbow_fill(root, 18, root.size, 2)
+		if btn != null:
+			HudTextureButtons.apply_optional_rainbow_fill(btn, 16, btn.size, 3)

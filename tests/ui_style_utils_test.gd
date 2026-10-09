@@ -13,6 +13,7 @@ func _run() -> void:
 	_test_make_outlined_label()
 	_test_flat_style()
 	_test_apply_button_style()
+	_test_candy_dialog_style()
 	print("=== RESULT: %d passed, %d failed ===" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -81,3 +82,19 @@ func _test_apply_button_style() -> void:
 		_fail("button_outline_size", str(btn.get_theme_constant("outline_size")))
 		return
 	_ok("apply_button_style")
+
+func _test_candy_dialog_style() -> void:
+	var style := UiStyleUtilsScript.candy_dialog_style(
+		Color(0.9, 0.8, 0.7, 1),
+		Color(0.2, 0.1, 0.1, 1),
+		Color(0.1, 0.05, 0.05, 0.4),
+		36,
+		10
+	)
+	if style.border_width_left != 10 or style.corner_radius_top_left != 36:
+		_fail("candy_metrics")
+		return
+	if style.shadow_size < 12:
+		_fail("candy_shadow", str(style.shadow_size))
+		return
+	_ok("candy_dialog_style")

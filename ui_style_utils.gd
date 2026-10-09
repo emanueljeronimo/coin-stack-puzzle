@@ -27,6 +27,20 @@ static func flat_style(bg: Color, border: Color, radius: int, border_w: int = 3)
 	style.corner_radius_bottom_right = radius
 	return style
 
+static func candy_dialog_style(
+	bg: Color,
+	border: Color,
+	shadow: Color,
+	radius: int,
+	border_w: int
+) -> StyleBoxFlat:
+	var style := flat_style(bg, border, radius, border_w)
+	style.anti_aliasing = true
+	style.shadow_color = shadow
+	style.shadow_size = maxi(border_w * 2, 12)
+	style.shadow_offset = Vector2(0, int(round(float(border_w) * 1.15)))
+	return style
+
 static func apply_button_style(btn: Button, bg: Color, border: Color, radius: int, font_color: Color, outline_color: Color, outline_size: int) -> void:
 	if btn == null:
 		return

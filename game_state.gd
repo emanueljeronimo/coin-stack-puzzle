@@ -12,16 +12,18 @@ const INITIAL_LIVES := 5
 const INITIAL_STARS := 3000
 
 const SETTINGS_PATH := "user://settings.cfg"
-const DEFAULT_BACKGROUND_THEME_ID := "fondo2-verde"
+const DEFAULT_BACKGROUND_THEME_ID := "fondo-naranja"
 const BOARD_MUSIC_PATH := "res://musica/musica tablero.mp3"
 
 const BACKGROUND_THEMES: Array = [
-	{"id": "fonde2-rosa", "path": "res://Imagenes/fonde2-rosa.png"},
+	{"id": "fondo-amarillo", "path": "res://Imagenes/fondo-amarillo.png"},
 	{"id": "fondo-azul", "path": "res://Imagenes/fondo-azul.png"},
 	{"id": "fondo-rosa", "path": "res://Imagenes/fondo-rosa.png"},
 	{"id": "fondo-verde", "path": "res://Imagenes/fondo-verde.png"},
-	{"id": "fondo2-verde", "path": "res://Imagenes/fondo2-verde.png"},
-	{"id": "fondo2-azul", "path": "res://Imagenes/fondo2-azul.png"},
+	{"id": "fondo-naranja", "path": "res://Imagenes/fondo-naranja.png"},
+	{"id": "fondo-violeta", "path": "res://Imagenes/fondo-violeta.png"},
+	{"id": "fondo-arcoiris", "path": "res://Imagenes/fondo-arcoiris.png"},
+	{"id": "fondo-gris", "path": "res://Imagenes/fondo-grises.png"},
 ]
 
 ## Paletas UI (slots + barra) por familia de fondo.
@@ -103,14 +105,155 @@ const UI_PALETTE_VERDE := {
 	"settings_option_selected": Color(0.68, 0.84, 0.62, 0.88),
 	"settings_option_idle": Color(0.54, 0.66, 0.52, 0.40),
 }
+const UI_PALETTE_AMARILLO := {
+	"slot_fill": Color(0.98, 0.90, 0.52, 0.38),
+	"slot_border": Color(0.92, 0.74, 0.22, 0.82),
+	"slot_fill_dim": Color(0.98, 0.94, 0.70, 0.20),
+	"slot_border_dim": Color(0.90, 0.82, 0.48, 0.50),
+	"slot_fill_temp": Color(0.96, 0.90, 0.58, 0.26),
+	"slot_border_temp": Color(0.90, 0.72, 0.28, 0.62),
+	"progress_track_bg": Color(0.98, 0.93, 0.70, 0.92),
+	"progress_track_border": Color(0.90, 0.76, 0.28, 0.88),
+	"progress_knob_bg": Color(0.99, 0.96, 0.82, 0.97),
+	"progress_knob_border": Color(0.90, 0.74, 0.28, 0.9),
+	"progress_text": Color(0.52, 0.40, 0.12),
+	"grad_a": Color(0.98, 0.90, 0.48, 0.96),
+	"grad_b": Color(0.96, 0.78, 0.28, 0.96),
+	"grad_c": Color(0.90, 0.64, 0.16, 0.96),
+	"settings_card_bg": Color(0.78, 0.62, 0.28, 0.98),
+	"settings_card_border": Color(0.94, 0.82, 0.48, 0.95),
+	"settings_title": Color(0.94, 0.90, 0.78),
+	"settings_label": Color(0.90, 0.86, 0.72),
+	"settings_section": Color(0.88, 0.84, 0.70),
+	"settings_btn_on": Color(0.94, 0.76, 0.28, 0.98),
+	"settings_btn_off": Color(0.58, 0.46, 0.22, 0.95),
+	"settings_btn_border": Color(0.98, 0.88, 0.48, 1.0),
+	"settings_option_selected": Color(0.96, 0.82, 0.42, 0.88),
+	"settings_option_idle": Color(0.78, 0.66, 0.36, 0.40),
+}
+const UI_PALETTE_VIOLETA := {
+	"slot_fill": Color(0.82, 0.72, 0.96, 0.38),
+	"slot_border": Color(0.62, 0.42, 0.88, 0.82),
+	"slot_fill_dim": Color(0.88, 0.82, 0.96, 0.20),
+	"slot_border_dim": Color(0.72, 0.62, 0.88, 0.50),
+	"slot_fill_temp": Color(0.82, 0.74, 0.94, 0.26),
+	"slot_border_temp": Color(0.64, 0.46, 0.86, 0.62),
+	"progress_track_bg": Color(0.88, 0.82, 0.96, 0.92),
+	"progress_track_border": Color(0.70, 0.56, 0.90, 0.88),
+	"progress_knob_bg": Color(0.92, 0.88, 0.98, 0.97),
+	"progress_knob_border": Color(0.68, 0.52, 0.88, 0.9),
+	"progress_text": Color(0.40, 0.26, 0.58),
+	"grad_a": Color(0.82, 0.72, 0.96, 0.96),
+	"grad_b": Color(0.66, 0.48, 0.90, 0.96),
+	"grad_c": Color(0.52, 0.34, 0.82, 0.96),
+	"settings_card_bg": Color(0.50, 0.38, 0.70, 0.98),
+	"settings_card_border": Color(0.78, 0.66, 0.92, 0.95),
+	"settings_title": Color(0.90, 0.86, 0.94),
+	"settings_label": Color(0.86, 0.82, 0.92),
+	"settings_section": Color(0.84, 0.80, 0.90),
+	"settings_btn_on": Color(0.68, 0.48, 0.90, 0.98),
+	"settings_btn_off": Color(0.40, 0.30, 0.56, 0.95),
+	"settings_btn_border": Color(0.82, 0.70, 0.96, 1.0),
+	"settings_option_selected": Color(0.72, 0.56, 0.92, 0.88),
+	"settings_option_idle": Color(0.56, 0.44, 0.72, 0.40),
+}
+const UI_PALETTE_NARANJA := {
+	"slot_fill": Color(0.98, 0.78, 0.52, 0.38),
+	"slot_border": Color(0.92, 0.52, 0.22, 0.82),
+	"slot_fill_dim": Color(0.98, 0.86, 0.70, 0.20),
+	"slot_border_dim": Color(0.90, 0.70, 0.48, 0.50),
+	"slot_fill_temp": Color(0.96, 0.80, 0.56, 0.26),
+	"slot_border_temp": Color(0.90, 0.56, 0.28, 0.62),
+	"progress_track_bg": Color(0.98, 0.88, 0.74, 0.92),
+	"progress_track_border": Color(0.92, 0.62, 0.32, 0.88),
+	"progress_knob_bg": Color(0.99, 0.92, 0.82, 0.97),
+	"progress_knob_border": Color(0.92, 0.58, 0.28, 0.9),
+	"progress_text": Color(0.58, 0.32, 0.14),
+	"grad_a": Color(0.98, 0.78, 0.48, 0.96),
+	"grad_b": Color(0.96, 0.58, 0.28, 0.96),
+	"grad_c": Color(0.90, 0.44, 0.16, 0.96),
+	"settings_card_bg": Color(0.78, 0.48, 0.28, 0.98),
+	"settings_card_border": Color(0.94, 0.72, 0.48, 0.95),
+	"settings_title": Color(0.94, 0.88, 0.80),
+	"settings_label": Color(0.90, 0.84, 0.76),
+	"settings_section": Color(0.88, 0.82, 0.74),
+	"settings_btn_on": Color(0.94, 0.58, 0.28, 0.98),
+	"settings_btn_off": Color(0.58, 0.36, 0.22, 0.95),
+	"settings_btn_border": Color(0.98, 0.78, 0.52, 1.0),
+	"settings_option_selected": Color(0.96, 0.70, 0.42, 0.88),
+	"settings_option_idle": Color(0.78, 0.52, 0.34, 0.40),
+}
+const UI_PALETTE_ARCOIRIS := {
+	"rainbow_ui": true,
+	"slot_fill": Color(0.92, 0.84, 0.96, 0.38),
+	"slot_border": Color(0.72, 0.52, 0.90, 0.82),
+	"slot_fill_dim": Color(0.94, 0.88, 0.96, 0.20),
+	"slot_border_dim": Color(0.78, 0.68, 0.90, 0.50),
+	"slot_fill_temp": Color(0.90, 0.82, 0.94, 0.26),
+	"slot_border_temp": Color(0.70, 0.54, 0.88, 0.62),
+	"progress_track_bg": Color(0.94, 0.88, 0.96, 0.92),
+	"progress_track_border": Color(0.74, 0.58, 0.90, 0.88),
+	"progress_knob_bg": Color(0.98, 0.94, 0.98, 0.97),
+	"progress_knob_border": Color(0.70, 0.54, 0.88, 0.9),
+	"progress_text": Color(0.42, 0.28, 0.56),
+	"grad_a": Color(0.96, 0.62, 0.78, 0.96),
+	"grad_b": Color(0.62, 0.72, 0.96, 0.96),
+	"grad_c": Color(0.72, 0.88, 0.58, 0.96),
+	"settings_card_bg": Color(0.52, 0.42, 0.66, 0.98),
+	"settings_card_border": Color(0.86, 0.72, 0.94, 0.95),
+	"settings_title": Color(0.92, 0.88, 0.94),
+	"settings_label": Color(0.88, 0.84, 0.92),
+	"settings_section": Color(0.86, 0.82, 0.90),
+	"settings_btn_on": Color(0.72, 0.52, 0.90, 0.98),
+	"settings_btn_off": Color(0.42, 0.34, 0.54, 0.95),
+	"settings_btn_border": Color(0.90, 0.76, 0.96, 1.0),
+	"settings_option_selected": Color(0.80, 0.62, 0.92, 0.88),
+	"settings_option_idle": Color(0.60, 0.48, 0.72, 0.40),
+}
+const UI_PALETTE_GRIS := {
+	"slot_fill": Color(0.78, 0.80, 0.82, 0.38),
+	"slot_border": Color(0.52, 0.56, 0.60, 0.82),
+	"slot_fill_dim": Color(0.86, 0.88, 0.90, 0.20),
+	"slot_border_dim": Color(0.66, 0.68, 0.72, 0.50),
+	"slot_fill_temp": Color(0.80, 0.82, 0.84, 0.26),
+	"slot_border_temp": Color(0.56, 0.58, 0.62, 0.62),
+	"progress_track_bg": Color(0.86, 0.88, 0.90, 0.92),
+	"progress_track_border": Color(0.62, 0.64, 0.68, 0.88),
+	"progress_knob_bg": Color(0.92, 0.94, 0.95, 0.97),
+	"progress_knob_border": Color(0.58, 0.60, 0.64, 0.9),
+	"progress_text": Color(0.32, 0.34, 0.38),
+	"grad_a": Color(0.78, 0.80, 0.84, 0.96),
+	"grad_b": Color(0.58, 0.62, 0.66, 0.96),
+	"grad_c": Color(0.42, 0.46, 0.50, 0.96),
+	"settings_card_bg": Color(0.42, 0.44, 0.48, 0.98),
+	"settings_card_border": Color(0.72, 0.74, 0.78, 0.95),
+	"settings_title": Color(0.90, 0.90, 0.92),
+	"settings_label": Color(0.84, 0.86, 0.88),
+	"settings_section": Color(0.80, 0.82, 0.84),
+	"settings_btn_on": Color(0.58, 0.62, 0.66, 0.98),
+	"settings_btn_off": Color(0.34, 0.36, 0.40, 0.95),
+	"settings_btn_border": Color(0.78, 0.80, 0.84, 1.0),
+	"settings_option_selected": Color(0.66, 0.70, 0.74, 0.88),
+	"settings_option_idle": Color(0.50, 0.52, 0.56, 0.40),
+}
 
 const UI_PALETTES_BY_THEME := {
-	"fonde2-rosa": UI_PALETTE_ROSA,
+	"fondo-amarillo": UI_PALETTE_AMARILLO,
 	"fondo-rosa": UI_PALETTE_ROSA,
 	"fondo-azul": UI_PALETTE_AZUL,
-	"fondo2-azul": UI_PALETTE_AZUL,
+	"fondo-violeta": UI_PALETTE_VIOLETA,
 	"fondo-verde": UI_PALETTE_VERDE,
-	"fondo2-verde": UI_PALETTE_VERDE,
+	"fondo-naranja": UI_PALETTE_NARANJA,
+	"fondo-arcoiris": UI_PALETTE_ARCOIRIS,
+	"fondo-gris": UI_PALETTE_GRIS,
+}
+
+const BACKGROUND_THEME_ALIASES := {
+	"fonde2-rosa": "fondo-amarillo",
+	"fondo2-azul": "fondo-violeta",
+	"fondo2-verde": "fondo-naranja",
+	"forndo2-azul": "fondo-violeta",
+	"fondo-grises": "fondo-gris",
 }
 
 var lives: int = INITIAL_LIVES
@@ -255,8 +398,8 @@ func load_settings() -> void:
 	background_theme_id = str(
 		cfg.get_value("display", "background_theme_id", DEFAULT_BACKGROUND_THEME_ID)
 	)
-	if background_theme_id == "forndo2-azul":
-		background_theme_id = "fondo2-azul"
+	if BACKGROUND_THEME_ALIASES.has(background_theme_id):
+		background_theme_id = str(BACKGROUND_THEME_ALIASES[background_theme_id])
 	if get_background_theme_path(background_theme_id).is_empty():
 		background_theme_id = DEFAULT_BACKGROUND_THEME_ID
 	music_enabled = bool(cfg.get_value("audio", "music_enabled", true))
@@ -284,6 +427,8 @@ func get_background_theme_path(theme_id: String) -> String:
 ## Colores de slots y barra de progreso según el fondo actual (o el id indicado).
 func get_ui_palette(theme_id: String = "") -> Dictionary:
 	var id := theme_id if not theme_id.is_empty() else background_theme_id
+	if BACKGROUND_THEME_ALIASES.has(id):
+		id = str(BACKGROUND_THEME_ALIASES[id])
 	if UI_PALETTES_BY_THEME.has(id):
 		return (UI_PALETTES_BY_THEME[id] as Dictionary).duplicate()
 	if UI_PALETTES_BY_THEME.has(DEFAULT_BACKGROUND_THEME_ID):
