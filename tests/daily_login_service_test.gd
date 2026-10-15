@@ -137,11 +137,11 @@ func _test_level_unlock() -> void:
 	_ok("level_unlock")
 
 func _test_unlocked_rotation() -> void:
-	if DailyLoginServiceScript.wildcard_for_day("2026-10-05", 5) != "mix":
-		_fail("level5_mix_a")
+	if DailyLoginServiceScript.wildcard_for_day("2026-10-05", 5) != "hammer":
+		_fail("level5_hammer_a")
 		return
-	if DailyLoginServiceScript.wildcard_for_day("2026-10-06", 5) != "mix":
-		_fail("level5_mix_b")
+	if DailyLoginServiceScript.wildcard_for_day("2026-10-06", 5) != "hammer":
+		_fail("level5_hammer_b")
 		return
 	var at_ten_a: String = DailyLoginServiceScript.wildcard_for_day("2026-10-05", 10)
 	var at_ten_b: String = DailyLoginServiceScript.wildcard_for_day("2026-10-06", 10)
@@ -151,7 +151,7 @@ func _test_unlocked_rotation() -> void:
 	if DailyLoginServiceScript.WILDCARD_TYPES.find(at_ten_a) < 0 or at_ten_a == "glove":
 		_fail("level10_pool", at_ten_a)
 		return
-	if DailyLoginServiceScript.wildcard_for_day("2026-10-07", 6) != "mix":
+	if DailyLoginServiceScript.wildcard_for_day("2026-10-07", 6) != "hammer":
 		_fail("level6_not_glove")
 		return
 	_ok("unlocked_rotation")

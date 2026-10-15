@@ -30,7 +30,7 @@ func _run() -> void:
 	_test_overflow_keeps_nines_together()
 	_test_wildcard_mix_joins_fused()
 	_test_wildcard_mix_does_not_chain()
-	_test_mix_keeps_star_coins_separate()
+	_test_mix_keeps_wildcard_coins_separate()
 	_test_overflow_keeps_medium_group_pure()
 	_test_mix_fill_order_reads_top_left()
 	_test_mix_plan_sorted_by_number()
@@ -495,7 +495,7 @@ func _test_wildcard_mix_does_not_chain() -> void:
 		return
 	_ok("wildcard_mix_converts_completed_stack")
 
-func _test_mix_keeps_star_coins_separate() -> void:
+func _test_mix_keeps_wildcard_coins_separate() -> void:
 	var values: Array = []
 	for _i in range(8):
 		values.append(5)
@@ -503,20 +503,20 @@ func _test_mix_keeps_star_coins_separate() -> void:
 		values.append(0)
 	var plan: Array = GameRules.build_wildcard_mix_plan(values, 3, STACK_CAPACITY)
 	if _count_value(plan, 5) != 8:
-		_fail("star_keep_fives", "5s=%d" % _count_value(plan, 5))
+		_fail("wildcard_keep_fives", "5s=%d" % _count_value(plan, 5))
 		return
 	if _count_value(plan, 0) != 3:
-		_fail("star_keep_zeros", "0s=%d" % _count_value(plan, 0))
+		_fail("wildcard_keep_zeros", "0s=%d" % _count_value(plan, 0))
 		return
 	if _count_pure_stacks_of(plan, 5) != 1:
-		_fail("star_five_stack", str(plan))
+		_fail("wildcard_five_stack", str(plan))
 		return
 	if _count_pure_stacks_of(plan, 0) != 1:
-		_fail("star_zero_stack", str(plan))
+		_fail("wildcard_zero_stack", str(plan))
 		return
-	if not _assert_all_homogeneous(plan, "star_coins_separate"):
+	if not _assert_all_homogeneous(plan, "wildcard_coins_separate"):
 		return
-	_ok("mix_keeps_star_coins_separate")
+	_ok("mix_keeps_wildcard_coins_separate")
 
 func _test_overflow_keeps_medium_group_pure() -> void:
 	# 9 ranuras y 8 numeros: 16x24 y 12x27 piden segunda pila. Los 8x22

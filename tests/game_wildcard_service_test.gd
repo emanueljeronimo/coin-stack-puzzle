@@ -33,6 +33,9 @@ func _fail(name: String, detail: String = "") -> void:
 	print("FAIL: ", name, (" — " + detail) if not detail.is_empty() else "")
 
 func _test_first_unlock_grants_initial_uses() -> void:
+	if GameWildcardServiceScript.earliest_unlock_level() != 4:
+		_fail("earliest_unlock", str(GameWildcardServiceScript.earliest_unlock_level()))
+		return
 	var synced := GameWildcardServiceScript.sync_unlocks(
 		4,
 		{"mix": 0, "hammer": 0, "glove": 0},
@@ -40,14 +43,14 @@ func _test_first_unlock_grants_initial_uses() -> void:
 		3
 	)
 	var counts: Dictionary = synced.get("wildcard_counts", {})
-	if int(counts.get("mix", 0)) != GameWildcardServiceScript.INITIAL_USES:
-		_fail("first_unlock_mix", str(counts))
+	if int(counts.get("hammer", 0)) != GameWildcardServiceScript.INITIAL_USES:
+		_fail("first_unlock_hammer", str(counts))
 		return
-	if int(counts.get("hammer", -1)) != 0:
-		_fail("first_unlock_hammer_locked", str(counts))
+	if int(counts.get("mix", -1)) != 0:
+		_fail("first_unlock_mix_locked", str(counts))
 		return
 	var newly: Array = synced.get("newly_unlocked", [])
-	if newly.size() != 1 or str(newly[0]) != "mix":
+	if newly.size() != 1 or str(newly[0]) != "hammer":
 		_fail("first_unlock_panel", str(newly))
 		return
 	_ok("first_unlock_grants_initial_uses")
@@ -183,34 +186,34 @@ func _test_runtime_roundtrip_preserves_wildcards() -> void:
 	_ok("runtime_roundtrip_preserves_wildcards")
 
 func _test_exit_reenter_does_not_refill_or_wipe() -> void:
-	# Simula: tenía 3, usó 1 → quedó 2, granted true. Al “reentrar” se sync con -1.
-	var after_use := {"mix": 2, "hammer": 0, "glove": 0}
-	var granted := {"mix": true, "hammer": false, "glove": false}
+	# Simula: tenia 3, uso 1 → quedo 2, granted true. Al "reentrar" se sync con -1.
+	var after_use := {"mix": 0, "hammer": 2, "glove": 0}
+	var granted := {"mix": false, "hammer": true, "glove": false}
 	var reenter := GameWildcardServiceScript.sync_unlocks(8, after_use, granted, -1)
 	var counts: Dictionary = reenter.get("wildcard_counts", {})
-	if int(counts.get("mix", 0)) != 2:
+	if int(counts.get("hammer", 0)) != 2:
 		_fail("reenter_no_refill", str(counts))
 		return
-	# Bug viejo: si se perdían counts/granted al reentrar (defaults), sync regalaba 3.
+	# Bug viejo: si se perdian counts/granted al reentrar (defaults), sync regalaba 3.
 	var wiped := GameWildcardServiceScript.sync_unlocks(
 		8,
 		{"mix": 0, "hammer": 0, "glove": 0},
 		{"mix": false, "hammer": false, "glove": false},
 		-1
 	)
-	# Sin flag granted, un restore “vacío” SÍ migra el primer unlock (esperado para saves viejos).
+	# Sin flag granted, un restore "vacio" SI migra el primer unlock (esperado para saves viejos).
 	# El fix de persistencia evita llegar a este estado si ya estaban granted.
-	if int((wiped.get("wildcard_counts", {}) as Dictionary).get("mix", 0)) != GameWildcardServiceScript.INITIAL_USES:
+	if int((wiped.get("wildcard_counts", {}) as Dictionary).get("hammer", 0)) != GameWildcardServiceScript.INITIAL_USES:
 		_fail("legacy_empty_migrates", str(wiped.get("wildcard_counts", {})))
 		return
 	# Con granted preservado y 0 usos: no rellenar.
 	var spent := GameWildcardServiceScript.sync_unlocks(
 		8,
 		{"mix": 0, "hammer": 0, "glove": 0},
-		{"mix": true, "hammer": false, "glove": false},
+		{"mix": false, "hammer": true, "glove": false},
 		-1
 	)
-	if int((spent.get("wildcard_counts", {}) as Dictionary).get("mix", -1)) != 0:
+	if int((spent.get("wildcard_counts", {}) as Dictionary).get("hammer", -1)) != 0:
 		_fail("spent_stays_zero", str(spent.get("wildcard_counts", {})))
 		return
 	_ok("exit_reenter_does_not_refill_or_wipe")

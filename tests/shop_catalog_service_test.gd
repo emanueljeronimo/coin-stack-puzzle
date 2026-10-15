@@ -148,20 +148,23 @@ func _test_resource_wildcards() -> void:
 	if hammer_offers.size() != 2:
 		_fail("hammer_offers", str(hammer_offers.size()))
 		return
-	if ShopCatalogServiceScript.unlock_level_for_type("mix") != 4:
+	if ShopCatalogServiceScript.unlock_level_for_type("hammer") != 4:
+		_fail("unlock_hammer")
+		return
+	if ShopCatalogServiceScript.unlock_level_for_type("mix") != 9:
 		_fail("unlock_mix")
 		return
-	if ShopCatalogServiceScript.can_buy_resource(mix, 3):
-		_fail("locked_at_3")
+	if ShopCatalogServiceScript.can_buy_resource(ShopCatalogServiceScript.pack_by_id("res_hammer"), 3):
+		_fail("hammer_locked_at_3")
 		return
-	if not ShopCatalogServiceScript.can_buy_resource(mix, 4):
-		_fail("unlocked_at_4")
+	if not ShopCatalogServiceScript.can_buy_resource(ShopCatalogServiceScript.pack_by_id("res_hammer"), 4):
+		_fail("hammer_unlocked_at_4")
 		return
-	if ShopCatalogServiceScript.can_buy_resource(ShopCatalogServiceScript.pack_by_id("res_hammer"), 8):
-		_fail("hammer_locked_at_8")
+	if ShopCatalogServiceScript.can_buy_resource(mix, 8):
+		_fail("mix_locked_at_8")
 		return
-	if not ShopCatalogServiceScript.can_buy_resource(ShopCatalogServiceScript.pack_by_id("res_hammer"), 9):
-		_fail("hammer_unlocked_at_9")
+	if not ShopCatalogServiceScript.can_buy_resource(mix, 9):
+		_fail("mix_unlocked_at_9")
 		return
 	if ShopCatalogServiceScript.can_buy_resource(ShopCatalogServiceScript.pack_by_id("res_glove"), 13):
 		_fail("glove_locked_at_13")

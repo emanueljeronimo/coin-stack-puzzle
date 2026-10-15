@@ -366,7 +366,7 @@ static func build_wildcard_mix_plan(
 	_mix_place_wildcards(plan, wildcard_n, capacity)
 	return plan
 
-## Los 0 (ficha estrella) no se mezclan con números: van a ranuras vacías.
+## Los 0 (comodin de mazo) no se mezclan con numeros: van a ranuras vacias.
 static func _mix_place_wildcards(plan: Array, amount: int, capacity: int) -> void:
 	var left := maxi(0, amount)
 	if left <= 0 or plan.is_empty() or capacity <= 0:
@@ -392,10 +392,10 @@ static func _mix_place_wildcards(plan: Array, amount: int, capacity: int) -> voi
 	if left <= 0:
 		_mix_sort_plan_stacks(plan)
 		return
-	var star_dump: Array = []
+	var wildcard_dump: Array = []
 	for _j in range(left):
-		star_dump.append(COIN_WILDCARD_VALUE)
-	_mix_dump_remainders(plan, star_dump, 0, plan.size(), capacity)
+		wildcard_dump.append(COIN_WILDCARD_VALUE)
+	_mix_dump_remainders(plan, wildcard_dump, 0, plan.size(), capacity)
 	_mix_sort_plan_stacks(plan)
 
 static func _mix_flatten_plan(plan: Array) -> Array:

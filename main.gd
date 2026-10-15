@@ -162,8 +162,8 @@ const WILDCARD_PACK_AMOUNT := 3
 const WILDCARD_PACK_COST_STARS := 500
 ## Nivel de checkpoint para desbloquear cada comodín (ver barra de progreso).
 const WILDCARD_UNLOCK_LEVEL := {
-	"mix": 4,
-	"hammer": 9,
+	"mix": 9,
+	"hammer": 4,
 	"glove": 14,
 }
 const WILDCARD_LOCKED_MODULATE := Color(0.70, 0.70, 0.70, 0.82)

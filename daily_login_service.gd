@@ -9,7 +9,7 @@ const UNLIMITED_LIVES_SEC := 15 * 60
 const WILDCARD_TYPES: PackedStringArray = ["mix", "hammer", "glove"]
 
 static func unlock_level() -> int:
-	return int(GameWildcardServiceScript.UNLOCK_LEVEL.get("mix", 4))
+	return GameWildcardServiceScript.earliest_unlock_level()
 
 static func is_unlocked(player_level: int) -> bool:
 	return player_level >= unlock_level()

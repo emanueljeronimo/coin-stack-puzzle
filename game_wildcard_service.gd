@@ -6,8 +6,8 @@ class_name GameWildcardService
 const TYPES := ["mix", "hammer", "glove"]
 const INITIAL_USES := 3
 const UNLOCK_LEVEL := {
-	"mix": 4,
-	"hammer": 9,
+	"mix": 9,
+	"hammer": 4,
 	"glove": 14,
 }
 
@@ -31,6 +31,12 @@ static func normalize_granted(raw: Variant) -> Dictionary:
 
 static func is_unlocked(wildcard_type: String, checkpoint_level: int, unlock_levels: Dictionary = UNLOCK_LEVEL) -> bool:
 	return checkpoint_level >= int(unlock_levels.get(wildcard_type, 9999))
+
+static func earliest_unlock_level(unlock_levels: Dictionary = UNLOCK_LEVEL) -> int:
+	var earliest: int = 9999
+	for wildcard_type in TYPES:
+		earliest = mini(earliest, int(unlock_levels.get(wildcard_type, 9999)))
+	return earliest
 
 ## Aplica desbloqueos. previous_level=-1 = restore/setup (sin carteles).
 ## Devuelve counts/granted actualizados y la lista de tipos recién cruzados (para UI).
