@@ -6,6 +6,7 @@ signal rewards_changed
 const DialogBuilderServiceScript = preload("res://dialog_builder_service.gd")
 const DailyLoginServiceScript = preload("res://daily_login_service.gd")
 const ShopCatalogServiceScript = preload("res://shop_catalog_service.gd")
+const GameBoosterServiceScript = preload("res://game_booster_service.gd")
 const StarIconTexture = preload("res://Imagenes/icono-estrella.png")
 const LifeIconTexture = preload("res://Imagenes/icono-vidas.png")
 const MixIconTexture = preload("res://Imagenes/icono-mezclar.png")
@@ -340,8 +341,8 @@ func _icon_for_slot(slot: Dictionary) -> Texture2D:
 	var kind: String = str(slot.get("kind", ""))
 	if kind == "unlimited_lives":
 		return LifeIconTexture
-	if kind == "wildcard":
-		match str(slot.get("wildcard_type", "mix")):
+	if kind == "booster":
+		match str(slot.get("booster_type", "mix")):
 			"hammer":
 				return HammerIconTexture
 			"glove":
@@ -378,24 +379,25 @@ func _apply_grant(slot: Dictionary) -> void:
 		elif amount > 0 and GameState != null:
 			GameState.player_stars += amount
 		return
-	if kind == "wildcard":
-		_persist_wildcard_uses(str(slot.get("wildcard_type", "")), int(slot.get("amount", 1)))
+	if kind == "booster":
+		_persist_booster_uses(str(slot.get("booster_type", "")), int(slot.get("amount", 1)))
 		return
 	if kind == "unlimited_lives" and GameState != null:
 		GameState.grant_unlimited_lives(int(slot.get("seconds", 0)))
 
-func _persist_wildcard_uses(wildcard_type: String, amount: int) -> void:
-	if amount <= 0 or wildcard_type.is_empty():
+func _persist_booster_uses(booster_type: String, amount: int) -> void:
+	if amount <= 0 or booster_type.is_empty():
 		return
 	var snap: Dictionary = {}
 	if SaveManager != null and SaveManager.player_data.get("checkpoint_snapshot") is Dictionary:
 		snap = (SaveManager.player_data["checkpoint_snapshot"] as Dictionary).duplicate(true)
 	elif GameState != null:
 		snap = GameState.checkpoint_snapshot.duplicate(true)
-	var counts: Dictionary = snap.get("wildcard_counts", {}) as Dictionary
-	if counts.is_empty() and GameState != null:
-		counts = GameState.checkpoint_snapshot.get("wildcard_counts", {}) as Dictionary
-	snap["wildcard_counts"] = ShopCatalogServiceScript.apply_wildcard_uses(counts, wildcard_type, amount)
+	var counts: Dictionary = GameBoosterServiceScript.read_counts(snap)
+	if not snap.has("booster_counts") and not snap.has("wildcard_counts") and GameState != null:
+		counts = GameBoosterServiceScript.read_counts(GameState.checkpoint_snapshot)
+	counts = ShopCatalogServiceScript.apply_booster_uses(counts, booster_type, amount)
+	GameBoosterServiceScript.write_state(snap, counts, GameBoosterServiceScript.read_granted(snap))
 	if GameState != null:
 		GameState.checkpoint_snapshot = snap
 	if SaveManager != null:
@@ -403,7 +405,7 @@ func _persist_wildcard_uses(wildcard_type: String, amount: int) -> void:
 		var runtime: Variant = SaveManager.player_data.get("runtime_snapshot", {})
 		if runtime is Dictionary:
 			var rt: Dictionary = (runtime as Dictionary).duplicate(true)
-			rt["wildcard_counts"] = snap["wildcard_counts"]
+			rt["booster_counts"] = snap["booster_counts"]
 			SaveManager.player_data["runtime_snapshot"] = rt
 		SaveManager.save_game()
 

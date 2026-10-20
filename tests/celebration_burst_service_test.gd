@@ -1,0 +1,134 @@
+extends SceneTree
+
+const Service := preload("res://celebration_burst_service.gd")
+const BurstScript := preload("res://celebration_burst.gd")
+
+var _failed := 0
+var _passed := 0
+
+func _initialize() -> void:
+	call_deferred("_run")
+
+func _run() -> void:
+	print("=== celebration_burst_service test ===")
+	_test_palette_sizes()
+	_test_gradient_from_colors()
+	_test_textures()
+	_test_apply_modes()
+	_test_burst_play_stop()
+	_test_confetti_is_pastel_firework()
+	print("=== RESULT: %d passed, %d failed ===" % [_passed, _failed])
+	quit(1 if _failed > 0 else 0)
+
+func _ok(name: String) -> void:
+	_passed += 1
+	print("PASS: ", name)
+
+func _fail(name: String, detail: String = "") -> void:
+	_failed += 1
+	print("FAIL: ", name, (" - " + detail) if not detail.is_empty() else "")
+
+func _test_palette_sizes() -> void:
+	if Service.confetti_colors().size() < 5:
+		_fail("confetti_colors")
+		return
+	if Service.sparkle_colors().size() < 3:
+		_fail("sparkle_colors")
+		return
+	_ok("palette_sizes")
+
+func _test_gradient_from_colors() -> void:
+	var colors: Array[Color] = Service.confetti_colors()
+	var g: Gradient = Service.gradient_from_colors(colors)
+	if g.colors.size() != colors.size():
+		_fail("gradient_count", str(g.colors.size()))
+		return
+	if g.interpolation_mode != Gradient.GRADIENT_INTERPOLATE_CONSTANT:
+		_fail("gradient_mode")
+		return
+	_ok("gradient_from_colors")
+
+func _test_textures() -> void:
+	var dot: ImageTexture = Service.make_dot_texture()
+	if dot.get_width() != 8 or dot.get_height() != 8:
+		_fail("dot_texture_size")
+		return
+	var rect: ImageTexture = Service.make_confetti_texture()
+	if rect.get_width() != 4 or rect.get_height() != 4:
+		_fail("confetti_texture_size")
+		return
+	_ok("textures")
+
+func _test_apply_modes() -> void:
+	var sparkles := CPUParticles2D.new()
+	Service.apply_sparkles(sparkles, 1.0, 720.0)
+	if not sparkles.one_shot or sparkles.amount != Service.SPARKLE_AMOUNT:
+		_fail("apply_sparkles")
+		sparkles.free()
+		return
+	var confetti := CPUParticles2D.new()
+	Service.apply_confetti(confetti, 1.0)
+	if not confetti.one_shot or confetti.amount != Service.CONFETTI_AMOUNT:
+		_fail("apply_confetti")
+		sparkles.free()
+		confetti.free()
+		return
+	var fireworks := CPUParticles2D.new()
+	Service.apply_fireworks(fireworks, 1.0)
+	if not fireworks.one_shot or fireworks.amount != Service.FIREWORK_AMOUNT:
+		_fail("apply_fireworks")
+		sparkles.free()
+		confetti.free()
+		fireworks.free()
+		return
+	sparkles.free()
+	confetti.free()
+	fireworks.free()
+	_ok("apply_modes")
+
+func _test_burst_play_stop() -> void:
+	var burst: Control = BurstScript.new()
+	root.add_child(burst)
+	var card := ColorRect.new()
+	card.position = Vector2(100, 200)
+	card.size = Vector2(400, 300)
+	root.add_child(card)
+	burst.play_for_card(card, 1.0)
+	if burst.get_child_count() < 1:
+		_fail("burst_children", str(burst.get_child_count()))
+		burst.queue_free()
+		card.queue_free()
+		return
+	if burst.z_index < 312:
+		_fail("burst_in_front", str(burst.z_index))
+		burst.queue_free()
+		card.queue_free()
+		return
+	burst.stop()
+	if burst.visible:
+		_fail("burst_still_visible")
+		burst.queue_free()
+		card.queue_free()
+		return
+	burst.queue_free()
+	card.queue_free()
+	_ok("burst_play_stop")
+
+func _test_confetti_is_pastel_firework() -> void:
+	for c in Service.confetti_colors():
+		var col: Color = c
+		if col.s > 0.55 or col.v < 0.82:
+			_fail("confetti_not_pastel", str(col))
+			return
+	var confetti := CPUParticles2D.new()
+	Service.apply_confetti(confetti, 1.0)
+	if confetti.scale_amount_max > 3.0:
+		_fail("confetti_too_big", str(confetti.scale_amount_max))
+		confetti.free()
+		return
+	if confetti.explosiveness < 0.99 or confetti.spread < 179.0:
+		_fail("confetti_not_firework", "%s %s" % [confetti.explosiveness, confetti.spread])
+		confetti.free()
+		return
+	confetti.free()
+	_ok("confetti_is_pastel_firework")

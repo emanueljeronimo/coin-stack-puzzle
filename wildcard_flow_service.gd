@@ -1,14 +1,7 @@
 class_name WildcardFlowService
-extends RefCounted
+extends "res://booster_flow_service.gd"
 
-static func has_uses(counts: Dictionary, wildcard_type: String) -> bool:
-	return int(counts.get(wildcard_type, 0)) > 0
+## Alias legado de BoosterFlowService.
 
-static func wildcard_action_kind(wildcard_type: String) -> String:
-	match wildcard_type:
-		"mix":
-			return "mix"
-		"hammer", "glove":
-			return "tool"
-		_:
-			return "unknown"
+static func wildcard_action_kind(booster_type: String) -> String:
+	return booster_action_kind(booster_type)

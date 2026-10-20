@@ -1,8 +1,10 @@
 extends Control
 
-const CoverTexture := preload("res://Imagenes/home-nueva.png")
+const BootCoverTexture := preload("res://Imagenes/portada-nueva2.png")
+const TransitCoverTexture := preload("res://Imagenes/home-nueva.png")
 const UiFont := preload("res://Fonts/Chewy-Regular.ttf")
 const SlotOverlayBgScript := preload("res://slot_overlay_bg.gd")
+const BootCoverLayoutServiceScript := preload("res://boot_cover_layout_service.gd")
 
 const REF_WIDTH := 1080.0
 const PROGRESS_TRACK_BG := Color(0.84, 0.80, 0.96, 0.92)
@@ -20,6 +22,7 @@ const BOOT_WARMUP_PRELOADS: Array[String] = [
 
 var _target_scene_path: String = ""
 var _loading_message: String = "Cargando"
+var _is_boot := false
 var _display_progress: float = 0.0
 var _target_progress: float = 0.0
 var _load_started := false
@@ -39,6 +42,7 @@ func _ready() -> void:
 	_apply_portrait_orientation()
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	_is_boot = SceneLoader.consume_is_boot()
 	_target_scene_path = SceneLoader.consume_pending_scene()
 	_loading_message = SceneLoader.consume_pending_message()
 	build_ui()
@@ -58,7 +62,7 @@ func _apply_portrait_orientation() -> void:
 func build_ui() -> void:
 	background_rect = TextureRect.new()
 	background_rect.set_anchors_preset(Control.PRESET_FULL_RECT)
-	background_rect.texture = CoverTexture
+	background_rect.texture = BootCoverTexture if _is_boot else TransitCoverTexture
 	background_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	background_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	background_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -107,22 +111,40 @@ func _create_panel(bg: Color, border: Color, radius: int) -> Panel:
 func layout_ui() -> void:
 	var viewport_size := get_viewport_rect().size
 	var scale := viewport_size.x / REF_WIDTH
-	var progress_w := minf(viewport_size.x * 0.82, 860.0 * scale)
-	var progress_h := 36.0 * scale
+	var progress_w: float = minf(viewport_size.x * 0.82, 860.0 * scale)
+	var progress_h: float = 36.0 * scale
+	var progress_x: float = (viewport_size.x - progress_w) * 0.5
+	var progress_y: float = viewport_size.y * 0.72
+	if _is_boot:
+		var tex_size := Vector2(1080, 1920)
+		if background_rect != null and background_rect.texture != null:
+			tex_size = background_rect.texture.get_size()
+		var cover: Rect2 = BootCoverLayoutServiceScript.cover_draw_rect(viewport_size, tex_size)
+		var slot: Rect2 = BootCoverLayoutServiceScript.play_slot_rect(
+			viewport_size,
+			cover,
+			BootCoverLayoutServiceScript.default_slot_size(cover.size.x)
+		)
+		progress_w = slot.size.x
+		progress_h = 32.0 * scale
+		progress_x = slot.position.x
+		progress_y = slot.position.y + slot.size.y - progress_h
+		if status_label != null:
+			var label_h: float = maxf(slot.size.y - progress_h - 8.0 * scale, 56.0 * scale)
+			status_label.position = Vector2(slot.position.x, slot.position.y)
+			status_label.size = Vector2(slot.size.x, label_h)
+			status_label.add_theme_font_size_override("font_size", int(64.0 * scale))
+	else:
+		if status_label != null:
+			var label_h := 80.0 * scale
+			status_label.position = Vector2(progress_x, progress_y - label_h - 12.0 * scale)
+			status_label.size = Vector2(progress_w, label_h)
+			status_label.add_theme_font_size_override("font_size", int(56.0 * scale))
+
 	progress_bar_max_width = progress_w
 	progress_bar_height = progress_h
-	var progress_x := (viewport_size.x - progress_w) * 0.5
-	var progress_y := viewport_size.y * 0.72
-
 	progress_container.position = Vector2(progress_x, progress_y)
 	progress_container.size = Vector2(progress_w, progress_h)
-
-	if status_label != null:
-		var label_h := 80.0 * scale
-		status_label.position = Vector2(progress_x, progress_y - label_h - 12.0 * scale)
-		status_label.size = Vector2(progress_w, label_h)
-		status_label.add_theme_font_size_override("font_size", int(56.0 * scale))
-
 	_update_progress_visual(false)
 
 

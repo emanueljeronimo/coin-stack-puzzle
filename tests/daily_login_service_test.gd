@@ -104,20 +104,20 @@ func _test_slots_and_rotation() -> void:
 	if DailyLoginServiceScript.slot_label(lives) != "15 min":
 		_fail("lives_label", DailyLoginServiceScript.slot_label(lives))
 		return
-	var a: String = DailyLoginServiceScript.wildcard_for_day("2026-10-05")
-	var b: String = DailyLoginServiceScript.wildcard_for_day("2026-10-06")
+	var a: String = DailyLoginServiceScript.booster_for_day("2026-10-05")
+	var b: String = DailyLoginServiceScript.booster_for_day("2026-10-06")
 	if a == b:
 		_fail("wildcard_rotates", "%s %s" % [a, b])
 		return
-	if DailyLoginServiceScript.WILDCARD_TYPES.find(a) < 0:
-		_fail("wildcard_type", a)
+	if DailyLoginServiceScript.BOOSTER_TYPES.find(a) < 0:
+		_fail("booster_type", a)
 		return
 	var wc: Dictionary = slots[2] as Dictionary
-	if str(wc.get("wildcard_type", "")) != a:
+	if str(wc.get("booster_type", "")) != a:
 		_fail("wildcard_slot", str(wc))
 		return
-	if DailyLoginServiceScript.wildcard_title("hammer") != "Martillo":
-		_fail("wildcard_title")
+	if DailyLoginServiceScript.booster_title("hammer") != "Martillo":
+		_fail("booster_title")
 		return
 	_ok("slots_and_rotation")
 
@@ -137,21 +137,21 @@ func _test_level_unlock() -> void:
 	_ok("level_unlock")
 
 func _test_unlocked_rotation() -> void:
-	if DailyLoginServiceScript.wildcard_for_day("2026-10-05", 5) != "hammer":
+	if DailyLoginServiceScript.booster_for_day("2026-10-05", 5) != "hammer":
 		_fail("level5_hammer_a")
 		return
-	if DailyLoginServiceScript.wildcard_for_day("2026-10-06", 5) != "hammer":
+	if DailyLoginServiceScript.booster_for_day("2026-10-06", 5) != "hammer":
 		_fail("level5_hammer_b")
 		return
-	var at_ten_a: String = DailyLoginServiceScript.wildcard_for_day("2026-10-05", 10)
-	var at_ten_b: String = DailyLoginServiceScript.wildcard_for_day("2026-10-06", 10)
+	var at_ten_a: String = DailyLoginServiceScript.booster_for_day("2026-10-05", 10)
+	var at_ten_b: String = DailyLoginServiceScript.booster_for_day("2026-10-06", 10)
 	if at_ten_a == at_ten_b:
 		_fail("level10_rotates", "%s %s" % [at_ten_a, at_ten_b])
 		return
-	if DailyLoginServiceScript.WILDCARD_TYPES.find(at_ten_a) < 0 or at_ten_a == "glove":
+	if DailyLoginServiceScript.BOOSTER_TYPES.find(at_ten_a) < 0 or at_ten_a == "glove":
 		_fail("level10_pool", at_ten_a)
 		return
-	if DailyLoginServiceScript.wildcard_for_day("2026-10-07", 6) != "hammer":
+	if DailyLoginServiceScript.booster_for_day("2026-10-07", 6) != "hammer":
 		_fail("level6_not_glove")
 		return
 	_ok("unlocked_rotation")

@@ -3,10 +3,11 @@ extends Control
 
 signal stars_purchased(amount: int)
 signal combo_purchased(pack: Dictionary)
-signal wildcard_purchased(wildcard_type: String, amount: int)
+signal booster_purchased(booster_type: String, amount: int)
 
 const ShopTabServiceScript = preload("res://shop_tab_service.gd")
 const ShopCatalogServiceScript = preload("res://shop_catalog_service.gd")
+const GameBoosterServiceScript = preload("res://game_booster_service.gd")
 const StarIconTexture = preload("res://Imagenes/icono-estrella.png")
 const LifeIconTexture = preload("res://Imagenes/icono-vidas.png")
 const MixIconTexture = preload("res://Imagenes/icono-mezclar.png")
@@ -309,22 +310,22 @@ func _build_resources_page() -> Control:
 	_resource_list = list
 
 	var types: PackedStringArray = ShopCatalogServiceScript.resource_column_types()
-	for wildcard_type in types:
-		var packs: Array = ShopCatalogServiceScript.resource_packs_for_type(wildcard_type)
+	for booster_type in types:
+		var packs: Array = ShopCatalogServiceScript.resource_packs_for_type(booster_type)
 		if packs.is_empty():
 			continue
-		var column: Dictionary = _make_resource_column(wildcard_type, packs)
+		var column: Dictionary = _make_resource_column(booster_type, packs)
 		list.add_child(column.get("root") as Control)
 		_resource_rows.append(column)
 	return scroll
 
-func _make_resource_column(wildcard_type: String, packs: Array) -> Dictionary:
+func _make_resource_column(booster_type: String, packs: Array) -> Dictionary:
 	var title_text: String = str((packs[0] as Dictionary).get("title", ""))
 	var root := Panel.new()
 	root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	root.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root.mouse_filter = Control.MOUSE_FILTER_STOP
-	root.set_meta("wildcard_type", wildcard_type)
+	root.set_meta("booster_type", booster_type)
 
 	var margin := MarginContainer.new()
 	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -342,7 +343,7 @@ func _make_resource_column(wildcard_type: String, packs: Array) -> Dictionary:
 	margin.add_child(vbox)
 
 	var icon := TextureRect.new()
-	icon.texture = _texture_for_confirm_key(wildcard_type)
+	icon.texture = _texture_for_confirm_key(booster_type)
 	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -355,7 +356,7 @@ func _make_resource_column(wildcard_type: String, packs: Array) -> Dictionary:
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	vbox.add_child(title)
 
-	var lock := _make_outlined_label("Nivel %d" % ShopCatalogServiceScript.unlock_level_for_type(wildcard_type), 26)
+	var lock := _make_outlined_label("Nivel %d" % ShopCatalogServiceScript.unlock_level_for_type(booster_type), 26)
 	lock.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lock.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	lock.visible = false
@@ -381,7 +382,7 @@ func _make_resource_column(wildcard_type: String, packs: Array) -> Dictionary:
 		"lock": lock,
 		"vbox": vbox,
 		"offers_box": offers_box,
-		"wildcard_type": wildcard_type,
+		"booster_type": booster_type,
 		"offers": offers,
 	}
 
@@ -785,7 +786,7 @@ func _style_combo_cards(
 
 func _on_buy_star_pack(pack_id: String) -> void:
 	var pack: Dictionary = ShopCatalogServiceScript.pack_by_id(pack_id)
-	if ShopCatalogServiceScript.is_resource_wildcard(pack):
+	if ShopCatalogServiceScript.is_resource_booster(pack):
 		if not ShopCatalogServiceScript.can_buy_resource(pack, _player_shop_level()):
 			return
 	_show_buy_confirm(pack_id)
@@ -804,9 +805,9 @@ func _sync_resource_locks() -> void:
 	var on_border: Color = p.get("settings_btn_border", Color(0.75, 0.88, 0.58, 1.0))
 	var text_marble := Color(0.88, 0.86, 0.83)
 	for column in _resource_rows:
-		var wildcard_type: String = str(column.get("wildcard_type", ""))
+		var booster_type: String = str(column.get("booster_type", ""))
 		var unlocked: bool = ShopCatalogServiceScript.can_buy_resource(
-			{"kind": "resource_wildcard", "wildcard_type": wildcard_type},
+			{"kind": "resource_booster", "booster_type": booster_type},
 			level
 		)
 		var root: Panel = column.get("root") as Panel
@@ -815,7 +816,7 @@ func _sync_resource_locks() -> void:
 			root.modulate = Color(1, 1, 1, 1) if unlocked else Color(0.72, 0.72, 0.72, 0.88)
 		if lock != null:
 			lock.visible = not unlocked
-			lock.text = "Nivel %d" % ShopCatalogServiceScript.unlock_level_for_type(wildcard_type)
+			lock.text = "Nivel %d" % ShopCatalogServiceScript.unlock_level_for_type(booster_type)
 		var offers: Array = column.get("offers", []) as Array
 		for offer_n in offers:
 			if not (offer_n is Dictionary):
@@ -836,7 +837,7 @@ func _grant_star_pack(pack_id: String) -> void:
 	if ShopCatalogServiceScript.is_combo_pack(pack):
 		_grant_combo_pack(pack)
 		return
-	if ShopCatalogServiceScript.is_resource_wildcard(pack):
+	if ShopCatalogServiceScript.is_resource_booster(pack):
 		_grant_resource_pack(pack)
 		return
 	var amount: int = int(pack.get("amount", 0))
@@ -857,9 +858,9 @@ func _grant_combo_pack(pack: Dictionary) -> void:
 	var unlimited_sec: int = int(pack.get("unlimited_lives_sec", 0))
 	if unlimited_sec > 0 and GameState != null:
 		GameState.grant_unlimited_lives(unlimited_sec)
-	var wildcards: int = int(pack.get("wildcards", 0))
-	if wildcards > 0:
-		_persist_wildcard_uses("mix", wildcards)
+	var boosters: int = int(pack.get("boosters", pack.get("wildcards", 0)))
+	if boosters > 0:
+		_persist_booster_uses("mix", boosters)
 	var temp_slots: int = int(pack.get("temp_slots", 0))
 	if temp_slots > 0:
 		_queue_pending_temp_slots(temp_slots)
@@ -870,7 +871,7 @@ func _grant_resource_pack(pack: Dictionary) -> bool:
 		return false
 	var cost: int = int(pack.get("star_cost", 0))
 	var amount: int = int(pack.get("amount", 1))
-	var wildcard_type: String = str(pack.get("wildcard_type", ""))
+	var booster_type: String = str(pack.get("booster_type", ""))
 	var current: int = 0
 	if GameState != null:
 		current = GameState.player_stars
@@ -883,9 +884,9 @@ func _grant_resource_pack(pack: Dictionary) -> bool:
 	elif GameState != null:
 		GameState.player_stars = int(preview.get("player_stars", current))
 	stars_purchased.emit(0)
-	if amount > 0 and not wildcard_type.is_empty():
-		_persist_wildcard_uses(wildcard_type, amount)
-		wildcard_purchased.emit(wildcard_type, amount)
+	if amount > 0 and not booster_type.is_empty():
+		_persist_booster_uses(booster_type, amount)
+		booster_purchased.emit(booster_type, amount)
 	return true
 
 func _apply_star_grant(amount: int, result: Dictionary) -> void:
@@ -895,18 +896,19 @@ func _apply_star_grant(amount: int, result: Dictionary) -> void:
 		GameState.player_stars = int(result.get("player_stars", GameState.player_stars))
 	stars_purchased.emit(amount)
 
-func _persist_wildcard_uses(wildcard_type: String, amount: int) -> void:
-	if amount <= 0 or wildcard_type.is_empty():
+func _persist_booster_uses(booster_type: String, amount: int) -> void:
+	if amount <= 0 or booster_type.is_empty():
 		return
 	var snap: Dictionary = {}
 	if SaveManager != null and SaveManager.player_data.get("checkpoint_snapshot") is Dictionary:
 		snap = (SaveManager.player_data["checkpoint_snapshot"] as Dictionary).duplicate(true)
 	elif GameState != null:
 		snap = GameState.checkpoint_snapshot.duplicate(true)
-	var counts: Dictionary = snap.get("wildcard_counts", {}) as Dictionary
-	if counts.is_empty() and GameState != null:
-		counts = GameState.checkpoint_snapshot.get("wildcard_counts", {}) as Dictionary
-	snap["wildcard_counts"] = ShopCatalogServiceScript.apply_wildcard_uses(counts, wildcard_type, amount)
+	var counts: Dictionary = GameBoosterServiceScript.read_counts(snap)
+	if not snap.has("booster_counts") and not snap.has("wildcard_counts") and GameState != null:
+		counts = GameBoosterServiceScript.read_counts(GameState.checkpoint_snapshot)
+	counts = ShopCatalogServiceScript.apply_booster_uses(counts, booster_type, amount)
+	GameBoosterServiceScript.write_state(snap, counts, GameBoosterServiceScript.read_granted(snap))
 	if GameState != null:
 		GameState.checkpoint_snapshot = snap
 	if SaveManager != null:
@@ -914,7 +916,7 @@ func _persist_wildcard_uses(wildcard_type: String, amount: int) -> void:
 		var runtime: Variant = SaveManager.player_data.get("runtime_snapshot", {})
 		if runtime is Dictionary:
 			var rt: Dictionary = (runtime as Dictionary).duplicate(true)
-			rt["wildcard_counts"] = snap["wildcard_counts"]
+			rt["booster_counts"] = snap["booster_counts"]
 			SaveManager.player_data["runtime_snapshot"] = rt
 
 func _queue_pending_temp_slots(amount: int) -> void:
@@ -991,7 +993,7 @@ func _show_buy_confirm(pack_id: String) -> void:
 	var pack: Dictionary = ShopCatalogServiceScript.pack_by_id(pack_id)
 	if pack.is_empty() or _confirm_root == null:
 		return
-	if ShopCatalogServiceScript.is_resource_wildcard(pack):
+	if ShopCatalogServiceScript.is_resource_booster(pack):
 		if not ShopCatalogServiceScript.can_buy_resource(pack, _player_shop_level()):
 			return
 	_pending_pack_id = pack_id
@@ -1017,7 +1019,7 @@ func _texture_for_confirm_key(key: String) -> Texture2D:
 	match key:
 		"lives":
 			return LifeIconTexture
-		"wildcards":
+		"boosters":
 			return MixIconTexture
 		"mix":
 			return MixIconTexture
@@ -1083,7 +1085,7 @@ func _on_confirm_accept_pressed() -> void:
 		_hide_buy_confirm()
 		return
 	var pack: Dictionary = ShopCatalogServiceScript.pack_by_id(pack_id)
-	if ShopCatalogServiceScript.is_resource_wildcard(pack):
+	if ShopCatalogServiceScript.is_resource_booster(pack):
 		if not _grant_resource_pack(pack):
 			return
 		_hide_buy_confirm()

@@ -227,15 +227,15 @@ func build_shop_dialog() -> void:
 	shop_layer.add_child(shop_ui)
 	if shop_ui.has_signal("combo_purchased") and not shop_ui.combo_purchased.is_connected(_on_shop_combo_purchased):
 		shop_ui.combo_purchased.connect(_on_shop_combo_purchased)
-	if shop_ui.has_signal("wildcard_purchased") and not shop_ui.wildcard_purchased.is_connected(_on_shop_wildcard_purchased):
-		shop_ui.wildcard_purchased.connect(_on_shop_wildcard_purchased)
+	if shop_ui.has_signal("booster_purchased") and not shop_ui.booster_purchased.is_connected(_on_shop_booster_purchased):
+		shop_ui.booster_purchased.connect(_on_shop_booster_purchased)
 	if shop_ui.has_signal("stars_purchased") and not shop_ui.stars_purchased.is_connected(_on_shop_stars_purchased):
 		shop_ui.stars_purchased.connect(_on_shop_stars_purchased)
 
 func _on_shop_combo_purchased(_pack: Dictionary) -> void:
 	update_displays()
 
-func _on_shop_wildcard_purchased(_wildcard_type: String, _amount: int) -> void:
+func _on_shop_booster_purchased(_booster_type: String, _amount: int) -> void:
 	update_displays()
 
 func _on_shop_stars_purchased(_amount: int) -> void:

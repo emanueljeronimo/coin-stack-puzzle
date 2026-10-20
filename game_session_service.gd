@@ -1,6 +1,8 @@
 extends RefCounted
 class_name GameSessionService
 
+const GameBoosterServiceScript = preload("res://game_booster_service.gd")
+
 static func build_runtime_snapshot(state: Dictionary) -> Dictionary:
 	var expected := int(state.get("active_stacks", 0))
 	if bool(state.get("has_active_temp_stack", false)):
@@ -28,8 +30,8 @@ static func build_runtime_snapshot(state: Dictionary) -> Dictionary:
 		"pending_cycle_reset_milestone": int(state.get("pending_cycle_reset_milestone", 0)),
 		"pending_level_up_alerts": normalize_int_list(state.get("pending_level_up_alerts", [])),
 		"last_acknowledged_checkpoint_level": int(state.get("last_acknowledged_checkpoint_level", 0)),
-		"wildcard_counts": (state.get("wildcard_counts", {}) as Dictionary).duplicate(true),
-		"wildcard_unlock_granted": (state.get("wildcard_unlock_granted", {}) as Dictionary).duplicate(true),
+		"booster_counts": GameBoosterServiceScript.read_counts(state),
+		"booster_unlock_granted": GameBoosterServiceScript.read_granted(state),
 		"stacks": rows,
 	}
 
@@ -47,8 +49,8 @@ static func build_checkpoint_snapshot(state: Dictionary) -> Dictionary:
 		"active_stacks": int(state.get("active_stacks", 1)),
 		"next_free_slot_unlock_level": int(state.get("next_free_slot_unlock_level", 1)),
 		"adjacent_slot_next_price": int(state.get("adjacent_slot_next_price", 0)),
-		"wildcard_counts": (state.get("wildcard_counts", {}) as Dictionary).duplicate(),
-		"wildcard_unlock_granted": (state.get("wildcard_unlock_granted", {}) as Dictionary).duplicate(),
+		"booster_counts": GameBoosterServiceScript.read_counts(state),
+		"booster_unlock_granted": GameBoosterServiceScript.read_granted(state),
 		"stacks": (state.get("stacks", []) as Array).duplicate(true),
 	}
 

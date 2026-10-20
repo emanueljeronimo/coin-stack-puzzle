@@ -1,6 +1,6 @@
 extends SceneTree
 
-const WildcardFlowServiceScript = preload("res://wildcard_flow_service.gd")
+const BoosterFlowServiceScript = preload("res://booster_flow_service.gd")
 
 var _failed := 0
 var _passed := 0
@@ -24,22 +24,22 @@ func _fail(name: String, detail: String = "") -> void:
 	print("FAIL: ", name, (" - " + detail) if not detail.is_empty() else "")
 
 func _test_has_uses() -> void:
-	if WildcardFlowServiceScript.has_uses({"mix": 0}, "mix"):
+	if BoosterFlowServiceScript.has_uses({"mix": 0}, "mix"):
 		_fail("has_uses_zero")
 		return
-	if not WildcardFlowServiceScript.has_uses({"mix": 2}, "mix"):
+	if not BoosterFlowServiceScript.has_uses({"mix": 2}, "mix"):
 		_fail("has_uses_positive")
 		return
 	_ok("has_uses")
 
 func _test_action_kind() -> void:
-	if WildcardFlowServiceScript.wildcard_action_kind("mix") != "mix":
+	if BoosterFlowServiceScript.booster_action_kind("mix") != "mix":
 		_fail("kind_mix")
 		return
-	if WildcardFlowServiceScript.wildcard_action_kind("hammer") != "tool":
+	if BoosterFlowServiceScript.booster_action_kind("hammer") != "tool":
 		_fail("kind_hammer")
 		return
-	if WildcardFlowServiceScript.wildcard_action_kind("x") != "unknown":
+	if BoosterFlowServiceScript.booster_action_kind("x") != "unknown":
 		_fail("kind_unknown")
 		return
 	_ok("action_kind")

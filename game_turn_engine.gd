@@ -24,11 +24,21 @@ static func compute_roll_count(pool_size: int, total_free_slots: int, keep_one_f
 const EARLY_GROUP_LEVELS := 0
 const EARLY_GROUP_CHUNK := 4
 
-## Hasta el 3, entre el playtest facil y el recorte; no se agrupan por color.
-const EARLY_DOUBLE_DEAL_UNTIL_LEVEL := 6
+## 2x al inicio, 1.5x al desbloquear Mezclar, 1x cerca del prestige.
+const DEAL_DOUBLE_UNTIL_LEVEL := 8
+const DEAL_ONE_HALF_UNTIL_LEVEL := 12
+
+static func deal_multiplier(checkpoint_level: int) -> float:
+	if checkpoint_level <= 0:
+		return 1.0
+	if checkpoint_level <= DEAL_DOUBLE_UNTIL_LEVEL:
+		return 2.0
+	if checkpoint_level <= DEAL_ONE_HALF_UNTIL_LEVEL:
+		return 1.5
+	return 1.0
 
 static func should_double_early_deals(checkpoint_level: int) -> bool:
-	return checkpoint_level >= 1 and checkpoint_level <= EARLY_DOUBLE_DEAL_UNTIL_LEVEL
+	return deal_multiplier(checkpoint_level) >= 2.0
 
 static func early_roll_target(checkpoint_level: int) -> int:
 	match checkpoint_level:
@@ -74,8 +84,7 @@ static func compute_level_roll_count(
 	var base: int = compute_roll_count(pool_size, total_free_slots, keep_one_free_if_possible)
 	var early: int = early_roll_target(checkpoint_level)
 	var wanted: int = maxi(base, early)
-	if should_double_early_deals(checkpoint_level):
-		wanted *= 2
+	wanted = int(round(float(wanted) * deal_multiplier(checkpoint_level)))
 	var cap: int = total_free_slots
 	if keep_one_free_if_possible and total_free_slots >= 2:
 		cap = total_free_slots - 1

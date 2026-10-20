@@ -13,6 +13,7 @@ func _run() -> void:
 	_test_roll_value_pool()
 	_test_roll_count_policy()
 	_test_early_roll_ramp()
+	_test_deal_multiplier_ramp()
 	_test_grouped_early_rolls()
 	_test_balanced_pick_policy()
 	_test_round_wildcard_once()
@@ -63,6 +64,7 @@ func _test_early_roll_ramp() -> void:
 	var lv5: int = GameTurnEngineScript.compute_level_roll_count(5, 3, 20, true)
 	var lv6: int = GameTurnEngineScript.compute_level_roll_count(6, 3, 20, true)
 	var lv7: int = GameTurnEngineScript.compute_level_roll_count(7, 3, 20, true)
+	var lv8: int = GameTurnEngineScript.compute_level_roll_count(8, 3, 20, true)
 	if GameTurnEngineScript.early_roll_target(1) != 10:
 		_fail("level1_target_10", str(GameTurnEngineScript.early_roll_target(1)))
 		return
@@ -72,11 +74,11 @@ func _test_early_roll_ramp() -> void:
 	if GameTurnEngineScript.early_roll_target(4) != 5:
 		_fail("level4_ramps_down", str(GameTurnEngineScript.early_roll_target(4)))
 		return
-	if not GameTurnEngineScript.should_double_early_deals(6):
-		_fail("double_until_6")
+	if not GameTurnEngineScript.should_double_early_deals(8):
+		_fail("double_until_8")
 		return
-	if GameTurnEngineScript.should_double_early_deals(7):
-		_fail("no_double_after_6")
+	if GameTurnEngineScript.should_double_early_deals(9):
+		_fail("no_double_after_8")
 		return
 	if lv1 < 19 or lv1 <= lv5:
 		_fail("level1_drops_more", "%d vs %d" % [lv1, lv5])
@@ -87,8 +89,11 @@ func _test_early_roll_ramp() -> void:
 	if lv6 != 6:
 		_fail("level6_double_pool", str(lv6))
 		return
-	if lv7 != 3:
-		_fail("level7_normal_pool", str(lv7))
+	if lv7 != 6:
+		_fail("level7_double_pool", str(lv7))
+		return
+	if lv8 != 6:
+		_fail("level8_double_pool", str(lv8))
 		return
 	if GameTurnEngineScript.early_roll_value_max(1, 0, 1, 4) != 2:
 		_fail("first_deal_ones_twos", str(GameTurnEngineScript.early_roll_value_max(1, 0, 1, 4)))
@@ -107,6 +112,39 @@ func _test_early_roll_ramp() -> void:
 		_fail("pad_pool", str(padded))
 		return
 	_ok("early_roll_ramp")
+
+func _test_deal_multiplier_ramp() -> void:
+	if GameTurnEngineScript.deal_multiplier(1) != 2.0:
+		_fail("mult_level1", str(GameTurnEngineScript.deal_multiplier(1)))
+		return
+	if GameTurnEngineScript.deal_multiplier(8) != 2.0:
+		_fail("mult_level8", str(GameTurnEngineScript.deal_multiplier(8)))
+		return
+	if GameTurnEngineScript.deal_multiplier(9) != 1.5:
+		_fail("mult_level9", str(GameTurnEngineScript.deal_multiplier(9)))
+		return
+	if GameTurnEngineScript.deal_multiplier(12) != 1.5:
+		_fail("mult_level12", str(GameTurnEngineScript.deal_multiplier(12)))
+		return
+	if GameTurnEngineScript.deal_multiplier(13) != 1.0:
+		_fail("mult_level13", str(GameTurnEngineScript.deal_multiplier(13)))
+		return
+	if GameTurnEngineScript.deal_multiplier(15) != 1.0:
+		_fail("mult_prestige", str(GameTurnEngineScript.deal_multiplier(15)))
+		return
+	var lv9: int = GameTurnEngineScript.compute_level_roll_count(9, 3, 20, true)
+	var lv12: int = GameTurnEngineScript.compute_level_roll_count(12, 3, 20, true)
+	var lv13: int = GameTurnEngineScript.compute_level_roll_count(13, 3, 20, true)
+	if lv9 != 5:
+		_fail("level9_one_half_pool", str(lv9))
+		return
+	if lv12 != 5:
+		_fail("level12_one_half_pool", str(lv12))
+		return
+	if lv13 != 3:
+		_fail("level13_normal_pool", str(lv13))
+		return
+	_ok("deal_multiplier_ramp")
 
 func _test_grouped_early_rolls() -> void:
 	if GameTurnEngineScript.should_group_early_rolls(1):

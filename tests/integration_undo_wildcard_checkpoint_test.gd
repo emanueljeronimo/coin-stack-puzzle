@@ -1,6 +1,6 @@
 extends SceneTree
 
-const GameWildcardServiceScript = preload("res://game_wildcard_service.gd")
+const GameBoosterServiceScript = preload("res://game_booster_service.gd")
 const GameSessionServiceScript = preload("res://game_session_service.gd")
 const GameEngineScript = preload("res://game_engine.gd")
 
@@ -25,7 +25,7 @@ func _fail(name: String, detail: String = "") -> void:
 	print("FAIL: ", name, (" - " + detail) if not detail.is_empty() else "")
 
 func _test_undo_restores_wildcard_and_checkpoint_snapshot() -> void:
-	var wildcard_counts := {"hammer": 1, "mix": 0, "glove": 0}
+	var booster_counts := {"hammer": 1, "mix": 0, "glove": 0}
 	var snapshot_before := GameSessionServiceScript.build_checkpoint_snapshot({
 		"checkpoint_level": 6,
 		"current_level": 6,
@@ -36,17 +36,17 @@ func _test_undo_restores_wildcard_and_checkpoint_snapshot() -> void:
 		"active_stacks": 5,
 		"next_free_slot_unlock_level": 9,
 		"adjacent_slot_next_price": 3,
-		"wildcard_counts": wildcard_counts,
-		"wildcard_unlock_granted": {"hammer": true},
+		"booster_counts": booster_counts,
+		"booster_unlock_granted": {"hammer": true},
 		"stacks": [[1, 1, 1, 1, 1]],
 	})
 
-	wildcard_counts = GameWildcardServiceScript.consume(wildcard_counts, "hammer")
-	if int(wildcard_counts.get("hammer", -1)) != 0:
+	booster_counts = GameBoosterServiceScript.consume(booster_counts, "hammer")
+	if int(booster_counts.get("hammer", -1)) != 0:
 		_fail("consume_hammer")
 		return
 
-	var restored_wildcards: Dictionary = snapshot_before.get("wildcard_counts", {})
+	var restored_wildcards: Dictionary = snapshot_before.get("booster_counts", {})
 	if int(restored_wildcards.get("hammer", -1)) != 1:
 		_fail("undo_wildcard_restore")
 		return

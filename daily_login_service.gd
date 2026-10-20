@@ -1,15 +1,15 @@
 extends RefCounted
 
-const GameWildcardServiceScript = preload("res://game_wildcard_service.gd")
+const GameBoosterServiceScript = preload("res://game_booster_service.gd")
 
 const SLOT_COUNT := 4
 const FREE_STARS := 70
 const AD_STARS := 100
 const UNLIMITED_LIVES_SEC := 15 * 60
-const WILDCARD_TYPES: PackedStringArray = ["mix", "hammer", "glove"]
+const BOOSTER_TYPES: PackedStringArray = ["mix", "hammer", "glove"]
 
 static func unlock_level() -> int:
-	return GameWildcardServiceScript.earliest_unlock_level()
+	return GameBoosterServiceScript.earliest_unlock_level()
 
 static func is_unlocked(player_level: int) -> bool:
 	return player_level >= unlock_level()
@@ -63,11 +63,11 @@ static func slot_status(index: int, claimed: int) -> String:
 		return "available"
 	return "locked"
 
-static func unlocked_wildcard_types(player_level: int) -> PackedStringArray:
+static func unlocked_booster_types(player_level: int) -> PackedStringArray:
 	var out: PackedStringArray = PackedStringArray()
-	for wildcard_type in WILDCARD_TYPES:
-		if GameWildcardServiceScript.is_unlocked(wildcard_type, player_level):
-			out.append(wildcard_type)
+	for booster_type in BOOSTER_TYPES:
+		if GameBoosterServiceScript.is_unlocked(booster_type, player_level):
+			out.append(booster_type)
 	return out
 
 static func day_ordinal(day_key: String) -> int:
@@ -76,14 +76,14 @@ static func day_ordinal(day_key: String) -> int:
 		return 0
 	return int(parts[0]) * 372 + int(parts[1]) * 31 + int(parts[2])
 
-static func wildcard_for_day(day_key: String, player_level: int = 9999) -> String:
-	var pool: PackedStringArray = unlocked_wildcard_types(player_level)
+static func booster_for_day(day_key: String, player_level: int = 9999) -> String:
+	var pool: PackedStringArray = unlocked_booster_types(player_level)
 	if pool.is_empty():
 		return "mix"
 	return pool[day_ordinal(day_key) % pool.size()]
 
-static func wildcard_title(wildcard_type: String) -> String:
-	match wildcard_type:
+static func booster_title(booster_type: String) -> String:
+	match booster_type:
 		"hammer":
 			return "Martillo"
 		"glove":
@@ -92,7 +92,7 @@ static func wildcard_title(wildcard_type: String) -> String:
 			return "Mezclar"
 
 static func slot_defs(day_key: String, player_level: int = 9999) -> Array:
-	var wildcard_type: String = wildcard_for_day(day_key, player_level)
+	var booster_type: String = booster_for_day(day_key, player_level)
 	return [
 		{
 			"id": "free_stars",
@@ -109,9 +109,9 @@ static func slot_defs(day_key: String, player_level: int = 9999) -> Array:
 			"requires_ad": true,
 		},
 		{
-			"id": "ad_wildcard",
-			"kind": "wildcard",
-			"wildcard_type": wildcard_type,
+			"id": "ad_booster",
+			"kind": "booster",
+			"booster_type": booster_type,
 			"amount": 1,
 			"button": "Ver anuncio",
 			"requires_ad": true,
@@ -129,8 +129,8 @@ static func slot_label(slot: Dictionary) -> String:
 	var kind: String = str(slot.get("kind", ""))
 	if kind == "stars":
 		return str(int(slot.get("amount", 0)))
-	if kind == "wildcard":
-		return wildcard_title(str(slot.get("wildcard_type", "mix")))
+	if kind == "booster":
+		return booster_title(str(slot.get("booster_type", "mix")))
 	if kind == "unlimited_lives":
 		return "15 min"
 	return ""

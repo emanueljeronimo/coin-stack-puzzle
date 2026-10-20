@@ -343,7 +343,7 @@ static func build_mix_stack_plan(
 	_mix_sort_plan_stacks(plan)
 	return plan
 
-## Mezclar del comodín: agrupa por número y convierte cada pila de 10.
+## Booster Mezclar: agrupa por numero y convierte cada pila de 10.
 ## Después de juntar los fusionados, si vuelve a haber 10 iguales, también se
 ## convierten. No sigue después de eso (evita 4→8 en un solo uso).
 static func build_wildcard_mix_plan(

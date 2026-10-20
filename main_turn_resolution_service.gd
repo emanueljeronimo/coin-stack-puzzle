@@ -14,8 +14,8 @@ static func level_alert_open(level_up_overlay: CanvasItem, pending_level_up_aler
 		or cycle_reset_transition_playing
 	)
 
-static func wildcard_alert_open(wildcard_unlock_overlay: CanvasItem) -> bool:
-	return wildcard_unlock_overlay != null and wildcard_unlock_overlay.visible
+static func booster_alert_open(booster_unlock_overlay: CanvasItem) -> bool:
+	return booster_unlock_overlay != null and booster_unlock_overlay.visible
 
-static func should_unlock_board(level_alert_open_flag: bool, wildcard_alert_open_flag: bool) -> bool:
-	return not level_alert_open_flag and not wildcard_alert_open_flag
+static func should_unlock_board(level_alert_open_flag: bool, booster_alert_open_flag: bool) -> bool:
+	return not level_alert_open_flag and not booster_alert_open_flag

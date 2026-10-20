@@ -10,9 +10,9 @@ const GameEconomyServiceScript = preload("res://game_economy_service.gd")
 const GameRulesScript = preload("res://game_rules.gd")
 const GameSessionServiceScript = preload("res://game_session_service.gd")
 const GameSlotServiceScript = preload("res://game_slot_service.gd")
-const GameWildcardServiceScript = preload("res://game_wildcard_service.gd")
+const GameBoosterServiceScript = preload("res://game_booster_service.gd")
 const MainMoveInteractionServiceScript = preload("res://main_move_interaction_service.gd")
-const WildcardFlowServiceScript = preload("res://wildcard_flow_service.gd")
+const BoosterFlowServiceScript = preload("res://booster_flow_service.gd")
 const TempSlotPurchaseServiceScript = preload("res://temp_slot_purchase_service.gd")
 const AdjacentSlotPurchaseServiceScript = preload("res://adjacent_slot_purchase_service.gd")
 const CheckpointServiceScript = preload("res://checkpoint_service.gd")
@@ -34,6 +34,9 @@ const DialogVisibilityServiceScript = preload("res://dialog_visibility_service.g
 const MainFacadeScript = preload("res://main_facade.gd")
 const BoardTutorialServiceScript = preload("res://board_tutorial_service.gd")
 const LevelUpRewardServiceScript = preload("res://level_up_reward_service.gd")
+const CelebrationBurstScript = preload("res://celebration_burst.gd")
+const LevelUpCartelTexture = preload("res://Imagenes/cartel-nivel.png")
+const LevelUpCartelLayoutServiceScript = preload("res://level_up_cartel_layout_service.gd")
 const SlotOverlayBgScript = preload("res://slot_overlay_bg.gd")
 const RainbowLabelShader = preload("res://rainbow_label.gdshader")
 const MixIconTexture = preload("res://Imagenes/icono-mezclar.png")
@@ -42,6 +45,8 @@ const GloveIconTexture = preload("res://Imagenes/icono-mano.png")
 const DiamondIconTexture = preload("res://Imagenes/icono-estrella.png")
 const LifeIconTexture = preload("res://Imagenes/icono-vidas.png")
 const StarIconTexture = preload("res://Imagenes/icono-estrella.png")
+const LevelUpStarsLeftTexture = preload("res://Imagenes/tres-estrellas-izq.png")
+const LevelUpStarsRightTexture = preload("res://Imagenes/tres-estrellas-der.png")
 const HomeIconTexture = preload("res://Imagenes/icono-home.png")
 const CartIconTexture = preload("res://Imagenes/icono-cart.png")
 const SettingsIconTexture = preload("res://Imagenes/icono-settings.png")
@@ -128,16 +133,22 @@ const DIALOG_BTN_HEIGHT := 118.0
 const DIALOG_BTN_RADIUS := 36
 const DIALOG_TITLE_FONT_SIZE := 72
 const LEVEL_UP_TITLE_FONT_SIZE := 96
+const LEVEL_UP_PAD := 28.0
+const LEVEL_UP_HEADER_H := 52.0
+const LEVEL_UP_TITLE_H := 90.0
+const LEVEL_UP_LEVEL_H := 48.0
+const LEVEL_UP_DESC_H := 40.0
+const LEVEL_UP_BUTTON_H := 82.0
 const DIALOG_SUBTITLE_FONT_SIZE := 52
 const DIALOG_BTN_FONT_SIZE := 42
 const DIALOG_COMPACT_BTN_WIDTH_RATIO := 0.52
 const DIALOG_COMPACT_BTN_HEIGHT_RATIO := 0.70
 const DIALOG_COMPACT_BTN_FONT_SIZE := 50
-const WILDCARD_UNLOCK_CARD_HEIGHT := 520.0
-const WILDCARD_UNLOCK_TITLE_FONT_SIZE := 80
+const BOOSTER_UNLOCK_CARD_HEIGHT := 520.0
+const BOOSTER_UNLOCK_TITLE_FONT_SIZE := 80
 const MENU_CARD_INNER_BTN_WIDTH_RATIO := 0.68
 const MENU_CARD_WIDTH_MAX := 920.0
-## Botón Repartir, deshacer y comodines.
+## Botón Repartir, deshacer y Boosters.
 const CTA_WIDTH_RATIO = 0.40
 const CTA_FOOTER_BTN_GAP = 12.0
 const CTA_HEIGHT = 70.0
@@ -147,26 +158,26 @@ const CTA_ICON_FILL := Color(0.20, 0.76, 0.96, 1.0)
 const CTA_ICON_BORDER := Color(0.08, 0.16, 0.38, 1.0)
 const CTA_ICON_TEXT := Color(0.98, 0.98, 0.96, 1.0)
 const CTA_ICON_TEXT_OUTLINE := Color(0.08, 0.14, 0.32, 0.92)
-## Mismo tamaño cuadrado para deshacer y comodines.
+## Mismo tamaño cuadrado para deshacer y Boosters.
 const FOOTER_ICON_BUTTON_SIZE = 86.0
 const UNDO_ICON_FONT_SIZE = 40.0
 const UNDO_DISABLED_MODULATE := Color(1.0, 1.0, 1.0, 0.42)
-const WILDCARD_BUTTON_GAP = 24.0
+const BOOSTER_BUTTON_GAP = 24.0
 const AD_FOOTER_HEIGHT_RATIO = 0.16
 const AD_FOOTER_MIN_HEIGHT = 120.0
 const AD_FOOTER_MAX_HEIGHT = 200.0
-const WILDCARD_TYPES := ["mix", "hammer", "glove"]
-const WILDCARD_INITIAL_USES := 3
-const WILDCARD_COST_STARS := 200
-const WILDCARD_PACK_AMOUNT := 3
-const WILDCARD_PACK_COST_STARS := 500
-## Nivel de checkpoint para desbloquear cada comodín (ver barra de progreso).
-const WILDCARD_UNLOCK_LEVEL := {
+const BOOSTER_TYPES := ["hammer", "mix", "glove"]
+const BOOSTER_INITIAL_USES := 3
+const BOOSTER_COST_STARS := 200
+const BOOSTER_PACK_AMOUNT := 3
+const BOOSTER_PACK_COST_STARS := 500
+## Nivel de checkpoint para desbloquear cada Booster (ver barra de progreso).
+const BOOSTER_UNLOCK_LEVEL := {
 	"mix": 9,
 	"hammer": 4,
 	"glove": 14,
 }
-const WILDCARD_LOCKED_MODULATE := Color(0.70, 0.70, 0.70, 0.82)
+const BOOSTER_LOCKED_MODULATE := Color(0.70, 0.70, 0.70, 0.82)
 const TEMP_SLOT_COST_STARS := 200
 const TEMP_SLOT_DURATION_SEC := 60.0
 const TEMP_LOCKED_PANEL_GREEN := Color(0.14, 0.38, 0.22, 1.0)
@@ -308,12 +319,12 @@ var action_pills: Array = []
 var action_icons: Array = []
 var action_count_badges: Array = []
 var action_count_labels: Array = []
-var wildcard_counts := {
+var booster_counts := {
 	"mix": 0,
 	"hammer": 0,
 	"glove": 0,
 }
-var wildcard_unlock_granted := {
+var booster_unlock_granted := {
 	"mix": false,
 	"hammer": false,
 	"glove": false,
@@ -408,22 +419,27 @@ var level_up_card: Panel = null
 var level_up_margin: MarginContainer = null
 var level_up_vbox: VBoxContainer = null
 var level_up_title_label: Label = null
+var level_up_level_row: HBoxContainer = null
+var level_up_level_star_left: TextureRect = null
+var level_up_level_star_right: TextureRect = null
 var level_up_subtitle_label: Label = null
+var level_up_body_spacer: Control = null
 var level_up_button_row: HBoxContainer = null
 var level_up_claim_button: Control = null
 var level_up_ad_button: Control = null
 var level_up_continue_button: Control = null
+var level_up_burst: Control = null
 var _level_up_stars_claimed := false
 var _level_up_show_reward := false
-## Cartel al desbloquear un comodín.
-var wildcard_unlock_overlay: ColorRect = null
-var wildcard_unlock_card: Panel = null
-var wildcard_unlock_margin: MarginContainer = null
-var wildcard_unlock_vbox: VBoxContainer = null
-var wildcard_unlock_title_label: Label = null
-var wildcard_unlock_subtitle_label: Label = null
-var wildcard_unlock_continue_button: Control = null
-var _pending_wildcard_unlock_queue: Array[String] = []
+## Cartel al desbloquear un Booster.
+var booster_unlock_overlay: ColorRect = null
+var booster_unlock_card: Panel = null
+var booster_unlock_margin: MarginContainer = null
+var booster_unlock_vbox: VBoxContainer = null
+var booster_unlock_title_label: Label = null
+var booster_unlock_subtitle_label: Label = null
+var booster_unlock_continue_button: Control = null
+var _pending_booster_unlock_queue: Array[String] = []
 var _main_facade: MainFacade = null
 
 func _ready() -> void:
@@ -614,7 +630,7 @@ func setup_board() -> void:
 	cycle_checkpoint_origin = 0
 	cycle_rules_revision = GameEngineScript.CYCLE_RULES_REVISION
 	active_stacks = INITIAL_PERMANENT_STACKS
-	reset_wildcard_state()
+	reset_booster_state()
 	clear_board_stacks()
 	create_stack_nodes(active_stacks)
 	if BoardTutorialServiceScript.should_start(_tutorial_is_saved_done(), checkpoint_level):
@@ -659,18 +675,18 @@ func capture_board_snapshot() -> Dictionary:
 		"pending_cycle_reset_milestone": _pending_cycle_reset_milestone,
 		"pending_level_up_alerts": _pending_level_up_alerts.duplicate(),
 		"last_acknowledged_checkpoint_level": _last_acked_checkpoint_level,
-		"wildcard_counts": wildcard_counts,
-		"wildcard_unlock_granted": wildcard_unlock_granted,
+		"booster_counts": booster_counts,
+		"booster_unlock_granted": booster_unlock_granted,
 		"all_rows": _capture_stack_data(),
 		"has_active_temp_stack": has_active_temp_stack(),
 	})
 
-## Mantiene los comodines del checkpoint al día (usos/compras entre niveles).
-func _sync_wildcards_into_checkpoint_snapshot() -> void:
+## Mantiene los Boosters del checkpoint al día (usos/compras entre niveles).
+func _sync_boosters_into_checkpoint_snapshot() -> void:
 	if checkpoint_snapshot.is_empty():
 		return
-	checkpoint_snapshot["wildcard_counts"] = wildcard_counts.duplicate(true)
-	checkpoint_snapshot["wildcard_unlock_granted"] = wildcard_unlock_granted.duplicate(true)
+	checkpoint_snapshot["booster_counts"] = booster_counts.duplicate(true)
+	checkpoint_snapshot["booster_unlock_granted"] = booster_unlock_granted.duplicate(true)
 
 func _clear_undo_snapshot() -> void:
 	undo_snapshot.clear()
@@ -683,7 +699,7 @@ func can_undo() -> bool:
 		return false
 	if level_up_overlay != null and level_up_overlay.visible:
 		return false
-	if wildcard_unlock_overlay != null and wildcard_unlock_overlay.visible:
+	if booster_unlock_overlay != null and booster_unlock_overlay.visible:
 		return false
 	if no_moves_overlay != null and no_moves_overlay.visible:
 		return false
@@ -898,13 +914,14 @@ func _restore_board_from_snapshot(snap: Dictionary) -> void:
 	_pending_level_up_alerts = GameSessionServiceScript.normalize_int_list(
 		snap.get("pending_level_up_alerts", [])
 	)
-	var wc_counts: Variant = snap.get("wildcard_counts", null) if snap.has("wildcard_counts") else null
-	var wc_granted: Variant = snap.get("wildcard_unlock_granted", null) if snap.has("wildcard_unlock_granted") else null
-	# Saves viejos: comodines solo vivían en el checkpoint.
-	if wc_counts == null and checkpoint_snapshot is Dictionary:
-		wc_counts = checkpoint_snapshot.get("wildcard_counts", null)
-		wc_granted = checkpoint_snapshot.get("wildcard_unlock_granted", null)
-	_apply_wildcard_state_from_dicts(wc_counts, wc_granted)
+	var booster_source: Dictionary = snap
+	var has_live_boosters := snap.has("booster_counts") or snap.has("wildcard_counts")
+	if not has_live_boosters and checkpoint_snapshot is Dictionary:
+		booster_source = checkpoint_snapshot
+	_apply_booster_state_from_dicts(
+		GameBoosterServiceScript.read_counts(booster_source),
+		GameBoosterServiceScript.read_granted(booster_source)
+	)
 	next_free_slot_unlock_level = maxi(
 		1,
 		int(
@@ -968,8 +985,8 @@ func try_undo_last_move() -> void:
 		return
 	if level_up_overlay != null:
 		level_up_overlay.visible = false
-	if wildcard_unlock_overlay != null:
-		wildcard_unlock_overlay.visible = false
+	if booster_unlock_overlay != null:
+		booster_unlock_overlay.visible = false
 	if no_moves_overlay != null:
 		no_moves_overlay.visible = false
 	board_locked = false
@@ -981,7 +998,7 @@ func try_undo_last_move() -> void:
 	print("Movimiento deshecho.")
 
 func save_game() -> void:
-	_sync_wildcards_into_checkpoint_snapshot()
+	_sync_boosters_into_checkpoint_snapshot()
 	_push_player_resources_to_game_state()
 	runtime_snapshot = capture_board_snapshot()
 	var session := collect_save_dict()
@@ -1004,7 +1021,7 @@ func try_load_saved_game() -> bool:
 ## Estado persistible (save/load sigue desactivado; estos helpers quedan listos para reactivarlo).
 ## Incluye el nivel actual (checkpoint) como pide el sistema de checkpoints.
 func collect_save_dict(_payload: Dictionary = {}) -> Dictionary:
-	_sync_wildcards_into_checkpoint_snapshot()
+	_sync_boosters_into_checkpoint_snapshot()
 	runtime_snapshot = capture_board_snapshot()
 	return GameSessionServiceScript.build_save_payload({
 		"checkpoint_level": checkpoint_level,
@@ -1066,7 +1083,7 @@ func _input(event: InputEvent) -> void:
 		settings_ui,
 		shop_ui,
 		level_up_overlay,
-		wildcard_unlock_overlay,
+		booster_unlock_overlay,
 		no_moves_overlay,
 		purchase_overlay,
 		slot_buy_overlay
@@ -1134,7 +1151,7 @@ func handle_glove_click(mouse_pos: Vector2) -> void:
 	if selected_stack == clicked_stack:
 		clear_selection()
 		return
-	# No pisar undo_snapshot: se capturó al activar el guante (tablero + comodín previos).
+	# No pisar undo_snapshot: se capturó al activar el guante (tablero + Booster previos).
 	var moved = selected_stack.move_top_block_to(clicked_stack, true)
 	if moved > 0:
 		GameState.play_coin_sound(int(moved))
@@ -1469,15 +1486,15 @@ func resolve_board_after_action(expected_revision: int = -1, skip_fusions: bool 
 		_pending_cycle_reset_milestone,
 		_cycle_reset_transition_playing
 	)
-	var wildcard_alert_open := MainTurnResolutionServiceScript.wildcard_alert_open(wildcard_unlock_overlay)
-	if MainTurnResolutionServiceScript.should_unlock_board(level_alert_open, wildcard_alert_open):
+	var booster_alert_open := MainTurnResolutionServiceScript.booster_alert_open(booster_unlock_overlay)
+	if MainTurnResolutionServiceScript.should_unlock_board(level_alert_open, booster_alert_open):
 		board_locked = false
 	if _main_facade != null:
 		_main_facade.save_and_print()
 	else:
 		print_status()
 		save_game()
-	if MainTurnResolutionServiceScript.should_unlock_board(level_alert_open, wildcard_alert_open):
+	if MainTurnResolutionServiceScript.should_unlock_board(level_alert_open, booster_alert_open):
 		check_blocked_state()
 	_update_undo_button_state()
 
@@ -1531,7 +1548,7 @@ func has_pending_incoming_coins() -> bool:
 func check_blocked_state() -> void:
 	if DialogVisibilityServiceScript.any_visible([
 		level_up_overlay,
-		wildcard_unlock_overlay,
+		booster_unlock_overlay,
 		no_moves_overlay,
 		slot_buy_overlay,
 	]):
@@ -1976,9 +1993,9 @@ func _on_cycle_board_transition_done() -> void:
 	GameState.checkpoint_snapshot = checkpoint_snapshot.duplicate(true)
 	save_game()
 	board_locked = false
-	try_show_wildcard_unlock_panel()
-	var wildcard_open := wildcard_unlock_overlay != null and wildcard_unlock_overlay.visible
-	if not wildcard_open:
+	try_show_booster_unlock_panel()
+	var booster_open := booster_unlock_overlay != null and booster_unlock_overlay.visible
+	if not booster_open:
 		check_blocked_state()
 	_update_undo_button_state()
 
@@ -2190,14 +2207,14 @@ func update_checkpoint_level() -> bool:
 			# Aplicar meta ya (evita re-disparar el hito), pero diferir el tablero nuevo.
 			_apply_cycle_reset_meta(cycle_milestone, cycle_state)
 			_pending_cycle_reset_milestone = cycle_milestone
-	# Encolar carteles ANTES de desbloquear comodines: el cartel de mix no debe
+	# Encolar carteles ANTES de desbloquear Boosters: el cartel de Mezclar no debe
 	# ganarle al de nivel (Mezclar / Martillo / Guante).
 	for alert_lvl in range(previous + 1, checkpoint_level + 1):
 		if not _pending_level_up_alerts.has(alert_lvl):
 			_pending_level_up_alerts.append(alert_lvl)
 	if _pending_cycle_reset_milestone > 0 and _pending_level_up_alerts.is_empty():
 		_pending_level_up_alerts.append(checkpoint_level)
-	sync_wildcard_unlocks(previous)
+	sync_booster_unlocks(previous)
 	# Tras un reset de ciclo no hay desbloqueo retroactivo de ranuras.
 	if not did_cycle_reset:
 		_unlock_adjacent_slots_for_level_range(previous, checkpoint_level)
@@ -2225,10 +2242,10 @@ func _sync_level_up_alerts_after_restore() -> void:
 
 func _show_next_level_up_alert() -> void:
 	if _pending_level_up_alerts.is_empty():
-		# Tras el último cartel de nivel, mostrar comodines pendientes si hay.
-		try_show_wildcard_unlock_panel()
+		# Tras el último cartel de nivel, mostrar Boosters pendientes si hay.
+		try_show_booster_unlock_panel()
 		return
-	if wildcard_unlock_overlay != null and wildcard_unlock_overlay.visible:
+	if booster_unlock_overlay != null and booster_unlock_overlay.visible:
 		return
 	# Si ya hay un cartel visible, solo re-layout (no consumir otro de la cola).
 	if level_up_overlay != null and level_up_overlay.visible:
@@ -2273,8 +2290,8 @@ func capture_checkpoint_snapshot() -> void:
 			"active_stacks": active_stacks,
 			"next_free_slot_unlock_level": next_free_slot_unlock_level,
 			"adjacent_slot_next_price": adjacent_slot_next_price,
-			"wildcard_counts": wildcard_counts,
-			"wildcard_unlock_granted": wildcard_unlock_granted,
+			"booster_counts": booster_counts,
+			"booster_unlock_granted": booster_unlock_granted,
 			"stacks": _capture_stack_data(),
 		},
 		Callable(GameSessionServiceScript, "build_checkpoint_snapshot")
@@ -2332,7 +2349,7 @@ func restore_checkpoint() -> void:
 				if coin_v > 0 and coin_v < roll_value_floor:
 					continue
 				stacks[i].push(coin_v)
-	_restore_wildcard_state_from_snapshot()
+	_restore_booster_state_from_snapshot()
 	refresh_fusion_target_bonus_unlock()
 	_sync_slot_overlay_controls()
 	update_progress_bar(false)
@@ -2491,7 +2508,7 @@ func _on_viewport_resized() -> void:
 	layout_purchase_dialog_controls()
 	layout_no_moves_dialog_controls()
 	layout_level_up_dialog_controls()
-	layout_wildcard_unlock_dialog_controls()
+	layout_booster_unlock_dialog_controls()
 	layout_slot_buy_confirm_dialog()
 	_sync_slot_overlay_controls()
 	queue_redraw()
@@ -2541,7 +2558,7 @@ func _apply_theme_ui_colors() -> void:
 	_sync_slot_overlay_controls()
 	_apply_dialog_cards_theme_colors()
 	_apply_purchase_dialog_theme_colors()
-	# Reaplica degradados de chips, Repartir, deshacer, comodines y botones de carteles.
+	# Reaplica degradados de chips, Repartir, deshacer, Boosters y botones de carteles.
 	layout_mock_ui()
 	queue_redraw()
 
@@ -2553,7 +2570,40 @@ func _settings_card_colors() -> Dictionary:
 		Color(0.42, 0.28, 0.58, 0.95)
 	)
 
-## Carteles de nivel/comodín: borde grueso oscuro + sombra, como los chips candy.
+## Cartel de subida de nivel: usa Imagenes/cartel-nivel.png como marco.
+func _apply_level_up_cartel_art(_ui_scale: float = 1.0) -> void:
+	if level_up_card == null:
+		return
+	var empty := StyleBoxEmpty.new()
+	level_up_card.add_theme_stylebox_override("panel", empty)
+	if level_up_card.has_meta(HudTextureButtons.RAINBOW_BG_META):
+		var rainbow_bg: TextureRect = level_up_card.get_meta(HudTextureButtons.RAINBOW_BG_META)
+		if rainbow_bg != null:
+			rainbow_bg.visible = false
+	if level_up_card.has_meta("wavy_bg"):
+		var wavy: Control = level_up_card.get_meta("wavy_bg")
+		if wavy != null:
+			wavy.visible = false
+	var art: TextureRect = null
+	if level_up_card.has_meta("cartel_art"):
+		art = level_up_card.get_meta("cartel_art")
+	if art == null:
+		art = TextureRect.new()
+		art.texture = LevelUpCartelTexture
+		art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		art.set_anchors_preset(Control.PRESET_FULL_RECT)
+		art.offset_left = 0.0
+		art.offset_top = 0.0
+		art.offset_right = 0.0
+		art.offset_bottom = 0.0
+		level_up_card.add_child(art)
+		level_up_card.move_child(art, 0)
+		level_up_card.set_meta("cartel_art", art)
+	art.visible = true
+
+## Carteles de Booster: borde grueso oscuro + sombra, como los chips candy.
 func _apply_candy_dialog_card(card: Panel, ui_scale: float = 1.0) -> void:
 	if card == null:
 		return
@@ -2591,8 +2641,11 @@ func _apply_candy_button_frame(btn: Control, radius: int, border_w: int, btn_siz
 		btn.set_meta("candy_frame_panel", frame)
 	btn.move_child(frame, 0)
 	var colors: Dictionary = UiThemeServiceScript.candy_dialog_colors(GameState.get_ui_palette())
+	var border_color: Color = colors.border
+	if bool(btn.get_meta("light_candy_border", false)):
+		border_color = LevelUpCartelLayoutServiceScript.button_border_color()
 	var style := StyleBoxFlat.new()
-	style.bg_color = colors.border
+	style.bg_color = border_color
 	style.draw_center = true
 	style.anti_aliasing = true
 	style.set_border_width_all(0)
@@ -2650,8 +2703,8 @@ func _apply_settings_style_card(card: Panel, radius: int = 30, border_w: int = 4
 
 func _apply_dialog_cards_theme_colors() -> void:
 	_apply_cta_border_dialog_card(no_moves_card)
-	_apply_candy_dialog_card(level_up_card)
-	_apply_candy_dialog_card(wildcard_unlock_card)
+	_apply_level_up_cartel_art()
+	_apply_candy_dialog_card(booster_unlock_card)
 	_apply_cta_border_dialog_card(slot_buy_card)
 	_apply_settings_style_card(purchase_card, 30, 4)
 
@@ -3452,8 +3505,8 @@ func _ensure_shop_ui() -> void:
 		shop_ui.stars_purchased.connect(_on_shop_stars_purchased)
 	if not shop_ui.combo_purchased.is_connected(_on_shop_combo_purchased):
 		shop_ui.combo_purchased.connect(_on_shop_combo_purchased)
-	if not shop_ui.wildcard_purchased.is_connected(_on_shop_wildcard_purchased):
-		shop_ui.wildcard_purchased.connect(_on_shop_wildcard_purchased)
+	if not shop_ui.booster_purchased.is_connected(_on_shop_booster_purchased):
+		shop_ui.booster_purchased.connect(_on_shop_booster_purchased)
 
 func _on_shop_stars_purchased(_amount: int) -> void:
 	player_stars = GameState.player_stars
@@ -3464,18 +3517,18 @@ func _on_shop_combo_purchased(pack: Dictionary) -> void:
 	update_stars_display()
 	lives = GameState.lives
 	update_life_display()
-	var wildcards: int = int(pack.get("wildcards", 0))
-	if wildcards > 0:
-		add_wildcard_use("mix", wildcards, false)
+	var boosters: int = int(pack.get("boosters", pack.get("wildcards", 0)))
+	if boosters > 0:
+		add_booster_use("mix", boosters, false)
 	if int(pack.get("temp_slots", 0)) > 0:
 		if _try_open_temp_slot(0):
 			_consume_pending_temp_slot()
 
-func _on_shop_wildcard_purchased(wildcard_type: String, amount: int) -> void:
+func _on_shop_booster_purchased(booster_type: String, amount: int) -> void:
 	player_stars = GameState.player_stars
 	update_stars_display()
-	if amount > 0 and not wildcard_type.is_empty():
-		add_wildcard_use(wildcard_type, amount, false)
+	if amount > 0 and not booster_type.is_empty():
+		add_booster_use(booster_type, amount, false)
 	save_game()
 
 func _on_shop_pressed() -> void:
@@ -3694,12 +3747,12 @@ func build_mock_ui() -> void:
 	_update_undo_button_state()
 
 	var action_index := 0
-	for _action_text in ["Mezclar", "Martillo", "Guante"]:
-		var wildcard_type: String = WILDCARD_TYPES[action_index]
-		var action_parts := _build_icon_only_chip(get_wildcard_icon_texture(wildcard_type))
+	for _action_text in ["Martillo", "Mezclar", "Guante"]:
+		var booster_type: String = BOOSTER_TYPES[action_index]
+		var action_parts := _build_icon_only_chip(get_booster_icon_texture(booster_type))
 		var action: Control = action_parts.panel
 		var icon: TextureRect = action_parts.icon
-		_bind_hud_chip_click(action, try_use_wildcard.bind(wildcard_type))
+		_bind_hud_chip_click(action, try_use_booster.bind(booster_type))
 		hud_root.add_child(action)
 		var count_badge = create_panel(Color(0.99, 0.99, 0.95, 0.98), Color(0.80, 0.86, 0.72, 0.92), 18)
 		var count_label = create_label("", 24, Color(0.27, 0.43, 0.24))
@@ -3719,7 +3772,7 @@ func build_mock_ui() -> void:
 
 	build_level_up_dialog()
 
-	build_wildcard_unlock_dialog()
+	build_booster_unlock_dialog()
 
 	build_temp_slot_locked_ui()
 
@@ -3755,7 +3808,7 @@ func build_mock_ui() -> void:
 
 	update_stars_display()
 	update_life_display()
-	update_wildcard_badges()
+	update_booster_badges()
 	layout_mock_ui()
 	_sync_slot_overlay_controls()
 
@@ -3918,12 +3971,12 @@ func layout_mock_ui() -> void:
 		cta_button.position,
 		cta_h,
 		icon_btn_size,
-		WILDCARD_BUTTON_GAP * scale,
+		BOOSTER_BUTTON_GAP * scale,
 		viewport_size.x
 	)
 	var action_y: float = float(action_row.get("action_y", cta_button.position.y + cta_h + 20.0 * scale))
 	var action_size: float = float(action_row.get("action_size", icon_btn_size))
-	var action_gap: float = float(action_row.get("action_gap", WILDCARD_BUTTON_GAP * scale))
+	var action_gap: float = float(action_row.get("action_gap", BOOSTER_BUTTON_GAP * scale))
 	var actions_start_x: float = float(action_row.get("actions_start_x", (viewport_size.x - (action_size * 3.0 + action_gap * 2.0)) * 0.5))
 	var badge_w = 36.0 * scale
 	var badge_h = 30.0 * scale
@@ -4120,7 +4173,7 @@ func perform_glove_action() -> void:
 func apply_hammer_on_stack(target_stack: Node) -> void:
 	if target_stack == null:
 		return
-	# Conservar undo_snapshot de la activación (incluye el comodín antes de gastarlo).
+	# Conservar undo_snapshot de la activación (incluye el Booster antes de gastarlo).
 	while not target_stack.is_empty():
 		target_stack.pop()
 	hammer_mode_active = false
@@ -4128,32 +4181,32 @@ func apply_hammer_on_stack(target_stack: Node) -> void:
 	_update_undo_button_state()
 	resolve_board_after_action()
 
-func try_use_wildcard(wildcard_type: String) -> void:
+func try_use_booster(booster_type: String) -> void:
 	if BoardTutorialServiceScript.blocks_tools(_tutorial_step):
 		return
 	if board_locked:
 		return
-	if not is_wildcard_unlocked(wildcard_type):
+	if not is_booster_unlocked(booster_type):
 		print(
 			"%s se desbloquea en el nivel %d."
-			% [get_wildcard_display_name(wildcard_type), get_wildcard_unlock_level(wildcard_type)]
+			% [get_booster_display_name(booster_type), get_booster_unlock_level(booster_type)]
 		)
 		return
-	if not WildcardFlowServiceScript.has_uses(wildcard_counts, wildcard_type):
-		open_purchase_dialog(wildcard_type)
+	if not BoosterFlowServiceScript.has_uses(booster_counts, booster_type):
+		open_purchase_dialog(booster_type)
 		return
 
-	match WildcardFlowServiceScript.wildcard_action_kind(wildcard_type):
+	match BoosterFlowServiceScript.booster_action_kind(booster_type):
 		"mix":
 			# Mezclar no tiene undo (reparte de nuevo el tablero).
-			consume_wildcard(wildcard_type)
+			consume_booster(booster_type)
 			perform_mix_action()
 		"tool":
-			# Snapshot ANTES de gastar: deshacer devuelve tablero + comodín.
+			# Snapshot ANTES de gastar: deshacer devuelve tablero + Booster.
 			_clear_undo_snapshot()
 			undo_snapshot = capture_board_snapshot()
-			consume_wildcard(wildcard_type)
-			if wildcard_type == "hammer":
+			consume_booster(booster_type)
+			if booster_type == "hammer":
 				perform_hammer_action()
 			else:
 				perform_glove_action()
@@ -4161,71 +4214,71 @@ func try_use_wildcard(wildcard_type: String) -> void:
 		_:
 			return
 
-func consume_wildcard(wildcard_type: String) -> void:
-	wildcard_counts = GameWildcardServiceScript.consume(wildcard_counts, wildcard_type)
-	_sync_wildcards_into_checkpoint_snapshot()
-	update_wildcard_badges()
+func consume_booster(booster_type: String) -> void:
+	booster_counts = GameBoosterServiceScript.consume(booster_counts, booster_type)
+	_sync_boosters_into_checkpoint_snapshot()
+	update_booster_badges()
 
-func add_wildcard_use(wildcard_type: String, amount: int = 1, require_unlock: bool = true) -> void:
-	wildcard_counts = GameWildcardServiceScript.add_uses(
-		wildcard_counts, wildcard_type, amount, checkpoint_level, WILDCARD_UNLOCK_LEVEL, require_unlock
+func add_booster_use(booster_type: String, amount: int = 1, require_unlock: bool = true) -> void:
+	booster_counts = GameBoosterServiceScript.add_uses(
+		booster_counts, booster_type, amount, checkpoint_level, BOOSTER_UNLOCK_LEVEL, require_unlock
 	)
-	_sync_wildcards_into_checkpoint_snapshot()
-	update_wildcard_badges()
+	_sync_boosters_into_checkpoint_snapshot()
+	update_booster_badges()
 
-func get_wildcard_unlock_level(wildcard_type: String) -> int:
-	return int(WILDCARD_UNLOCK_LEVEL.get(wildcard_type, 9999))
+func get_booster_unlock_level(booster_type: String) -> int:
+	return int(BOOSTER_UNLOCK_LEVEL.get(booster_type, 9999))
 
-func is_wildcard_unlocked(wildcard_type: String) -> bool:
-	return GameWildcardServiceScript.is_unlocked(wildcard_type, get_current_level(), WILDCARD_UNLOCK_LEVEL)
+func is_booster_unlocked(booster_type: String) -> bool:
+	return GameBoosterServiceScript.is_unlocked(booster_type, get_current_level(), BOOSTER_UNLOCK_LEVEL)
 
-func reset_wildcard_state() -> void:
-	wildcard_counts = GameWildcardServiceScript.normalize_counts({})
-	wildcard_unlock_granted = GameWildcardServiceScript.normalize_granted({})
+func reset_booster_state() -> void:
+	booster_counts = GameBoosterServiceScript.normalize_counts({})
+	booster_unlock_granted = GameBoosterServiceScript.normalize_granted({})
 	# Sin previous_level: no mostrar carteles (setup / reset de tablero).
-	sync_wildcard_unlocks(-1)
+	sync_booster_unlocks(-1)
 
-func _apply_wildcard_state_from_dicts(counts_raw: Variant, granted_raw: Variant) -> void:
-	wildcard_counts = GameWildcardServiceScript.normalize_counts(counts_raw)
-	wildcard_unlock_granted = GameWildcardServiceScript.normalize_granted(granted_raw)
+func _apply_booster_state_from_dicts(counts_raw: Variant, granted_raw: Variant) -> void:
+	booster_counts = GameBoosterServiceScript.normalize_counts(counts_raw)
+	booster_unlock_granted = GameBoosterServiceScript.normalize_granted(granted_raw)
 	# Restore no debe re-mostrar carteles de desbloqueo.
-	sync_wildcard_unlocks(-1)
+	sync_booster_unlocks(-1)
 
-func _restore_wildcard_state_from_snapshot() -> void:
-	_apply_wildcard_state_from_dicts(
-		checkpoint_snapshot.get("wildcard_counts", null),
-		checkpoint_snapshot.get("wildcard_unlock_granted", null)
+func _restore_booster_state_from_snapshot() -> void:
+	_apply_booster_state_from_dicts(
+		GameBoosterServiceScript.read_counts(checkpoint_snapshot),
+		GameBoosterServiceScript.read_granted(checkpoint_snapshot)
 	)
 
-## Concede usos gratis la primera vez que el nivel desbloquea cada comodín.
+## Concede usos gratis la primera vez que el nivel desbloquea cada Booster.
 ## previous_level: checkpoint antes del salto (para mostrar cartel solo al cruzar el umbral).
 ## Pasar -1 en restore/setup para migrar en silencio sin cartel.
-func sync_wildcard_unlocks(previous_level: int = -1) -> void:
-	var synced := GameWildcardServiceScript.sync_unlocks(
+func sync_booster_unlocks(previous_level: int = -1) -> void:
+	var synced := GameBoosterServiceScript.sync_unlocks(
 		checkpoint_level,
-		wildcard_counts,
-		wildcard_unlock_granted,
+		booster_counts,
+		booster_unlock_granted,
 		previous_level,
-		WILDCARD_INITIAL_USES,
-		WILDCARD_UNLOCK_LEVEL
+		BOOSTER_INITIAL_USES,
+		BOOSTER_UNLOCK_LEVEL
 	)
-	wildcard_counts = synced.get("wildcard_counts", wildcard_counts)
-	wildcard_unlock_granted = synced.get("wildcard_unlock_granted", wildcard_unlock_granted)
+	booster_counts = synced.get("booster_counts", booster_counts)
+	booster_unlock_granted = synced.get("booster_unlock_granted", booster_unlock_granted)
 	var newly: Array = synced.get("newly_unlocked", [])
-	for wildcard_type in newly:
-		queue_wildcard_unlock_panel(str(wildcard_type))
+	for booster_type in newly:
+		queue_booster_unlock_panel(str(booster_type))
 		print(
-			"Comodín desbloqueado: %s (%d usos gratis)"
-			% [get_wildcard_display_name(str(wildcard_type)), WILDCARD_INITIAL_USES]
+			"Booster desbloqueado: %s (%d usos gratis)"
+			% [get_booster_display_name(str(booster_type)), BOOSTER_INITIAL_USES]
 		)
-	update_wildcard_badges()
+	update_booster_badges()
 
-func update_wildcard_badges() -> void:
-	for i in range(mini(action_count_labels.size(), WILDCARD_TYPES.size())):
-		var wildcard_type: String = WILDCARD_TYPES[i]
-		var unlocked := is_wildcard_unlocked(wildcard_type)
-		var uses_left := int(wildcard_counts.get(wildcard_type, 0))
-		var modulate_color := Color.WHITE if unlocked else WILDCARD_LOCKED_MODULATE
+func update_booster_badges() -> void:
+	for i in range(mini(action_count_labels.size(), BOOSTER_TYPES.size())):
+		var booster_type: String = BOOSTER_TYPES[i]
+		var unlocked := is_booster_unlocked(booster_type)
+		var uses_left := int(booster_counts.get(booster_type, 0))
+		var modulate_color := Color.WHITE if unlocked else BOOSTER_LOCKED_MODULATE
 		if i < action_pills.size():
 			action_pills[i].modulate = modulate_color
 		if i < action_count_badges.size():
@@ -4267,11 +4320,11 @@ func build_purchase_dialog() -> void:
 	purchase_subtitle_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	purchase_card.add_child(purchase_subtitle_label)
 
-	purchase_icon_texture_rect = create_wildcard_icon_texture_rect(MixIconTexture)
+	purchase_icon_texture_rect = create_booster_icon_texture_rect(MixIconTexture)
 	purchase_card.add_child(purchase_icon_texture_rect)
 	purchase_icon_circle = null
 
-	var offer_one := _create_purchase_offer_button(1, WILDCARD_COST_STARS)
+	var offer_one := _create_purchase_offer_button(1, BOOSTER_COST_STARS)
 	purchase_buy_button = offer_one.button
 	purchase_buy_center = offer_one.center
 	purchase_buy_content = offer_one.content
@@ -4280,7 +4333,7 @@ func build_purchase_dialog() -> void:
 	purchase_buy_cost_label = offer_one.cost_label
 	purchase_card.add_child(purchase_buy_button)
 
-	var offer_pack := _create_purchase_offer_button(WILDCARD_PACK_AMOUNT, WILDCARD_PACK_COST_STARS)
+	var offer_pack := _create_purchase_offer_button(BOOSTER_PACK_AMOUNT, BOOSTER_PACK_COST_STARS)
 	purchase_buy_pack_button = offer_pack.button
 	purchase_buy_pack_center = offer_pack.center
 	purchase_buy_pack_content = offer_pack.content
@@ -4311,13 +4364,13 @@ func _create_purchase_offer_button(amount: int, cost: int) -> Dictionary:
 		_on_purchase_confirmed.bind(amount, cost)
 	)
 
-func open_purchase_dialog(wildcard_type: String) -> void:
-	if not is_wildcard_unlocked(wildcard_type):
+func open_purchase_dialog(booster_type: String) -> void:
+	if not is_booster_unlocked(booster_type):
 		return
 	if purchase_overlay == null:
 		return
-	pending_purchase_type = wildcard_type
-	update_purchase_dialog_content(wildcard_type)
+	pending_purchase_type = booster_type
+	update_purchase_dialog_content(booster_type)
 	_apply_purchase_dialog_theme_colors()
 	purchase_overlay.visible = true
 	purchase_overlay.move_to_front()
@@ -4335,7 +4388,7 @@ func _on_purchase_confirmed(amount: int, cost: int) -> void:
 		)
 		return
 	player_stars -= cost
-	add_wildcard_use(pending_purchase_type, amount)
+	add_booster_use(pending_purchase_type, amount)
 	update_stars_display()
 	pending_purchase_type = ""
 	if purchase_overlay != null:
@@ -4455,25 +4508,25 @@ func _on_purchase_close_pressed() -> void:
 func _on_purchase_close_requested() -> void:
 	_on_purchase_close_pressed()
 
-func update_purchase_dialog_content(wildcard_type: String) -> void:
+func update_purchase_dialog_content(booster_type: String) -> void:
 	if purchase_title_label == null:
 		return
-	purchase_title_label.text = get_wildcard_display_name(wildcard_type)
+	purchase_title_label.text = get_booster_display_name(booster_type)
 	if purchase_subtitle_label != null:
 		purchase_subtitle_label.text = "Sin usos. Elegí una oferta:"
 	if purchase_icon_texture_rect != null:
-		purchase_icon_texture_rect.texture = get_wildcard_icon_texture(wildcard_type)
+		purchase_icon_texture_rect.texture = get_booster_icon_texture(booster_type)
 	if purchase_buy_qty_label != null:
 		purchase_buy_qty_label.text = "x1"
 	if purchase_buy_cost_label != null:
-		purchase_buy_cost_label.text = str(WILDCARD_COST_STARS)
+		purchase_buy_cost_label.text = str(BOOSTER_COST_STARS)
 	if purchase_buy_pack_qty_label != null:
-		purchase_buy_pack_qty_label.text = "x%d" % WILDCARD_PACK_AMOUNT
+		purchase_buy_pack_qty_label.text = "x%d" % BOOSTER_PACK_AMOUNT
 	if purchase_buy_pack_cost_label != null:
-		purchase_buy_pack_cost_label.text = str(WILDCARD_PACK_COST_STARS)
+		purchase_buy_pack_cost_label.text = str(BOOSTER_PACK_COST_STARS)
 
-func get_wildcard_display_name(wildcard_type: String) -> String:
-	match wildcard_type:
+func get_booster_display_name(booster_type: String) -> String:
+	match booster_type:
 		"mix":
 			return "Mezclar"
 		"hammer":
@@ -4481,10 +4534,10 @@ func get_wildcard_display_name(wildcard_type: String) -> String:
 		"glove":
 			return "Guante"
 		_:
-			return "Comodín"
+			return "Booster"
 
-func get_wildcard_unlock_description(wildcard_type: String) -> String:
-	match wildcard_type:
+func get_booster_unlock_description(booster_type: String) -> String:
+	match booster_type:
 		"mix":
 			return "Se usa para reorganizar las fichas del tablero existentes por color."
 		"hammer":
@@ -4494,8 +4547,8 @@ func get_wildcard_unlock_description(wildcard_type: String) -> String:
 		_:
 			return ""
 
-func get_wildcard_icon_texture(wildcard_type: String) -> Texture2D:
-	match wildcard_type:
+func get_booster_icon_texture(booster_type: String) -> Texture2D:
+	match booster_type:
 		"mix":
 			return MixIconTexture
 		"hammer":
@@ -4505,7 +4558,7 @@ func get_wildcard_icon_texture(wildcard_type: String) -> Texture2D:
 		_:
 			return MixIconTexture
 
-func create_wildcard_icon_texture_rect(texture: Texture2D) -> TextureRect:
+func create_booster_icon_texture_rect(texture: Texture2D) -> TextureRect:
 	var icon := TextureRect.new()
 	icon.texture = texture
 	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -4541,6 +4594,20 @@ func _heavy_dialog_font() -> Font:
 	variation.base_font = UiFont
 	variation.variation_embolden = 0.65
 	return variation
+
+func _style_level_up_level_label(lbl: Label, font_size: int) -> void:
+	if lbl == null:
+		return
+	lbl.material = null
+	if UiFont != null:
+		lbl.add_theme_font_override("font", UiFont)
+	lbl.add_theme_font_size_override("font_size", font_size)
+	lbl.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
+	lbl.add_theme_color_override("font_outline_color", Color(0.38, 0.24, 0.58, 0.92))
+	lbl.add_theme_constant_override("outline_size", maxi(int(round(float(font_size) * 0.12)), 6))
+	lbl.add_theme_color_override("font_shadow_color", Color(0.28, 0.16, 0.42, 0.35))
+	lbl.add_theme_constant_override("shadow_offset_x", 0)
+	lbl.add_theme_constant_override("shadow_offset_y", 3)
 
 func _apply_rainbow_label(lbl: Label, span_px: float) -> void:
 	if lbl == null:
@@ -4592,10 +4659,28 @@ func make_dialog_gradient_button(text: String, font_size: int = DIALOG_BTN_FONT_
 	btn.set_meta("label", lbl)
 	return btn
 
+func _make_level_up_star_icon(texture: Texture2D) -> TextureRect:
+	var icon := TextureRect.new()
+	icon.texture = texture
+	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	return icon
+
+func _layout_level_up_star_icon(icon: TextureRect, icon_size: Vector2) -> void:
+	if icon == null:
+		return
+	icon.custom_minimum_size = icon_size
+	icon.size = icon_size
+	icon.visible = true
+
 func _make_dialog_star_button(text: String) -> Control:
 	var btn := HudTextureButtons.create_gradient_pill()
 	btn.focus_mode = Control.FOCUS_NONE
 	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	btn.clip_contents = false
 	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	btn.custom_minimum_size = Vector2(0, DIALOG_BTN_HEIGHT)
 	btn.set_meta("compact", false)
@@ -4603,25 +4688,46 @@ func _make_dialog_star_button(text: String) -> Control:
 	btn.set_meta("use_candy_frame", true)
 	var content := HBoxContainer.new()
 	content.set_anchors_preset(Control.PRESET_FULL_RECT)
-	content.offset_left = 18
-	content.offset_right = -18
+	content.offset_left = 10
+	content.offset_right = -10
+	content.offset_top = 4
+	content.offset_bottom = -4
 	content.alignment = BoxContainer.ALIGNMENT_CENTER
 	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	content.add_theme_constant_override("separation", 14)
+	content.z_index = 2
+	content.add_theme_constant_override("separation", 6)
 	btn.add_child(content)
 	var icon := TextureRect.new()
 	icon.texture = StarIconTexture
 	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	icon.z_index = 2
 	content.add_child(icon)
 	var lbl := HudTextureButtons.create_button_label(text, DIALOG_BTN_FONT_SIZE)
+	lbl.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	lbl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	lbl.autowrap_mode = TextServer.AUTOWRAP_OFF
+	lbl.clip_text = false
+	lbl.z_index = 2
 	content.add_child(lbl)
 	btn.set_meta("label", lbl)
 	btn.set_meta("star_icon", icon)
+	btn.set_meta("star_content", content)
 	return btn
+
+func _raise_dialog_button_content(btn: Control) -> void:
+	if btn == null:
+		return
+	var front: Node = null
+	if btn.has_meta("star_content"):
+		front = btn.get_meta("star_content")
+	elif btn.has_meta("label"):
+		front = btn.get_meta("label")
+	if front is Node and (front as Node).get_parent() == btn:
+		btn.move_child(front as Node, btn.get_child_count() - 1)
 
 func _layout_dialog_gradient_button(btn: Control, btn_w: float, scale: float, font_size: int) -> void:
 	if btn == null:
@@ -4640,16 +4746,29 @@ func _layout_dialog_gradient_button(btn: Control, btn_w: float, scale: float, fo
 		lbl.add_theme_font_size_override("font_size", int(font_size * scale))
 		if bool(btn.get_meta("use_candy_frame", false)):
 			lbl.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 1.0))
-			lbl.add_theme_constant_override("outline_size", int(clampf(round(7.0 * scale), 6.0, 10.0)))
+			lbl.add_theme_constant_override("outline_size", int(clampf(round(4.0 * scale), 3.0, 6.0)))
+	if btn.has_meta("star_content"):
+		var content: HBoxContainer = btn.get_meta("star_content")
+		if content != null:
+			var pad: float = LevelUpCartelLayoutServiceScript.BUTTON_PAD * scale
+			content.offset_left = pad
+			content.offset_right = -pad
+			content.offset_top = 4.0 * scale
+			content.offset_bottom = -4.0 * scale
+			content.add_theme_constant_override(
+				"separation",
+				int(LevelUpCartelLayoutServiceScript.BUTTON_ICON_SEP * scale)
+			)
 	if btn.has_meta("star_icon"):
 		var star_icon: TextureRect = btn.get_meta("star_icon")
 		if star_icon != null:
-			var icon_side := btn_h * 0.72
+			var icon_side := btn_h * LevelUpCartelLayoutServiceScript.BUTTON_ICON_RATIO
 			star_icon.custom_minimum_size = Vector2(icon_side, icon_side)
 			star_icon.size = Vector2(icon_side, icon_side)
 	if bool(btn.get_meta("use_candy_frame", false)):
 		var border_w: int = int(clampf(5.0 * scale, 4.0, 7.0))
 		_apply_candy_button_frame(btn, radius, border_w, Vector2(actual_w, btn_h))
+	_raise_dialog_button_content(btn)
 
 func build_no_moves_dialog() -> void:
 	no_moves_overlay = DialogBuilderServiceScript.create_modal_overlay(0.45, 320)
@@ -4969,7 +5088,7 @@ func build_level_up_dialog() -> void:
 	level_up_card.add_child(level_up_margin)
 
 	level_up_vbox = VBoxContainer.new()
-	level_up_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	level_up_vbox.alignment = BoxContainer.ALIGNMENT_BEGIN
 	level_up_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	level_up_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	level_up_vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -4982,11 +5101,30 @@ func build_level_up_dialog() -> void:
 	level_up_title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	level_up_vbox.add_child(level_up_title_label)
 
-	level_up_subtitle_label = create_label("Nivel 2", DIALOG_SUBTITLE_FONT_SIZE, HudTextureButtons.BTN_TEXT_COLOR)
-	_style_dialog_title_label(level_up_subtitle_label, DIALOG_SUBTITLE_FONT_SIZE, true, true)
-	level_up_subtitle_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	level_up_subtitle_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	level_up_vbox.add_child(level_up_subtitle_label)
+	level_up_level_row = HBoxContainer.new()
+	level_up_level_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	level_up_level_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	level_up_level_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	level_up_level_row.add_theme_constant_override("separation", 10)
+	level_up_vbox.add_child(level_up_level_row)
+
+	level_up_level_star_left = _make_level_up_star_icon(LevelUpStarsLeftTexture)
+	level_up_level_row.add_child(level_up_level_star_left)
+
+	level_up_subtitle_label = create_label("Nivel 2", DIALOG_SUBTITLE_FONT_SIZE, Color(1, 1, 1, 1))
+	_style_level_up_level_label(level_up_subtitle_label, DIALOG_SUBTITLE_FONT_SIZE)
+	level_up_subtitle_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	level_up_subtitle_label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	level_up_level_row.add_child(level_up_subtitle_label)
+
+	level_up_level_star_right = _make_level_up_star_icon(LevelUpStarsRightTexture)
+	level_up_level_row.add_child(level_up_level_star_right)
+
+	level_up_body_spacer = Control.new()
+	level_up_body_spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	level_up_body_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	level_up_body_spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	level_up_vbox.add_child(level_up_body_spacer)
 
 	level_up_button_row = HBoxContainer.new()
 	level_up_button_row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -4996,20 +5134,30 @@ func build_level_up_dialog() -> void:
 	level_up_button_row.visible = false
 	level_up_vbox.add_child(level_up_button_row)
 
-	level_up_claim_button = _make_dialog_star_button("10")
+	level_up_claim_button = _make_dialog_star_button("20")
+	level_up_claim_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	level_up_claim_button.set_meta("light_candy_border", true)
 	_bind_hud_chip_click(level_up_claim_button, _on_level_up_continue_pressed)
 	level_up_claim_button.visible = false
 	level_up_button_row.add_child(level_up_claim_button)
 
-	level_up_ad_button = _make_dialog_star_button("Duplicar")
+	level_up_ad_button = _make_dialog_star_button(LevelUpCartelLayoutServiceScript.AD_LABEL)
+	level_up_ad_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	level_up_ad_button.set_meta("light_candy_border", true)
 	_bind_hud_chip_click(level_up_ad_button, _on_level_up_ad_pressed)
 	level_up_ad_button.visible = false
 	level_up_button_row.add_child(level_up_ad_button)
 
 	level_up_continue_button = make_dialog_gradient_button("Continuar", DIALOG_COMPACT_BTN_FONT_SIZE, true)
 	level_up_continue_button.set_meta("use_candy_frame", true)
+	level_up_continue_button.set_meta("light_candy_border", true)
 	_bind_hud_chip_click(level_up_continue_button, _on_level_up_continue_pressed)
 	level_up_vbox.add_child(level_up_continue_button)
+
+	level_up_burst = CelebrationBurstScript.new()
+	level_up_burst.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	level_up_overlay.add_child(level_up_burst)
+	level_up_burst.move_to_front()
 
 	layout_level_up_dialog_controls()
 
@@ -5021,40 +5169,86 @@ func layout_level_up_dialog_controls() -> void:
 		return
 	var scale = DialogBuilderServiceScript.dialog_scale(viewport_size)
 	var show_reward := _level_up_show_reward
-	var card_h: float = 560.0 * scale if show_reward else 480.0 * scale
-	var card_size = Vector2(min(viewport_size.x * 0.92, 860.0 * scale), card_h)
+	var card_size: Vector2 = LevelUpCartelLayoutServiceScript.card_size(viewport_size, scale)
+	var margins: Dictionary = LevelUpCartelLayoutServiceScript.content_margins(card_size)
 	level_up_card.size = card_size
 	level_up_card.position = (viewport_size - card_size) * 0.5
 	level_up_card.visible = true
 
 	if level_up_margin != null:
-		level_up_margin.add_theme_constant_override("margin_left", int(40 * scale))
-		level_up_margin.add_theme_constant_override("margin_right", int(40 * scale))
-		level_up_margin.add_theme_constant_override("margin_top", int(18 * scale))
-		level_up_margin.add_theme_constant_override("margin_bottom", int(36 * scale))
+		level_up_margin.add_theme_constant_override("margin_left", int(margins.left))
+		level_up_margin.add_theme_constant_override("margin_right", int(margins.right))
+		level_up_margin.add_theme_constant_override("margin_top", int(margins.top))
+		level_up_margin.add_theme_constant_override("margin_bottom", int(margins.bottom))
 	if level_up_vbox != null:
-		level_up_vbox.add_theme_constant_override("separation", int(16 * scale))
-	_apply_candy_dialog_card(level_up_card, scale)
+		level_up_vbox.add_theme_constant_override("separation", int(LevelUpCartelLayoutServiceScript.V_SEP * scale))
+	if level_up_body_spacer != null:
+		level_up_body_spacer.custom_minimum_size.y = LevelUpCartelLayoutServiceScript.BODY_GAP_MIN * scale
+		level_up_body_spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_apply_level_up_cartel_art(scale)
 	if level_up_title_label != null:
-		_style_dialog_title_label(level_up_title_label, int(LEVEL_UP_TITLE_FONT_SIZE * scale), true, true)
+		_style_dialog_title_label(
+			level_up_title_label,
+			int(LevelUpCartelLayoutServiceScript.TITLE_FONT_SIZE * scale),
+			true,
+			true
+		)
 		level_up_title_label.visible = true
-		_apply_rainbow_label(level_up_title_label, card_size.x - 80.0 * scale)
+		level_up_title_label.custom_minimum_size.y = LevelUpCartelLayoutServiceScript.TITLE_H * scale
+		_apply_rainbow_label(level_up_title_label, card_size.x - float(margins.left) - float(margins.right))
+	if level_up_level_row != null:
+		level_up_level_row.custom_minimum_size.y = LevelUpCartelLayoutServiceScript.LEVEL_H * scale
+		level_up_level_row.add_theme_constant_override("separation", int(10.0 * scale))
+	var star_size: Vector2 = LevelUpCartelLayoutServiceScript.star_icon_size(scale)
+	_layout_level_up_star_icon(level_up_level_star_left, star_size)
+	_layout_level_up_star_icon(level_up_level_star_right, star_size)
 	if level_up_subtitle_label != null:
-		_style_dialog_title_label(level_up_subtitle_label, int(DIALOG_SUBTITLE_FONT_SIZE * scale), true, true)
+		_style_level_up_level_label(
+			level_up_subtitle_label,
+			int(LevelUpCartelLayoutServiceScript.LEVEL_FONT_SIZE * scale)
+		)
 		level_up_subtitle_label.visible = true
-		_apply_rainbow_label(level_up_subtitle_label, card_size.x * 0.55)
+		level_up_subtitle_label.custom_minimum_size = Vector2(0.0, LevelUpCartelLayoutServiceScript.LEVEL_H * scale)
 	if level_up_button_row != null:
 		level_up_button_row.visible = show_reward
-		level_up_button_row.add_theme_constant_override("separation", int(18 * scale))
+		level_up_button_row.add_theme_constant_override(
+			"separation",
+			int(LevelUpCartelLayoutServiceScript.BUTTON_SEP * scale)
+		)
+		level_up_button_row.custom_minimum_size.y = LevelUpCartelLayoutServiceScript.BUTTON_H * scale
 	if level_up_continue_button != null:
 		level_up_continue_button.visible = not show_reward
-	var inner_w: float = _dialog_inner_button_width(card_size.x)
+	var inner_w: float = maxf(card_size.x - float(margins.left) - float(margins.right), 80.0)
+	var button_ratio: float = LevelUpCartelLayoutServiceScript.BUTTON_H / DIALOG_BTN_HEIGHT
+	var claim_w: float = LevelUpCartelLayoutServiceScript.reward_button_width(inner_w)
+	var ad_w: float = LevelUpCartelLayoutServiceScript.ad_button_width(inner_w)
 	if show_reward:
-		var pair_w: float = (inner_w - 18.0 * scale) * 0.5
-		_layout_dialog_gradient_button(level_up_claim_button, pair_w, scale, 48)
-		_layout_dialog_gradient_button(level_up_ad_button, pair_w, scale, 44)
+		if level_up_claim_button != null:
+			level_up_claim_button.set_meta("height_ratio", button_ratio)
+		if level_up_ad_button != null:
+			level_up_ad_button.set_meta("height_ratio", button_ratio)
+		_layout_dialog_gradient_button(
+			level_up_claim_button,
+			claim_w,
+			scale,
+			LevelUpCartelLayoutServiceScript.CLAIM_FONT_SIZE
+		)
+		_layout_dialog_gradient_button(
+			level_up_ad_button,
+			ad_w,
+			scale,
+			LevelUpCartelLayoutServiceScript.AD_FONT_SIZE
+		)
 	else:
-		_layout_dialog_gradient_button(level_up_continue_button, inner_w, scale, DIALOG_COMPACT_BTN_FONT_SIZE)
+		if level_up_continue_button != null:
+			level_up_continue_button.set_meta("compact", false)
+			level_up_continue_button.set_meta("height_ratio", button_ratio)
+		_layout_dialog_gradient_button(
+			level_up_continue_button,
+			ad_w,
+			scale,
+			LevelUpCartelLayoutServiceScript.CONTINUE_FONT_SIZE
+		)
 
 func show_level_up_panel(level: int) -> void:
 	if level_up_overlay == null:
@@ -5090,9 +5284,15 @@ func show_level_up_panel(level: int) -> void:
 	if dialog_layer != null:
 		dialog_layer.move_child(level_up_overlay, dialog_layer.get_child_count() - 1)
 	layout_level_up_dialog_controls()
+	if level_up_burst != null and level_up_card != null:
+		level_up_burst.move_to_front()
+		var burst_scale: float = DialogBuilderServiceScript.dialog_scale(get_viewport_rect().size)
+		level_up_burst.play_for_card(level_up_card, burst_scale)
 	print("Cartel de nivel mostrado: ", level)
 
 func hide_level_up_panel() -> void:
+	if level_up_burst != null:
+		level_up_burst.stop()
 	if level_up_overlay != null:
 		level_up_overlay.visible = false
 	_visible_level_up_alert = 0
@@ -5117,14 +5317,14 @@ func _finish_level_up_alert() -> void:
 		_last_acked_checkpoint_level = maxi(_last_acked_checkpoint_level, _visible_level_up_alert)
 	hide_level_up_panel()
 	save_game()
-	# Si salto varios niveles, mostrar el siguiente cartel antes de comodines/bloqueo.
+	# Si salto varios niveles, mostrar el siguiente cartel antes de Boosters/bloqueo.
 	if not _pending_level_up_alerts.is_empty():
 		_show_next_level_up_alert()
 		return
 	if _pending_cycle_reset_milestone > 0:
 		_play_cycle_board_transition(_pending_cycle_reset_milestone)
 		return
-	try_show_wildcard_unlock_panel()
+	try_show_booster_unlock_panel()
 	check_blocked_state()
 
 func _on_level_up_ad_pressed() -> void:
@@ -5140,59 +5340,59 @@ func _on_level_up_continue_pressed() -> void:
 	_claim_level_up_stars(false)
 	_finish_level_up_alert()
 
-func build_wildcard_unlock_dialog() -> void:
-	wildcard_unlock_overlay = DialogBuilderServiceScript.create_modal_overlay(0.40, 315)
-	wildcard_unlock_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-	dialog_layer.add_child(wildcard_unlock_overlay)
+func build_booster_unlock_dialog() -> void:
+	booster_unlock_overlay = DialogBuilderServiceScript.create_modal_overlay(0.40, 315)
+	booster_unlock_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dialog_layer.add_child(booster_unlock_overlay)
 
-	wildcard_unlock_card = _create_dialog_card(false)
-	wildcard_unlock_card.clip_contents = false
-	wildcard_unlock_card.z_as_relative = false
-	wildcard_unlock_card.z_index = 316
-	wildcard_unlock_overlay.add_child(wildcard_unlock_card)
+	booster_unlock_card = _create_dialog_card(false)
+	booster_unlock_card.clip_contents = false
+	booster_unlock_card.z_as_relative = false
+	booster_unlock_card.z_index = 316
+	booster_unlock_overlay.add_child(booster_unlock_card)
 
-	wildcard_unlock_margin = MarginContainer.new()
-	wildcard_unlock_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	wildcard_unlock_margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	wildcard_unlock_card.add_child(wildcard_unlock_margin)
+	booster_unlock_margin = MarginContainer.new()
+	booster_unlock_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	booster_unlock_margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	booster_unlock_card.add_child(booster_unlock_margin)
 
-	wildcard_unlock_vbox = VBoxContainer.new()
-	wildcard_unlock_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	wildcard_unlock_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	wildcard_unlock_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	wildcard_unlock_vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	wildcard_unlock_vbox.add_theme_constant_override("separation", 16)
-	wildcard_unlock_margin.add_child(wildcard_unlock_vbox)
+	booster_unlock_vbox = VBoxContainer.new()
+	booster_unlock_vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	booster_unlock_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	booster_unlock_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	booster_unlock_vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	booster_unlock_vbox.add_theme_constant_override("separation", 16)
+	booster_unlock_margin.add_child(booster_unlock_vbox)
 
-	wildcard_unlock_title_label = create_label(
-		"Desbloqueado: comodín Mezclar", WILDCARD_UNLOCK_TITLE_FONT_SIZE, HudTextureButtons.BTN_TEXT_COLOR
+	booster_unlock_title_label = create_label(
+		"Desbloqueado: Booster Mezclar", BOOSTER_UNLOCK_TITLE_FONT_SIZE, HudTextureButtons.BTN_TEXT_COLOR
 	)
-	_style_dialog_title_label(wildcard_unlock_title_label, WILDCARD_UNLOCK_TITLE_FONT_SIZE, true, true)
-	wildcard_unlock_title_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	wildcard_unlock_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	wildcard_unlock_title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	wildcard_unlock_vbox.add_child(wildcard_unlock_title_label)
+	_style_dialog_title_label(booster_unlock_title_label, BOOSTER_UNLOCK_TITLE_FONT_SIZE, true, true)
+	booster_unlock_title_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	booster_unlock_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	booster_unlock_title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	booster_unlock_vbox.add_child(booster_unlock_title_label)
 
-	wildcard_unlock_subtitle_label = create_label(
+	booster_unlock_subtitle_label = create_label(
 		"", DIALOG_SUBTITLE_FONT_SIZE, HudTextureButtons.BTN_TEXT_COLOR
 	)
-	_style_dialog_title_label(wildcard_unlock_subtitle_label, DIALOG_SUBTITLE_FONT_SIZE, true, true)
-	wildcard_unlock_subtitle_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	wildcard_unlock_subtitle_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	wildcard_unlock_subtitle_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	wildcard_unlock_vbox.add_child(wildcard_unlock_subtitle_label)
+	_style_dialog_title_label(booster_unlock_subtitle_label, DIALOG_SUBTITLE_FONT_SIZE, true, true)
+	booster_unlock_subtitle_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	booster_unlock_subtitle_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	booster_unlock_subtitle_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	booster_unlock_vbox.add_child(booster_unlock_subtitle_label)
 
-	wildcard_unlock_continue_button = make_dialog_gradient_button("Continuar", DIALOG_COMPACT_BTN_FONT_SIZE, true)
-	wildcard_unlock_continue_button.set_meta("use_candy_frame", true)
-	wildcard_unlock_continue_button.set_meta("height_ratio", 0.78)
-	_bind_hud_chip_click(wildcard_unlock_continue_button, _on_wildcard_unlock_continue_pressed)
-	wildcard_unlock_vbox.add_child(wildcard_unlock_continue_button)
+	booster_unlock_continue_button = make_dialog_gradient_button("Continuar", DIALOG_COMPACT_BTN_FONT_SIZE, true)
+	booster_unlock_continue_button.set_meta("use_candy_frame", true)
+	booster_unlock_continue_button.set_meta("height_ratio", 0.78)
+	_bind_hud_chip_click(booster_unlock_continue_button, _on_booster_unlock_continue_pressed)
+	booster_unlock_vbox.add_child(booster_unlock_continue_button)
 
-	_apply_candy_dialog_card(wildcard_unlock_card)
-	layout_wildcard_unlock_dialog_controls()
+	_apply_candy_dialog_card(booster_unlock_card)
+	layout_booster_unlock_dialog_controls()
 
-func layout_wildcard_unlock_dialog_controls() -> void:
-	if wildcard_unlock_overlay == null or wildcard_unlock_card == null:
+func layout_booster_unlock_dialog_controls() -> void:
+	if booster_unlock_overlay == null or booster_unlock_card == null:
 		return
 	var viewport_size: Vector2 = get_viewport_rect().size
 	if viewport_size.x < 2.0 or viewport_size.y < 2.0:
@@ -5201,38 +5401,38 @@ func layout_wildcard_unlock_dialog_controls() -> void:
 	var card_w: float = minf(viewport_size.x * 0.92, 860.0 * ui_scale)
 	var card_h: float = 520.0 * ui_scale
 	var card_size := Vector2(card_w, card_h)
-	wildcard_unlock_card.size = card_size
-	wildcard_unlock_card.position = (viewport_size - card_size) * 0.5
+	booster_unlock_card.size = card_size
+	booster_unlock_card.position = (viewport_size - card_size) * 0.5
 
-	if wildcard_unlock_margin != null:
-		wildcard_unlock_margin.add_theme_constant_override("margin_left", int(40 * ui_scale))
-		wildcard_unlock_margin.add_theme_constant_override("margin_right", int(40 * ui_scale))
-		wildcard_unlock_margin.add_theme_constant_override("margin_top", int(18 * ui_scale))
-		wildcard_unlock_margin.add_theme_constant_override("margin_bottom", int(36 * ui_scale))
-	if wildcard_unlock_vbox != null:
-		wildcard_unlock_vbox.add_theme_constant_override("separation", int(16 * ui_scale))
-	_apply_candy_dialog_card(wildcard_unlock_card, ui_scale)
-	if wildcard_unlock_title_label != null:
-		_style_dialog_title_label(wildcard_unlock_title_label, int(WILDCARD_UNLOCK_TITLE_FONT_SIZE * ui_scale), true, true)
-		_apply_rainbow_label(wildcard_unlock_title_label, card_size.x - 80.0 * ui_scale)
-	if wildcard_unlock_subtitle_label != null:
-		_style_dialog_title_label(wildcard_unlock_subtitle_label, int(DIALOG_SUBTITLE_FONT_SIZE * ui_scale), true, true)
-		_apply_rainbow_label(wildcard_unlock_subtitle_label, card_size.x * 0.72)
+	if booster_unlock_margin != null:
+		booster_unlock_margin.add_theme_constant_override("margin_left", int(40 * ui_scale))
+		booster_unlock_margin.add_theme_constant_override("margin_right", int(40 * ui_scale))
+		booster_unlock_margin.add_theme_constant_override("margin_top", int(18 * ui_scale))
+		booster_unlock_margin.add_theme_constant_override("margin_bottom", int(36 * ui_scale))
+	if booster_unlock_vbox != null:
+		booster_unlock_vbox.add_theme_constant_override("separation", int(16 * ui_scale))
+	_apply_candy_dialog_card(booster_unlock_card, ui_scale)
+	if booster_unlock_title_label != null:
+		_style_dialog_title_label(booster_unlock_title_label, int(BOOSTER_UNLOCK_TITLE_FONT_SIZE * ui_scale), true, true)
+		_apply_rainbow_label(booster_unlock_title_label, card_size.x - 80.0 * ui_scale)
+	if booster_unlock_subtitle_label != null:
+		_style_dialog_title_label(booster_unlock_subtitle_label, int(DIALOG_SUBTITLE_FONT_SIZE * ui_scale), true, true)
+		_apply_rainbow_label(booster_unlock_subtitle_label, card_size.x * 0.72)
 	var btn_w: float = _dialog_inner_button_width(card_size.x)
-	_layout_dialog_gradient_button(wildcard_unlock_continue_button, btn_w, ui_scale, DIALOG_COMPACT_BTN_FONT_SIZE)
+	_layout_dialog_gradient_button(booster_unlock_continue_button, btn_w, ui_scale, DIALOG_COMPACT_BTN_FONT_SIZE)
 
-func queue_wildcard_unlock_panel(wildcard_type: String) -> void:
-	if wildcard_type.is_empty():
+func queue_booster_unlock_panel(booster_type: String) -> void:
+	if booster_type.is_empty():
 		return
-	if _pending_wildcard_unlock_queue.has(wildcard_type):
+	if _pending_booster_unlock_queue.has(booster_type):
 		return
-	_pending_wildcard_unlock_queue.append(wildcard_type)
-	call_deferred("try_show_wildcard_unlock_panel")
+	_pending_booster_unlock_queue.append(booster_type)
+	call_deferred("try_show_booster_unlock_panel")
 
-func try_show_wildcard_unlock_panel() -> void:
-	if wildcard_unlock_overlay == null:
+func try_show_booster_unlock_panel() -> void:
+	if booster_unlock_overlay == null:
 		return
-	if wildcard_unlock_overlay.visible:
+	if booster_unlock_overlay.visible:
 		return
 	if level_up_overlay != null and level_up_overlay.visible:
 		return
@@ -5242,36 +5442,36 @@ func try_show_wildcard_unlock_panel() -> void:
 		return
 	if no_moves_overlay != null and no_moves_overlay.visible:
 		return
-	if _pending_wildcard_unlock_queue.is_empty():
+	if _pending_booster_unlock_queue.is_empty():
 		return
-	show_wildcard_unlock_panel(_pending_wildcard_unlock_queue.pop_front())
+	show_booster_unlock_panel(_pending_booster_unlock_queue.pop_front())
 
-func show_wildcard_unlock_panel(wildcard_type: String) -> void:
-	if wildcard_unlock_overlay == null:
+func show_booster_unlock_panel(booster_type: String) -> void:
+	if booster_unlock_overlay == null:
 		return
 	hide_no_moves_panel()
 	board_locked = true
 	clear_selection()
 	hammer_mode_active = false
 	glove_mode_active = false
-	var wildcard_name := get_wildcard_display_name(wildcard_type)
-	if wildcard_unlock_title_label != null:
-		wildcard_unlock_title_label.text = "Desbloqueado: comodín %s" % wildcard_name
-	if wildcard_unlock_subtitle_label != null:
-		wildcard_unlock_subtitle_label.text = get_wildcard_unlock_description(wildcard_type)
-	wildcard_unlock_overlay.visible = true
-	wildcard_unlock_overlay.move_to_front()
-	layout_wildcard_unlock_dialog_controls()
+	var booster_name := get_booster_display_name(booster_type)
+	if booster_unlock_title_label != null:
+		booster_unlock_title_label.text = "Desbloqueado: Booster %s" % booster_name
+	if booster_unlock_subtitle_label != null:
+		booster_unlock_subtitle_label.text = get_booster_unlock_description(booster_type)
+	booster_unlock_overlay.visible = true
+	booster_unlock_overlay.move_to_front()
+	layout_booster_unlock_dialog_controls()
 
-func hide_wildcard_unlock_panel() -> void:
-	if wildcard_unlock_overlay != null:
-		wildcard_unlock_overlay.visible = false
+func hide_booster_unlock_panel() -> void:
+	if booster_unlock_overlay != null:
+		booster_unlock_overlay.visible = false
 	board_locked = false
 
-func _on_wildcard_unlock_continue_pressed() -> void:
-	hide_wildcard_unlock_panel()
+func _on_booster_unlock_continue_pressed() -> void:
+	hide_booster_unlock_panel()
 	if not _pending_level_up_alerts.is_empty():
 		_show_next_level_up_alert()
 		return
-	try_show_wildcard_unlock_panel()
+	try_show_booster_unlock_panel()
 	check_blocked_state()

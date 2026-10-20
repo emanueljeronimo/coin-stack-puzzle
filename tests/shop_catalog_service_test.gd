@@ -14,7 +14,7 @@ func _run() -> void:
 	_test_formatters()
 	_test_confirm_copy()
 	_test_combo_pack()
-	_test_resource_wildcards()
+	_test_resource_boosters()
 	_test_grant_stars()
 	print("=== RESULT: %d passed, %d failed ===" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
@@ -82,7 +82,7 @@ func _test_combo_pack() -> void:
 	if int(pack.get("stars", 0)) != 2500 or int(pack.get("unlimited_lives_sec", 0)) != 3600:
 		_fail("combo_contents", str(pack))
 		return
-	if int(pack.get("wildcards", 0)) != 3 or int(pack.get("temp_slots", 0)) != 1:
+	if int(pack.get("boosters", 0)) != 3 or int(pack.get("temp_slots", 0)) != 1:
 		_fail("combo_extras", str(pack))
 		return
 	if ShopCatalogServiceScript.confirm_copy_for_pack(pack) != "¿Comprar PACK JUGADOR por $3.99?":
@@ -93,7 +93,7 @@ func _test_combo_pack() -> void:
 		_fail("combo_lines", str(lines))
 		return
 	var icons: PackedStringArray = ShopCatalogServiceScript.confirm_icon_keys(pack)
-	if icons.size() != 3 or icons[0] != "stars" or icons[1] != "lives" or icons[2] != "wildcards":
+	if icons.size() != 3 or icons[0] != "stars" or icons[1] != "lives" or icons[2] != "boosters":
 		_fail("combo_confirm_icons", str(icons))
 		return
 	var star_icons: PackedStringArray = ShopCatalogServiceScript.confirm_icon_keys(
@@ -108,16 +108,16 @@ func _test_combo_pack() -> void:
 		return
 	_ok("combo_pack")
 
-func _test_resource_wildcards() -> void:
-	var packs: Array = ShopCatalogServiceScript.resource_wildcard_packs()
+func _test_resource_boosters() -> void:
+	var packs: Array = ShopCatalogServiceScript.resource_booster_packs()
 	if packs.size() != 6:
 		_fail("resource_count", str(packs.size()))
 		return
 	var mix: Dictionary = ShopCatalogServiceScript.pack_by_id("res_mix")
-	if not ShopCatalogServiceScript.is_resource_wildcard(mix):
+	if not ShopCatalogServiceScript.is_resource_booster(mix):
 		_fail("resource_kind", str(mix))
 		return
-	if str(mix.get("wildcard_type", "")) != "mix" or int(mix.get("star_cost", 0)) != 200:
+	if str(mix.get("booster_type", "")) != "mix" or int(mix.get("star_cost", 0)) != 200:
 		_fail("resource_mix", str(mix))
 		return
 	var mix_pack: Dictionary = ShopCatalogServiceScript.pack_by_id("res_mix_pack")
@@ -141,7 +141,7 @@ func _test_resource_wildcards() -> void:
 		_fail("resource_icons", str(icons))
 		return
 	var types: PackedStringArray = ShopCatalogServiceScript.resource_column_types()
-	if types.size() != 3 or types[0] != "mix" or types[2] != "glove":
+	if types.size() != 3 or types[0] != "hammer" or types[1] != "mix" or types[2] != "glove":
 		_fail("resource_columns", str(types))
 		return
 	var hammer_offers: Array = ShopCatalogServiceScript.resource_packs_for_type("hammer")
@@ -180,11 +180,11 @@ func _test_resource_wildcards() -> void:
 	if bool(poor.get("ok", true)):
 		_fail("spend_poor", str(poor))
 		return
-	var uses: Dictionary = ShopCatalogServiceScript.apply_wildcard_uses({"hammer": 1}, "hammer", 1)
+	var uses: Dictionary = ShopCatalogServiceScript.apply_booster_uses({"hammer": 1}, "hammer", 1)
 	if int(uses.get("hammer", 0)) != 2:
 		_fail("apply_hammer", str(uses))
 		return
-	_ok("resource_wildcards")
+	_ok("resource_boosters")
 
 func _test_grant_stars() -> void:
 	var bad: Dictionary = ShopCatalogServiceScript.grant_stars(10, 0)
