@@ -231,10 +231,10 @@ func _test_attached_wildcard_resolution() -> void:
 	_ok("attached_wildcard_resolution")
 
 func _test_deal_wildcard_unlock() -> void:
-	if GameRulesScript.deal_wildcard_chance(9) != 0.0:
-		_fail("locked_before_10")
+	if GameRulesScript.deal_wildcard_chance(6) != 0.0:
+		_fail("locked_before_7")
 		return
-	if GameRulesScript.deal_wildcard_chance(10) != GameRulesScript.WILDCARD_ROUND_CHANCE:
-		_fail("unlocks_at_10")
+	if GameRulesScript.deal_wildcard_chance(7) != GameRulesScript.WILDCARD_ROUND_CHANCE:
+		_fail("unlocks_at_7")
 		return
 	_ok("deal_wildcard_unlock")

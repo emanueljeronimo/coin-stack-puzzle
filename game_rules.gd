@@ -10,7 +10,7 @@ const FUSION_OUTPUT_COUNT := 2
 ## Una sola tirada por repartida: 10% de chance de incluir exactamente 1 comodin.
 const WILDCARD_ROUND_CHANCE := 0.10
 ## El comodin de mazo no aparece hasta este checkpoint.
-const WILDCARD_ROUND_UNLOCK_LEVEL := 10
+const WILDCARD_ROUND_UNLOCK_LEVEL := 7
 const COIN_WILDCARD_VALUE := 0
 
 static func deal_wildcard_chance(checkpoint_level: int) -> float:
