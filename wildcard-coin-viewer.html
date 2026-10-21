@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Comodin — vista previa</title>
+  <style>
+    @font-face {
+      font-family: Chewy;
+      src: url("Fonts/Chewy-Regular.ttf") format("truetype");
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 28px;
+      font-family: Chewy, "Segoe UI", sans-serif;
+      color: #2a2a32;
+      background: linear-gradient(180deg, #eef1f6, #d7dde8);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 28px;
+      font-weight: 400;
+      letter-spacing: 0.5px;
+    }
+
+    p {
+      margin: 0;
+      max-width: 520px;
+      text-align: center;
+      font-family: "Segoe UI", sans-serif;
+      font-size: 14px;
+      line-height: 1.45;
+      color: #4a4e58;
+    }
+
+    .row {
+      display: flex;
+      align-items: flex-end;
+      gap: 48px;
+    }
+
+    .coin-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .coin-wrap span {
+      font-family: "Segoe UI", sans-serif;
+      font-size: 13px;
+      color: #5a5e68;
+    }
+
+    .coin {
+      position: relative;
+      width: var(--side);
+      height: var(--side);
+      filter: drop-shadow(0 2px 0 rgba(130, 118, 140, 0.18));
+    }
+
+    .coin .tex,
+    .coin .rainbow {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .coin .tex {
+      z-index: 1;
+    }
+
+    .coin .rainbow {
+      z-index: 2;
+      mix-blend-mode: color;
+      -webkit-mask-image: url("Imagenes/ficha.png");
+      mask-image: url("Imagenes/ficha.png");
+      -webkit-mask-size: 100% 100%;
+      mask-size: 100% 100%;
+      -webkit-mask-repeat: no-repeat;
+      mask-repeat: no-repeat;
+    }
+
+    .coin .q {
+      position: absolute;
+      inset: 0;
+      z-index: 3;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: Chewy, sans-serif;
+      font-size: calc(var(--side) * 0.36);
+      line-height: 1;
+      color: #fcfcfc;
+      transform: translateY(-2%);
+      -webkit-text-stroke: 2px #000;
+      text-shadow: 0 0 0 #000;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .big { --side: 280px; }
+    .board { --side: 104px; }
+  </style>
+</head>
+<body>
+  <h1>Ficha comodin</h1>
+  <p>
+    Asi se ve ahora en el tablero: arcoiris fijo alrededor del centro
+    (no gira), sin brillo extra, y un <strong>?</strong> blanco con borde negro.
+  </p>
+  <div class="row">
+    <div class="coin-wrap">
+      <div class="coin big">
+        <img class="tex" src="Imagenes/ficha.png" alt="" />
+        <div class="rainbow" id="rainbow-big"></div>
+        <div class="q">?</div>
+      </div>
+      <span>grande</span>
+    </div>
+    <div class="coin-wrap">
+      <div class="coin board">
+        <img class="tex" src="Imagenes/ficha.png" alt="" />
+        <div class="rainbow" id="rainbow-board"></div>
+        <div class="q">?</div>
+      </div>
+      <span>tamano tablero</span>
+    </div>
+  </div>
+
+  <script>
+    function hsv2rgb(h, s, v) {
+      const i = Math.floor(h * 6);
+      const f = h * 6 - i;
+      const p = v * (1 - s);
+      const q = v * (1 - f * s);
+      const t = v * (1 - (1 - f) * s);
+      let r = 0, g = 0, b = 0;
+      switch (i % 6) {
+        case 0: r = v; g = t; b = p; break;
+        case 1: r = q; g = v; b = p; break;
+        case 2: r = p; g = v; b = t; break;
+        case 3: r = p; g = q; b = v; break;
+        case 4: r = t; g = p; b = v; break;
+        case 5: r = v; g = p; b = q; break;
+      }
+      return [r, g, b];
+    }
+
+    function shaderColor(hue) {
+      const sat = 0.52;
+      const val = 0.88;
+      const pastel = 0.16;
+      let [r, g, b] = hsv2rgb(hue, sat, val);
+      r = r + (1 - r) * pastel;
+      g = g + (1 - g) * pastel;
+      b = b + (1 - b) * pastel;
+      return `rgb(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)})`;
+    }
+
+    const stops = [];
+    for (let i = 0; i <= 12; i++) {
+      const t = i / 12;
+      stops.push(`${shaderColor(t)} ${(t * 360).toFixed(1)}deg`);
+    }
+    const gradient = `conic-gradient(from 90deg, ${stops.join(", ")})`;
+    document.querySelectorAll(".rainbow").forEach((el) => {
+      el.style.background = gradient;
+    });
+  </script>
+</body>
+</html>

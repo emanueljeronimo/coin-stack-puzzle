@@ -4,7 +4,7 @@ extends RefCounted
 const REF_WIDTH := 1080.0
 const PLAY_WIDTH_RATIO := 0.46
 const PLAY_BOTTOM_MARGIN := 0.0
-const PLAY_Y_DROP := 58.0
+const PLAY_Y_DROP := -90.0
 const PLAY_VISIBLE_HEIGHT := 0.86
 const SLOT_HEIGHT_RATIO := 0.28
 

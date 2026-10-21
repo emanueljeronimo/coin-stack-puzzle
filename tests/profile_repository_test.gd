@@ -48,7 +48,7 @@ func _test_default_player_data() -> void:
 	if int(data.get("save_version", 0)) != 7:
 		_fail("save_version", str(data))
 		return
-	if int(data.get("coins", 0)) != 99:
+	if int(data.get("coins", 0)) != 99 or int(data.get("player_diamonds", 0)) != 99:
 		_fail("coins", str(data))
 		return
 	if data.has("gems"):

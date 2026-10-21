@@ -26,10 +26,10 @@ func _fail(name: String, detail: String = "") -> void:
 func _test_builders() -> void:
 	var req := TempSlotPurchaseServiceScript.build_purchase_request(10, false, false)
 	var rules := TempSlotPurchaseServiceScript.build_rules(5, 30.0, 2)
-	if int(req.get("player_stars", -1)) != 10:
-		_fail("request_player_stars")
+	if int(req.get("player_diamonds", -1)) != 10:
+		_fail("request_player_diamonds")
 		return
-	if int(rules.get("temp_slot_cost_stars", -1)) != 5:
+	if int(rules.get("temp_slot_cost_diamonds", -1)) != 5:
 		_fail("rules_cost")
 		return
 	_ok("builders")
@@ -38,7 +38,7 @@ func _test_messages() -> void:
 	if TempSlotPurchaseServiceScript.message_for_rejection("already_active", 0, 0).is_empty():
 		_fail("already_active_message")
 		return
-	if TempSlotPurchaseServiceScript.message_for_rejection("insufficient_stars", 7, 3).is_empty():
+	if TempSlotPurchaseServiceScript.message_for_rejection("insufficient_diamonds", 7, 3).is_empty():
 		_fail("insufficient_message")
 		return
 	if TempSlotPurchaseServiceScript.confirm_copy(200) != "¿Comprar ranura temporal por 200?":

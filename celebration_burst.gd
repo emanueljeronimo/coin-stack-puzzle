@@ -1,9 +1,9 @@
 class_name CelebrationBurst
 extends Control
 
-const RainbowsScript := preload("res://celebration_rainbows.gd")
+const FireworksScript := preload("res://celebration_fireworks.gd")
 
-var _rainbows: Control = null
+var _fireworks: Control = null
 var _built := false
 
 func _ready() -> void:
@@ -21,19 +21,19 @@ func _ensure_built() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	z_as_relative = false
 	z_index = 320
-	_rainbows = RainbowsScript.new()
-	_rainbows.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_rainbows)
+	_fireworks = FireworksScript.new()
+	_fireworks.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_fireworks)
 
 func play_for_card(card: Control, ui_scale: float) -> void:
 	if card == null:
 		return
 	_ensure_built()
 	visible = true
-	if _rainbows != null and _rainbows.has_method("play_around_card"):
-		_rainbows.play_around_card(card, ui_scale)
+	if _fireworks != null and _fireworks.has_method("play_around_card"):
+		_fireworks.play_around_card(card, ui_scale)
 
 func stop() -> void:
-	if _rainbows != null and _rainbows.has_method("stop"):
-		_rainbows.stop()
+	if _fireworks != null and _fireworks.has_method("stop"):
+		_fireworks.stop()
 	visible = false

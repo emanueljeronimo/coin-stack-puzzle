@@ -68,6 +68,9 @@ func _test_inner_copy_is_smaller_than_frame() -> void:
 	if Service.TITLE_FONT_SIZE >= 90:
 		_fail("copy_still_large")
 		return
+	if Service.TITLE_LETTER_SPACING < 2 or Service.TITLE_LETTER_SPACING > 10:
+		_fail("title_spacing", str(Service.TITLE_LETTER_SPACING))
+		return
 	if Service.MAX_WIDTH < 900.0:
 		_fail("frame_not_enlarged", str(Service.MAX_WIDTH))
 		return
@@ -105,6 +108,9 @@ func _test_reward_buttons_are_compact() -> void:
 func _test_buttons_sit_lower() -> void:
 	if Service.PAD_BOTTOM < 0.25:
 		_fail("buttons_too_low", str(Service.PAD_BOTTOM))
+		return
+	if Service.BUTTON_SEP < 20.0 or Service.BUTTON_SEP > 32.0:
+		_fail("button_sep", str(Service.BUTTON_SEP))
 		return
 	if Service.BODY_GAP_MIN < 20.0:
 		_fail("body_gap_too_small", str(Service.BODY_GAP_MIN))

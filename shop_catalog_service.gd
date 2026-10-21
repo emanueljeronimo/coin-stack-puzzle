@@ -2,12 +2,12 @@ extends RefCounted
 
 const GameBoosterServiceScript = preload("res://game_booster_service.gd")
 
-const STAR_PACKS := [
-	{"id": "stars_500", "amount": 500, "price_cents": 99, "favorite": false},
-	{"id": "stars_1200", "amount": 1200, "price_cents": 199, "favorite": false},
-	{"id": "stars_2500", "amount": 2500, "price_cents": 399, "favorite": true},
-	{"id": "stars_6000", "amount": 6000, "price_cents": 799, "favorite": false},
-	{"id": "stars_15000", "amount": 15000, "price_cents": 1499, "favorite": false},
+const DIAMOND_PACKS := [
+	{"id": "diamonds_500", "amount": 500, "price_cents": 99, "favorite": false},
+	{"id": "diamonds_1200", "amount": 1200, "price_cents": 199, "favorite": false},
+	{"id": "diamonds_2500", "amount": 2500, "price_cents": 399, "favorite": true},
+	{"id": "diamonds_6000", "amount": 6000, "price_cents": 799, "favorite": false},
+	{"id": "diamonds_15000", "amount": 15000, "price_cents": 1499, "favorite": false},
 ]
 
 const COMBO_PACKS := [
@@ -16,7 +16,7 @@ const COMBO_PACKS := [
 		"kind": "combo",
 		"title": "PACK JUGADOR",
 		"price_cents": 399,
-		"stars": 2500,
+		"diamonds": 2500,
 		"unlimited_lives_sec": 3600,
 		"boosters": 3,
 		"temp_slots": 1,
@@ -35,7 +35,7 @@ const RESOURCE_BOOSTERS := [
 		"booster_type": "mix",
 		"title": "Mezclar",
 		"amount": BOOSTER_UNIT_AMOUNT,
-		"star_cost": BOOSTER_UNIT_COST,
+		"diamond_cost": BOOSTER_UNIT_COST,
 	},
 	{
 		"id": "res_mix_pack",
@@ -43,7 +43,7 @@ const RESOURCE_BOOSTERS := [
 		"booster_type": "mix",
 		"title": "Mezclar",
 		"amount": BOOSTER_PACK_AMOUNT,
-		"star_cost": BOOSTER_PACK_COST,
+		"diamond_cost": BOOSTER_PACK_COST,
 	},
 	{
 		"id": "res_hammer",
@@ -51,7 +51,7 @@ const RESOURCE_BOOSTERS := [
 		"booster_type": "hammer",
 		"title": "Martillo",
 		"amount": BOOSTER_UNIT_AMOUNT,
-		"star_cost": BOOSTER_UNIT_COST,
+		"diamond_cost": BOOSTER_UNIT_COST,
 	},
 	{
 		"id": "res_hammer_pack",
@@ -59,7 +59,7 @@ const RESOURCE_BOOSTERS := [
 		"booster_type": "hammer",
 		"title": "Martillo",
 		"amount": BOOSTER_PACK_AMOUNT,
-		"star_cost": BOOSTER_PACK_COST,
+		"diamond_cost": BOOSTER_PACK_COST,
 	},
 	{
 		"id": "res_glove",
@@ -67,7 +67,7 @@ const RESOURCE_BOOSTERS := [
 		"booster_type": "glove",
 		"title": "Guante",
 		"amount": BOOSTER_UNIT_AMOUNT,
-		"star_cost": BOOSTER_UNIT_COST,
+		"diamond_cost": BOOSTER_UNIT_COST,
 	},
 	{
 		"id": "res_glove_pack",
@@ -75,12 +75,12 @@ const RESOURCE_BOOSTERS := [
 		"booster_type": "glove",
 		"title": "Guante",
 		"amount": BOOSTER_PACK_AMOUNT,
-		"star_cost": BOOSTER_PACK_COST,
+		"diamond_cost": BOOSTER_PACK_COST,
 	},
 ]
 
-static func star_packs() -> Array:
-	return STAR_PACKS.duplicate(true)
+static func diamond_packs() -> Array:
+	return DIAMOND_PACKS.duplicate(true)
 
 static func combo_packs() -> Array:
 	return COMBO_PACKS.duplicate(true)
@@ -113,7 +113,7 @@ static func is_resource_booster(pack: Dictionary) -> bool:
 	return str(pack.get("kind", "")) == "resource_booster"
 
 static func pack_by_id(pack_id: String) -> Dictionary:
-	for pack in STAR_PACKS:
+	for pack in DIAMOND_PACKS:
 		if str(pack.get("id", "")) == pack_id:
 			return (pack as Dictionary).duplicate(true)
 	for pack in COMBO_PACKS:
@@ -152,7 +152,7 @@ static func confirm_copy_for_pack(pack: Dictionary) -> String:
 	if is_resource_booster(pack):
 		var title: String = str(pack.get("title", ""))
 		var amount: int = int(pack.get("amount", 1))
-		var cost_txt: String = format_amount(int(pack.get("star_cost", 0)))
+		var cost_txt: String = format_amount(int(pack.get("diamond_cost", 0)))
 		if amount > 1:
 			return "¿Comprar %d %s por %s?" % [amount, title, cost_txt]
 		return "¿Comprar %s por %s?" % [title, cost_txt]
@@ -165,12 +165,12 @@ static func confirm_copy_for_pack(pack: Dictionary) -> String:
 
 static func combo_line_texts(pack: Dictionary) -> PackedStringArray:
 	var lines := PackedStringArray()
-	var stars: int = int(pack.get("stars", 0))
+	var diamonds: int = int(pack.get("diamonds", 0))
 	var unlimited_sec: int = int(pack.get("unlimited_lives_sec", 0))
 	var boosters: int = int(pack.get("boosters", pack.get("wildcards", 0)))
 	var temp_slots: int = int(pack.get("temp_slots", 0))
-	if stars > 0:
-		lines.append("%s monedas" % format_amount(stars))
+	if diamonds > 0:
+		lines.append("%s diamantes" % format_amount(diamonds))
 	if unlimited_sec >= 3600:
 		var hours: int = int(unlimited_sec / 3600)
 		if hours == 1:
@@ -190,8 +190,8 @@ static func combo_line_texts(pack: Dictionary) -> PackedStringArray:
 static func confirm_icon_keys(pack: Dictionary) -> PackedStringArray:
 	var keys := PackedStringArray()
 	if is_combo_pack(pack):
-		if int(pack.get("stars", 0)) > 0:
-			keys.append("stars")
+		if int(pack.get("diamonds", 0)) > 0:
+			keys.append("diamonds")
 		if int(pack.get("unlimited_lives_sec", 0)) > 0 or int(pack.get("lives", 0)) > 0:
 			keys.append("lives")
 		if int(pack.get("boosters", pack.get("wildcards", 0))) > 0:
@@ -199,9 +199,9 @@ static func confirm_icon_keys(pack: Dictionary) -> PackedStringArray:
 		return keys
 	if is_resource_booster(pack):
 		keys.append(str(pack.get("booster_type", "mix")))
-		keys.append("stars")
+		keys.append("diamonds")
 		return keys
-	keys.append("stars")
+	keys.append("diamonds")
 	return keys
 
 static func apply_booster_uses(counts: Dictionary, booster_type: String, amount: int) -> Dictionary:
@@ -215,29 +215,29 @@ static func apply_booster_uses(counts: Dictionary, booster_type: String, amount:
 static func apply_mix_uses(counts: Dictionary, amount: int) -> Dictionary:
 	return apply_booster_uses(counts, "mix", amount)
 
-static func spend_stars(current_stars: int, cost: int) -> Dictionary:
+static func spend_diamonds(current_diamonds: int, cost: int) -> Dictionary:
 	if cost <= 0:
-		return {"ok": false, "player_stars": current_stars, "spent": 0, "reason": "invalid"}
-	if current_stars < cost:
+		return {"ok": false, "player_diamonds": current_diamonds, "spent": 0, "reason": "invalid"}
+	if current_diamonds < cost:
 		return {
 			"ok": false,
-			"player_stars": current_stars,
+			"player_diamonds": current_diamonds,
 			"spent": 0,
 			"required": cost,
 			"reason": "insufficient",
 		}
 	return {
 		"ok": true,
-		"player_stars": current_stars - cost,
+		"player_diamonds": current_diamonds - cost,
 		"spent": cost,
 	}
 
-static func grant_stars(current_stars: int, amount: int) -> Dictionary:
+static func grant_diamonds(current_diamonds: int, amount: int) -> Dictionary:
 	if amount <= 0:
-		return {"ok": false, "player_stars": current_stars, "granted": 0}
+		return {"ok": false, "player_diamonds": current_diamonds, "granted": 0}
 	return {
 		"ok": true,
-		"player_stars": current_stars + amount,
+		"player_diamonds": current_diamonds + amount,
 		"granted": amount,
 	}
 

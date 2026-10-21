@@ -17,6 +17,8 @@ func _run() -> void:
 	_test_apply_modes()
 	_test_burst_play_stop()
 	_test_confetti_is_pastel_firework()
+	_test_firework_bursts()
+	_test_firework_progress_vanishes()
 	print("=== RESULT: %d passed, %d failed ===" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -132,3 +134,53 @@ func _test_confetti_is_pastel_firework() -> void:
 		return
 	confetti.free()
 	_ok("confetti_is_pastel_firework")
+
+func _test_firework_bursts() -> void:
+	var viewport := Vector2(1080, 1920)
+	var card := Rect2(Vector2(180, 720), Vector2(720, 480))
+	var bursts: Array[Dictionary] = Service.firework_bursts(viewport, card, 1.0, 11)
+	if bursts.size() < 12:
+		_fail("firework_count", str(bursts.size()))
+		return
+	var kinds := {}
+	var quad := PackedInt32Array([0, 0, 0, 0])
+	var mid_x: float = viewport.x * 0.5
+	var mid_y: float = card.get_center().y
+	for burst in bursts:
+		var origin: Vector2 = burst.origin
+		if card.has_point(origin):
+			_fail("firework_inside_card", str(origin))
+			return
+		var idx: int = (0 if origin.y <= mid_y else 2) + (1 if origin.x >= mid_x else 0)
+		quad[idx] += 1
+		kinds[str(burst.get("kind", ""))] = true
+	var qmin: int = mini(mini(quad[0], quad[1]), mini(quad[2], quad[3]))
+	var qmax: int = maxi(maxi(quad[0], quad[1]), maxi(quad[2], quad[3]))
+	if qmin < 2 or qmax - qmin > 2:
+		_fail("uneven_quads", str(quad))
+		return
+	if Service.firework_kinds().size() < 3:
+		_fail("kind_count", str(Service.firework_kinds().size()))
+		return
+	if kinds.size() < 3:
+		_fail("missing_kinds", str(kinds.keys()))
+		return
+	_ok("firework_bursts")
+
+func _test_firework_progress_vanishes() -> void:
+	if Service.firework_progress(0.0, 0.5, 1.2, 3.0) > 0.01:
+		_fail("firework_before_delay")
+		return
+	var mid: float = Service.firework_progress(0.60, 0.0, 1.2, 3.0)
+	if mid < 0.3 or mid > 0.7:
+		_fail("firework_in_progress", str(mid))
+		return
+	if Service.firework_progress(1.5, 0.0, 1.2, 3.0) > 0.01:
+		_fail("firework_still_visible")
+		return
+	var start: Vector2 = Service.spark_offset(0.0, 100.0, 0.0, 1.0)
+	var end: Vector2 = Service.spark_offset(0.0, 100.0, 1.0, 1.0)
+	if end.length() <= start.length():
+		_fail("spark_does_not_expand")
+		return
+	_ok("firework_progress_vanishes")

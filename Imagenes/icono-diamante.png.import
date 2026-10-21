@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://c5fgkch15n0xw"
-path="res://.godot/imported/boton-redondo.png-82ffa8d8ce26d8340a7b03708aba4b6f.ctex"
+uid="uid://k0jhfh4bauug"
+path="res://.godot/imported/icono-diamante.png-4d91832779e8f5736e34b98305b9cb2b.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Imagenes/boton-redondo.png"
-dest_files=["res://.godot/imported/boton-redondo.png-82ffa8d8ce26d8340a7b03708aba4b6f.ctex"]
+source_file="res://Imagenes/icono-diamante.png"
+dest_files=["res://.godot/imported/icono-diamante.png-4d91832779e8f5736e34b98305b9cb2b.ctex"]
 
 [params]
 

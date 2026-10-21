@@ -34,7 +34,7 @@ func _test_build_request() -> void:
 	_ok("build_request")
 
 func _test_reason_helpers() -> void:
-	if not AdjacentSlotPurchaseServiceScript.is_insufficient_stars("insufficient_stars"):
+	if not AdjacentSlotPurchaseServiceScript.is_insufficient_diamonds("insufficient_diamonds"):
 		_fail("insufficient_helper")
 		return
 	if not AdjacentSlotPurchaseServiceScript.is_free_unlock("free_unlock"):

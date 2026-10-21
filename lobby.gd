@@ -2,7 +2,7 @@ extends Control
 
 const CoverTexture = preload("res://Imagenes/home-nueva.png")
 const LifeIconTexture = preload("res://Imagenes/icono-vidas.png")
-const StarIconTexture = preload("res://Imagenes/icono-estrella.png")
+const DiamondIconTexture = preload("res://Imagenes/icono-diamante.png")
 const CartIconTexture = preload("res://Imagenes/icono-cart.png")
 const SettingsIconTexture = preload("res://Imagenes/icono-settings.png")
 const DailyLoginIconTexture = preload("res://Imagenes/icono-login-diario.png")
@@ -56,11 +56,11 @@ var life_button_count_label: Label = null
 var life_button_heart: Control = null
 var life_button_label: Label = null
 var life_chip_parts: Dictionary = {}
-var stars_button_shadow: Panel = null
-var stars_button: Control = null
-var stars_button_icon: TextureRect = null
-var stars_button_label: Label = null
-var stars_chip_parts: Dictionary = {}
+var diamonds_button_shadow: Panel = null
+var diamonds_button: Control = null
+var diamonds_button_icon: TextureRect = null
+var diamonds_button_label: Label = null
+var diamonds_chip_parts: Dictionary = {}
 var settings_button_shadow: Panel = null
 var settings_button: Control = null
 var settings_button_icon: TextureRect = null
@@ -150,15 +150,15 @@ func build_ui() -> void:
 	if life_parts.plus != null:
 		(life_parts.plus as Button).pressed.connect(_on_shop_pressed)
 		GameState.hook_button_sound(life_parts.plus as Button)
-	var stars_parts := HudTextureButtons.create_resource_chip(StarIconTexture, false)
-	stars_chip_parts = stars_parts
-	stars_button = stars_parts.panel
-	stars_button_icon = stars_parts.icon
-	stars_button_label = stars_parts.label
-	_bind_chip_click(stars_button, _on_shop_pressed)
-	if stars_parts.plus != null:
-		(stars_parts.plus as Button).pressed.connect(_on_shop_pressed)
-		GameState.hook_button_sound(stars_parts.plus as Button)
+	var diamonds_parts := HudTextureButtons.create_resource_chip(DiamondIconTexture, false)
+	diamonds_chip_parts = diamonds_parts
+	diamonds_button = diamonds_parts.panel
+	diamonds_button_icon = diamonds_parts.icon
+	diamonds_button_label = diamonds_parts.label
+	_bind_chip_click(diamonds_button, _on_shop_pressed)
+	if diamonds_parts.plus != null:
+		(diamonds_parts.plus as Button).pressed.connect(_on_shop_pressed)
+		GameState.hook_button_sound(diamonds_parts.plus as Button)
 	var settings_parts := _build_icon_only_chip(SettingsIconTexture)
 	settings_button_shadow = settings_parts.shadow
 	settings_button = settings_parts.panel
@@ -173,7 +173,7 @@ func build_ui() -> void:
 	hud_root.add_child(profile_button_shadow)
 	hud_root.add_child(profile_button)
 	hud_root.add_child(life_button)
-	hud_root.add_child(stars_button)
+	hud_root.add_child(diamonds_button)
 	hud_root.add_child(settings_button)
 	hud_root.add_child(shop_button)
 	hud_root.add_child(daily_login_button)
@@ -229,8 +229,8 @@ func build_shop_dialog() -> void:
 		shop_ui.combo_purchased.connect(_on_shop_combo_purchased)
 	if shop_ui.has_signal("booster_purchased") and not shop_ui.booster_purchased.is_connected(_on_shop_booster_purchased):
 		shop_ui.booster_purchased.connect(_on_shop_booster_purchased)
-	if shop_ui.has_signal("stars_purchased") and not shop_ui.stars_purchased.is_connected(_on_shop_stars_purchased):
-		shop_ui.stars_purchased.connect(_on_shop_stars_purchased)
+	if shop_ui.has_signal("diamonds_purchased") and not shop_ui.diamonds_purchased.is_connected(_on_shop_diamonds_purchased):
+		shop_ui.diamonds_purchased.connect(_on_shop_diamonds_purchased)
 
 func _on_shop_combo_purchased(_pack: Dictionary) -> void:
 	update_displays()
@@ -238,7 +238,7 @@ func _on_shop_combo_purchased(_pack: Dictionary) -> void:
 func _on_shop_booster_purchased(_booster_type: String, _amount: int) -> void:
 	update_displays()
 
-func _on_shop_stars_purchased(_amount: int) -> void:
+func _on_shop_diamonds_purchased(_amount: int) -> void:
 	update_displays()
 
 func build_profile_editor() -> void:
@@ -266,13 +266,13 @@ func _on_profile_saved() -> void:
 
 func update_displays() -> void:
 	if life_button_count_label != null:
-		life_button_count_label.text = GameState.get_life_count_text()
+		HudTextureButtons.set_life_count_text(life_button_count_label, GameState.get_life_count_text())
 	if not life_chip_parts.is_empty():
 		HudTextureButtons.set_resource_chip_value(life_chip_parts, GameState.get_life_chip_text())
-	if not stars_chip_parts.is_empty():
+	if not diamonds_chip_parts.is_empty():
 		HudTextureButtons.set_resource_chip_value(
-			stars_chip_parts,
-			HudTextureButtons.format_stat_number(GameState.player_stars)
+			diamonds_chip_parts,
+			HudTextureButtons.format_stat_number(GameState.player_diamonds)
 		)
 	if level_label != null:
 		level_label.text = "Nivel %d" % GameState.player_level
@@ -413,7 +413,7 @@ func _build_lives_chip() -> Dictionary:
 	var lbl := create_hud_text_label(GameState.get_life_chip_text(), LOBBY_STAT_FONT_SIZE)
 	row.add_child(lbl)
 	if badge.count != null:
-		(badge.count as Label).text = GameState.get_life_count_text()
+		HudTextureButtons.set_life_count_text(badge.count as Label, GameState.get_life_count_text())
 	return {
 		"shadow": shadow,
 		"panel": panel,
@@ -493,7 +493,7 @@ func layout_ui() -> void:
 	)
 
 	var life_hang := HudTextureButtons.resource_chip_hang(chip_h, 0.62, 1.38)
-	var money_hang := HudTextureButtons.resource_chip_hang(chip_h, 0.62, 1.48, 1.16)
+	var money_hang := HudTextureButtons.resource_chip_hang(chip_h, 0.62, 1.26, 1.06)
 	HudTextureButtons.layout_resource_chip(
 		life_chip_parts,
 		Vector2(center_x + life_hang, row_y),
@@ -504,14 +504,14 @@ func layout_ui() -> void:
 		1.38
 	)
 	HudTextureButtons.layout_resource_chip(
-		stars_chip_parts,
+		diamonds_chip_parts,
 		Vector2(center_x + life_w + resource_gap + money_hang, row_y),
 		stat_size,
 		0.38,
 		42,
 		0.62,
-		1.48,
-		1.16
+		1.26,
+		1.06
 	)
 
 	layout_hud_pill_pair(

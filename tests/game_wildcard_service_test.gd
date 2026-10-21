@@ -162,7 +162,7 @@ func _test_runtime_roundtrip_preserves_wildcards() -> void:
 		"next_free_slot_unlock_level": 14,
 		"temp_slot_actions_remaining": 0,
 		"lives": 5,
-		"player_stars": 100,
+		"player_diamonds": 100,
 	})
 	var parsed := GameSessionServiceScript.parse_save_payload(payload, {
 		"checkpoint_level": 1,
@@ -175,7 +175,7 @@ func _test_runtime_roundtrip_preserves_wildcards() -> void:
 		"next_free_slot_unlock_level": 4,
 		"temp_slot_actions_remaining": 0,
 		"lives": 5,
-		"player_stars": 0,
+		"player_diamonds": 0,
 		"checkpoint_base_value": 5,
 	})
 	var rs: Dictionary = parsed.get("runtime_snapshot", {})

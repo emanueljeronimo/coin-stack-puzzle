@@ -13,6 +13,7 @@ func _run() -> void:
 	_test_temp_slot_purchase()
 	_test_temp_slot_purchase_rejects()
 	_test_adjacent_purchase_paths()
+	_test_read_write_diamonds()
 	print("=== RESULT: %d passed, %d failed ===" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -27,12 +28,12 @@ func _fail(name: String, detail: String = "") -> void:
 func _test_temp_slot_purchase() -> void:
 	var out := GameEconomyServiceScript.purchase_temp_slot(
 		{
-			"player_stars": 900,
+			"player_diamonds": 900,
 			"temp_slot_bonus_active": false,
 			"has_active_temp_stack": false,
 		},
 		{
-			"temp_slot_cost_stars": 200,
+			"temp_slot_cost_diamonds": 200,
 			"temp_slot_duration_sec": 60.0,
 			"temp_slot_actions_to_close": 3,
 		}
@@ -40,8 +41,8 @@ func _test_temp_slot_purchase() -> void:
 	if not bool(out.get("ok", false)):
 		_fail("temp_purchase_ok", str(out))
 		return
-	if int(out.get("player_stars", 0)) != 700:
-		_fail("temp_purchase_stars", str(out))
+	if int(out.get("player_diamonds", 0)) != 700:
+		_fail("temp_purchase_diamonds", str(out))
 		return
 	if int(out.get("temp_slot_actions_remaining", 0)) != 3:
 		_fail("temp_purchase_actions", str(out))
@@ -51,12 +52,12 @@ func _test_temp_slot_purchase() -> void:
 func _test_temp_slot_purchase_rejects() -> void:
 	var active := GameEconomyServiceScript.purchase_temp_slot(
 		{
-			"player_stars": 900,
+			"player_diamonds": 900,
 			"temp_slot_bonus_active": true,
 			"has_active_temp_stack": true,
 		},
 		{
-			"temp_slot_cost_stars": 200,
+			"temp_slot_cost_diamonds": 200,
 			"temp_slot_duration_sec": 60.0,
 			"temp_slot_actions_to_close": 3,
 		}
@@ -66,12 +67,12 @@ func _test_temp_slot_purchase_rejects() -> void:
 		return
 	var poor := GameEconomyServiceScript.purchase_temp_slot(
 		{
-			"player_stars": 100,
+			"player_diamonds": 100,
 			"temp_slot_bonus_active": false,
 			"has_active_temp_stack": false,
 		},
 		{
-			"temp_slot_cost_stars": 200,
+			"temp_slot_cost_diamonds": 200,
 			"temp_slot_duration_sec": 60.0,
 			"temp_slot_actions_to_close": 3,
 		}
@@ -89,7 +90,7 @@ func _test_adjacent_purchase_paths() -> void:
 			"max_permanent_stacks": 14,
 			"checkpoint_level": 8,
 			"next_free_slot_unlock_level": 8,
-			"player_stars": 100,
+			"player_diamonds": 100,
 			"adjacent_slot_next_price": 600,
 		}
 	)
@@ -104,15 +105,15 @@ func _test_adjacent_purchase_paths() -> void:
 			"max_permanent_stacks": 14,
 			"checkpoint_level": 7,
 			"next_free_slot_unlock_level": 8,
-			"player_stars": 1000,
+			"player_diamonds": 1000,
 			"adjacent_slot_next_price": 600,
 		}
 	)
 	if str(paid.get("reason", "")) != "purchased":
 		_fail("adjacent_paid_reason", str(paid))
 		return
-	if int(paid.get("player_stars", -1)) != 400:
-		_fail("adjacent_paid_stars", str(paid))
+	if int(paid.get("player_diamonds", -1)) != 400:
+		_fail("adjacent_paid_diamonds", str(paid))
 		return
 
 	var poor := GameEconomyServiceScript.purchase_adjacent_slot(
@@ -122,7 +123,7 @@ func _test_adjacent_purchase_paths() -> void:
 			"max_permanent_stacks": 14,
 			"checkpoint_level": 7,
 			"next_free_slot_unlock_level": 8,
-			"player_stars": 200,
+			"player_diamonds": 200,
 			"adjacent_slot_next_price": 600,
 		}
 	)
@@ -130,3 +131,40 @@ func _test_adjacent_purchase_paths() -> void:
 		_fail("adjacent_reject_poor", str(poor))
 		return
 	_ok("adjacent_purchase_paths")
+
+func _test_read_write_diamonds() -> void:
+	if GameEconomyServiceScript.read_diamonds({"player_diamonds": 10, "player_stars": 99, "coins": 1}) != 10:
+		_fail("read_prefers_diamonds")
+		return
+	if GameEconomyServiceScript.read_diamonds({"player_stars": 99, "coins": 1}) != 99:
+		_fail("read_legacy_stars")
+		return
+	if GameEconomyServiceScript.read_diamonds({"coins": 1}) != 1:
+		_fail("read_legacy_coins")
+		return
+	if GameEconomyServiceScript.read_diamonds({}, 7) != 7:
+		_fail("read_fallback")
+		return
+	var out: Dictionary = GameEconomyServiceScript.write_diamonds({}, 42)
+	if int(out.get("player_diamonds", 0)) != 42:
+		_fail("write_diamonds", str(out))
+		return
+	if int(out.get("player_stars", 0)) != 42 or int(out.get("coins", 0)) != 42:
+		_fail("write_legacy_keys", str(out))
+		return
+	var from_stars := GameEconomyServiceScript.purchase_temp_slot(
+		{
+			"player_stars": 900,
+			"temp_slot_bonus_active": false,
+			"has_active_temp_stack": false,
+		},
+		{
+			"temp_slot_cost_diamonds": 200,
+			"temp_slot_duration_sec": 60.0,
+			"temp_slot_actions_to_close": 3,
+		}
+	)
+	if not bool(from_stars.get("ok", false)) or int(from_stars.get("player_diamonds", 0)) != 700:
+		_fail("purchase_reads_legacy_stars", str(from_stars))
+		return
+	_ok("read_write_diamonds")

@@ -28,12 +28,12 @@ func _fail(name: String, detail: String = "") -> void:
 func _test_temp_slot_lifecycle_timer_only() -> void:
 	var purchase := GameEconomyServiceScript.purchase_temp_slot(
 		{
-			"player_stars": 500,
+			"player_diamonds": 500,
 			"temp_slot_bonus_active": false,
 			"has_active_temp_stack": false,
 		},
 		{
-			"temp_slot_cost_stars": 200,
+			"temp_slot_cost_diamonds": 200,
 			"temp_slot_duration_sec": 60.0,
 			"temp_slot_actions_to_close": (
 				GameRulesScript.TEMP_SLOT_ACTIONS_TO_CLOSE if GameRulesScript.TEMP_SLOT_CLOSE_BY_ACTIONS else 0

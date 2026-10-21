@@ -8,9 +8,10 @@ const MAX_WIDTH := 980.0
 const PAD_LEFT := 0.16
 const PAD_RIGHT := 0.16
 const PAD_TOP := 0.26
-const PAD_BOTTOM := 0.58
+const PAD_BOTTOM := 0.61
 const TITLE_FONT_SIZE := 72
 const TITLE_H := 86.0
+const TITLE_LETTER_SPACING := 4
 const LEVEL_FONT_SIZE := 62
 const LEVEL_H := 78.0
 const STAR_H := 72.0
@@ -29,7 +30,7 @@ const BUTTON_ICON_SEP := 8.0
 const CONTINUE_FONT_SIZE := 40
 const V_SEP := 16.0
 const BODY_GAP_MIN := 28.0
-const BUTTON_SEP := 16.0
+const BUTTON_SEP := 24.0
 const AD_LABEL := "x2 (ver Ad)"
 
 static func texture_aspect() -> float:

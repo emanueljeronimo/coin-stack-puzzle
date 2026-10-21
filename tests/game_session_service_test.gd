@@ -73,7 +73,7 @@ func _test_parse_save_payload_fallbacks() -> void:
 		"next_free_slot_unlock_level": 4,
 		"temp_slot_actions_remaining": 0,
 		"lives": 5,
-		"player_stars": 999,
+		"player_diamonds": 999,
 		"checkpoint_base_value": 5,
 		"gems": 10,
 	}
@@ -98,7 +98,7 @@ func _test_parse_save_payload_with_data() -> void:
 		"next_free_slot_unlock_level": 4,
 		"temp_slot_actions_remaining": 0,
 		"lives": 5,
-		"player_stars": 999,
+		"player_diamonds": 999,
 		"checkpoint_base_value": 5,
 	}
 	var parsed := GameSessionServiceScript.parse_save_payload({
@@ -118,8 +118,14 @@ func _test_parse_save_payload_with_data() -> void:
 	if int(parsed.get("temp_slot_actions_remaining", 1)) != 0:
 		_fail("parse_temp_actions_clamped", str(parsed))
 		return
-	if int(parsed.get("player_stars", 0)) != 1234:
+	if int(parsed.get("player_diamonds", 0)) != 1234:
 		_fail("parse_coins_alias", str(parsed))
+		return
+	var from_stars := GameSessionServiceScript.parse_save_payload({
+		"player_stars": 555,
+	}, defaults)
+	if int(from_stars.get("player_diamonds", 0)) != 555:
+		_fail("parse_stars_alias", str(from_stars))
 		return
 	if int(parsed.get("cycle_checkpoint_origin", 0)) != 20:
 		_fail("parse_cycle_origin", str(parsed))

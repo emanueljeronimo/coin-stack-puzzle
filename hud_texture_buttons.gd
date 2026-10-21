@@ -2,7 +2,6 @@ class_name HudTextureButtons
 extends RefCounted
 
 const LongButtonTexture := preload("res://Imagenes/boton-largo.png")
-const RoundButtonTexture := preload("res://Imagenes/boton-redondo.png")
 const PlayPastelButtonTexture := preload("res://Imagenes/boton-nuevo.png")
 const PlayButtonTexture := preload("res://Imagenes/boton-nuevo.png")
 const LogoFont := preload("res://Fonts/Chewy-Regular.ttf")
@@ -10,28 +9,32 @@ const GameLivesServiceScript := preload("res://game_lives_service.gd")
 const SlotOverlayBgScript := preload("res://slot_overlay_bg.gd")
 const UiThemeServiceScript := preload("res://ui_theme_service.gd")
 
-const PILL_GRAD_CELESTE := Color(0.62, 0.82, 0.97, 0.94)
-const PILL_GRAD_ROSA := Color(0.98, 0.68, 0.84, 0.94)
-const PILL_GRAD_VERDE := Color(0.66, 0.88, 0.68, 0.94)
+const PILL_GRAD_CELESTE := Color(0.72, 0.87, 0.98, 0.94)
+const PILL_GRAD_ROSA := Color(0.98, 0.76, 0.87, 0.94)
+const PILL_GRAD_VERDE := Color(0.74, 0.91, 0.76, 0.94)
 const PILL_BG_META := "pill_bg"
 const RAINBOW_BG_META := "rainbow_fill_bg"
 const RoundedClipShader = preload("res://rounded_clip.gdshader")
 
 const BTN_TEXT_COLOR := Color(0.88, 0.86, 0.83)
 const BTN_TEXT_OUTLINE := Color(0.22, 0.20, 0.24, 0.78)
-## Texto sobre chips crema (vidas, estrellas): verde oscuro legible sobre fondo claro.
+## Texto sobre chips crema (vidas, diamantes): verde oscuro legible sobre fondo claro.
 const CHIP_STAT_COLOR := Color(0.34, 0.48, 0.36)
 const CHIP_STAT_OUTLINE := Color(0.99, 0.98, 0.94, 0.75)
 const CHIP_STAT_OUTLINE_SIZE := 2
 const CHIP_STAT_FONT_SIZE := 33
-const ROUND_ICON_SIZE_RATIO := 0.58
 const LONG_CHIP_ICON_SIZE_RATIO := 0.52
 const LIFE_HEART_ICON_SIZE_RATIO := 1.12
 const LIFE_COUNT_COLOR := Color(0.98, 0.97, 0.94)
 const LIFE_COUNT_OUTLINE := Color(0.28, 0.10, 0.14, 0.92)
+const LIFE_UNLIMITED_GLYPH := "∞"
+const LIFE_UNLIMITED_COLOR := Color(0.06, 0.06, 0.08, 1.0)
+const LIFE_UNLIMITED_OUTLINE := Color(1.0, 1.0, 1.0, 0.96)
 ## El PNG llena el recuadro: el número va al centro del corazón.
 const LIFE_COUNT_TOP_RATIO := 0.18
 const LIFE_COUNT_BOTTOM_RATIO := 0.22
+## Sube el ∞ entero. Recortar top/bottom no lo mueve: el glifo se desborda igual.
+const LIFE_UNLIMITED_LIFT_RATIO := 0.12
 const RESOURCE_PILL_BG := Color(0.97, 0.94, 0.88, 0.98)
 const RESOURCE_PILL_SHADOW := Color(0.18, 0.12, 0.10, 0.22)
 const RESOURCE_TEXT := Color(0.16, 0.20, 0.34)
@@ -42,6 +45,13 @@ const RESOURCE_PILL_HEIGHT_RATIO := 0.66
 const RESOURCE_ICON_HEIGHT_RATIO := 1.18
 const RESOURCE_ICON_WIDTH_RATIO := 1.0
 const RESOURCE_ICON_HANG := 0.68
+const RESOURCE_VALUE_FONT_RATIO := 0.80
+const RESOURCE_VALUE_FONT_MIN := 22
+const RESOURCE_VALUE_FONT_MAX := 56
+const LIFE_COUNT_FONT_RATIO := 0.44
+const LIFE_COUNT_FONT_MAX := 46
+const LIFE_UNLIMITED_FONT_RATIO := 0.74
+const LIFE_UNLIMITED_FONT_MAX := 78
 const CANDY_TEXT := Color(0.98, 0.98, 0.96, 1.0)
 const CANDY_FILL_FALLBACK := Color(0.20, 0.76, 0.96, 1.0)
 
@@ -316,8 +326,8 @@ static func apply_gradient_pill_style(pill: Control, radius: int, pill_size: Vec
 static func theme_candy_button_colors() -> Dictionary:
 	var palette: Dictionary = GameState.get_ui_palette()
 	var fill: Color = palette.get("settings_btn_on", CANDY_FILL_FALLBACK)
-	fill.s = minf(1.0, fill.s * 1.40 + 0.10)
-	fill.v = clampf(fill.v * 0.92, 0.58, 0.86)
+	fill.s = minf(1.0, fill.s * 1.15)
+	fill.v = clampf(fill.v * 0.94, 0.66, 0.88)
 	fill.a = 1.0
 	var border := Color.from_hsv(fill.h, minf(1.0, fill.s + 0.12), clampf(fill.v * 0.34, 0.14, 0.28), 1.0)
 	return {"fill": fill, "border": border}
@@ -477,22 +487,69 @@ static func layout_life_heart_badge(
 	stack: Control,
 	count: Label,
 	size: float,
-	font_ratio: float = 0.36,
-	font_max: int = 38
+	font_ratio: float = LIFE_COUNT_FONT_RATIO,
+	font_max: int = LIFE_COUNT_FONT_MAX
 ) -> void:
 	if stack != null:
 		stack.custom_minimum_size = Vector2(size, size)
 		stack.size = Vector2(size, size)
 	if count != null:
-		count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		count.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		count.offset_left = 0.0
-		count.offset_right = 0.0
-		count.offset_top = size * LIFE_COUNT_TOP_RATIO
-		count.offset_bottom = -size * LIFE_COUNT_BOTTOM_RATIO
-		count.clip_text = false
-		count.add_theme_constant_override("outline_size", 4)
-		count.add_theme_font_size_override("font_size", int(clampf(size * font_ratio, 16.0, float(font_max))))
+		count.set_meta("heart_size", size)
+		apply_life_count_style(count, size, font_ratio, font_max)
+
+
+static func is_unlimited_life_text(text: String) -> bool:
+	return text == LIFE_UNLIMITED_GLYPH
+
+
+static func apply_life_count_style(
+	count: Label,
+	size: float,
+	font_ratio: float = LIFE_COUNT_FONT_RATIO,
+	font_max: int = LIFE_COUNT_FONT_MAX
+) -> void:
+	if count == null:
+		return
+	var unlimited: bool = is_unlimited_life_text(count.text)
+	count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	count.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	count.anchor_left = 0.0
+	count.anchor_top = 0.0
+	count.anchor_right = 1.0
+	count.anchor_bottom = 1.0
+	count.offset_left = 0.0
+	count.offset_right = 0.0
+	count.clip_text = false
+	if unlimited:
+		var lift: float = size * LIFE_UNLIMITED_LIFT_RATIO
+		count.offset_top = -lift
+		count.offset_bottom = -lift
+		count.add_theme_color_override("font_color", LIFE_UNLIMITED_COLOR)
+		count.add_theme_color_override("font_outline_color", LIFE_UNLIMITED_OUTLINE)
+		count.add_theme_constant_override("outline_size", 6)
+		count.add_theme_font_size_override(
+			"font_size",
+			int(clampf(size * LIFE_UNLIMITED_FONT_RATIO, 22.0, float(LIFE_UNLIMITED_FONT_MAX)))
+		)
+		return
+	count.offset_top = size * LIFE_COUNT_TOP_RATIO
+	count.offset_bottom = -size * LIFE_COUNT_BOTTOM_RATIO
+	count.add_theme_color_override("font_color", LIFE_COUNT_COLOR)
+	count.add_theme_color_override("font_outline_color", LIFE_COUNT_OUTLINE)
+	count.add_theme_constant_override("outline_size", 4)
+	count.add_theme_font_size_override("font_size", int(clampf(size * font_ratio, 16.0, float(font_max))))
+
+
+static func set_life_count_text(count: Label, text: String) -> void:
+	if count == null:
+		return
+	count.text = text
+	var size: float = float(count.get_meta("heart_size", 0.0))
+	if size <= 1.0 and count.get_parent() is Control:
+		size = (count.get_parent() as Control).size.y
+	if size > 1.0:
+		apply_life_count_style(count, size)
+
 
 static func create_resource_chip(icon_texture: Texture2D, with_icon_count: bool) -> Dictionary:
 	var root := Control.new()
@@ -610,8 +667,8 @@ static func layout_resource_chip(
 	chip: Dictionary,
 	pill_pos: Vector2,
 	pill_size: Vector2,
-	count_font_ratio: float = 0.36,
-	count_font_max: int = 38,
+	count_font_ratio: float = LIFE_COUNT_FONT_RATIO,
+	count_font_max: int = LIFE_COUNT_FONT_MAX,
 	pill_height_ratio: float = RESOURCE_PILL_HEIGHT_RATIO,
 	icon_height_ratio: float = RESOURCE_ICON_HEIGHT_RATIO,
 	icon_width_ratio: float = RESOURCE_ICON_WIDTH_RATIO
@@ -686,7 +743,11 @@ static func layout_resource_chip(
 		value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		value.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		style_candy_label(value, ui_scale)
-		var desired_font := int(clampf(pill_h * 0.60, 18.0, 42.0))
+		var desired_font := int(clampf(
+			pill_h * RESOURCE_VALUE_FONT_RATIO,
+			float(RESOURCE_VALUE_FONT_MIN),
+			float(RESOURCE_VALUE_FONT_MAX)
+		))
 		value.set_meta("fit_max_w", text_w)
 		value.set_meta("fit_desired", desired_font)
 		fit_resource_value_label(value)
@@ -709,7 +770,7 @@ static func fit_resource_value_label(label: Label) -> void:
 		sample = "000.000"
 	var outline := float(label.get_theme_constant("outline_size"))
 	var font_size := desired
-	var min_size := 14
+	var min_size := RESOURCE_VALUE_FONT_MIN
 	while font_size > min_size:
 		var measured := font.get_string_size(sample, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
 		if measured.x + outline * 2.0 + 2.0 <= max_w:
@@ -738,31 +799,6 @@ static func create_button_label(text: String, font_size: int) -> Label:
 	lbl.add_theme_color_override("font_outline_color", BTN_TEXT_OUTLINE)
 	lbl.add_theme_constant_override("outline_size", 4)
 	return lbl
-
-static func create_round_icon(icon_texture: Texture2D) -> TextureButton:
-	var btn := create_base(RoundButtonTexture)
-	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	btn.add_child(center)
-
-	var icon := TextureRect.new()
-	icon.texture = icon_texture
-	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	center.add_child(icon)
-
-	btn.set_meta("chip_icon", icon)
-	return btn
-
-static func create_round_symbol(symbol: String, font_size: int) -> TextureButton:
-	var btn := create_base(RoundButtonTexture)
-	var lbl := create_button_label(symbol, font_size)
-	lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
-	btn.add_child(lbl)
-	btn.set_meta("chip_label", lbl)
-	return btn
 
 static func create_long_icon_text(icon_texture: Texture2D, text: String, font_size: int = CHIP_STAT_FONT_SIZE) -> TextureButton:
 	var btn := create_base(LongButtonTexture)
@@ -813,7 +849,7 @@ static func apply_content_layout(btn: TextureButton, size: Vector2, icon_size_ra
 		return
 	var ratio := icon_size_ratio
 	if ratio < 0.0:
-		ratio = LONG_CHIP_ICON_SIZE_RATIO if btn.has_meta("chip_label") else ROUND_ICON_SIZE_RATIO
+		ratio = LONG_CHIP_ICON_SIZE_RATIO
 	var icon_size := size.y * ratio
 	icon.custom_minimum_size = Vector2(icon_size, icon_size)
 

@@ -10,12 +10,12 @@ func _initialize() -> void:
 
 func _run() -> void:
 	print("=== shop_catalog_service test ===")
-	_test_star_packs()
+	_test_diamond_packs()
 	_test_formatters()
 	_test_confirm_copy()
 	_test_combo_pack()
 	_test_resource_boosters()
-	_test_grant_stars()
+	_test_grant_diamonds()
 	print("=== RESULT: %d passed, %d failed ===" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -27,19 +27,19 @@ func _fail(name: String, detail: String = "") -> void:
 	_failed += 1
 	print("FAIL: ", name, (" - " + detail) if not detail.is_empty() else "")
 
-func _test_star_packs() -> void:
-	var packs: Array = ShopCatalogServiceScript.star_packs()
+func _test_diamond_packs() -> void:
+	var packs: Array = ShopCatalogServiceScript.diamond_packs()
 	if packs.size() != 5:
 		_fail("pack_count", str(packs.size()))
 		return
-	var fav := ShopCatalogServiceScript.pack_by_id("stars_2500")
+	var fav := ShopCatalogServiceScript.pack_by_id("diamonds_2500")
 	if fav.is_empty() or int(fav.get("amount", 0)) != 2500 or not bool(fav.get("favorite", false)):
 		_fail("favorite_pack", str(fav))
 		return
 	if not ShopCatalogServiceScript.pack_by_id("missing").is_empty():
 		_fail("unknown_pack")
 		return
-	_ok("star_packs")
+	_ok("diamond_packs")
 
 func _test_formatters() -> void:
 	if ShopCatalogServiceScript.format_amount(500) != "500":
@@ -79,7 +79,7 @@ func _test_combo_pack() -> void:
 	if pack.is_empty() or not ShopCatalogServiceScript.is_combo_pack(pack):
 		_fail("combo_lookup", str(pack))
 		return
-	if int(pack.get("stars", 0)) != 2500 or int(pack.get("unlimited_lives_sec", 0)) != 3600:
+	if int(pack.get("diamonds", 0)) != 2500 or int(pack.get("unlimited_lives_sec", 0)) != 3600:
 		_fail("combo_contents", str(pack))
 		return
 	if int(pack.get("boosters", 0)) != 3 or int(pack.get("temp_slots", 0)) != 1:
@@ -89,18 +89,18 @@ func _test_combo_pack() -> void:
 		_fail("combo_confirm", ShopCatalogServiceScript.confirm_copy_for_pack(pack))
 		return
 	var lines: PackedStringArray = ShopCatalogServiceScript.combo_line_texts(pack)
-	if lines.size() != 4 or lines[1] != "1 hora de vidas ilimitadas" or lines[3] != "1 ranura temporal":
+	if lines.size() != 4 or lines[0] != "2.500 diamantes" or lines[1] != "1 hora de vidas ilimitadas" or lines[3] != "1 ranura temporal":
 		_fail("combo_lines", str(lines))
 		return
 	var icons: PackedStringArray = ShopCatalogServiceScript.confirm_icon_keys(pack)
-	if icons.size() != 3 or icons[0] != "stars" or icons[1] != "lives" or icons[2] != "boosters":
+	if icons.size() != 3 or icons[0] != "diamonds" or icons[1] != "lives" or icons[2] != "boosters":
 		_fail("combo_confirm_icons", str(icons))
 		return
-	var star_icons: PackedStringArray = ShopCatalogServiceScript.confirm_icon_keys(
-		ShopCatalogServiceScript.pack_by_id("stars_500")
+	var diamond_icons: PackedStringArray = ShopCatalogServiceScript.confirm_icon_keys(
+		ShopCatalogServiceScript.pack_by_id("diamonds_500")
 	)
-	if star_icons.size() != 1 or star_icons[0] != "stars":
-		_fail("star_confirm_icons", str(star_icons))
+	if diamond_icons.size() != 1 or diamond_icons[0] != "diamonds":
+		_fail("diamond_confirm_icons", str(diamond_icons))
 		return
 	var mixed: Dictionary = ShopCatalogServiceScript.apply_mix_uses({"mix": 1, "hammer": 0}, 3)
 	if int(mixed.get("mix", 0)) != 4:
@@ -117,17 +117,17 @@ func _test_resource_boosters() -> void:
 	if not ShopCatalogServiceScript.is_resource_booster(mix):
 		_fail("resource_kind", str(mix))
 		return
-	if str(mix.get("booster_type", "")) != "mix" or int(mix.get("star_cost", 0)) != 200:
+	if str(mix.get("booster_type", "")) != "mix" or int(mix.get("diamond_cost", 0)) != 200:
 		_fail("resource_mix", str(mix))
 		return
 	var mix_pack: Dictionary = ShopCatalogServiceScript.pack_by_id("res_mix_pack")
-	if int(mix_pack.get("amount", 0)) != 3 or int(mix_pack.get("star_cost", 0)) != 500:
+	if int(mix_pack.get("amount", 0)) != 3 or int(mix_pack.get("diamond_cost", 0)) != 500:
 		_fail("resource_mix_pack", str(mix_pack))
 		return
-	if int(ShopCatalogServiceScript.pack_by_id("res_hammer_pack").get("star_cost", 0)) != 500:
+	if int(ShopCatalogServiceScript.pack_by_id("res_hammer_pack").get("diamond_cost", 0)) != 500:
 		_fail("resource_hammer_pack_cost")
 		return
-	if int(ShopCatalogServiceScript.pack_by_id("res_glove").get("star_cost", 0)) != 200:
+	if int(ShopCatalogServiceScript.pack_by_id("res_glove").get("diamond_cost", 0)) != 200:
 		_fail("resource_glove_cost")
 		return
 	if ShopCatalogServiceScript.confirm_copy_for_pack(mix) != "¿Comprar Mezclar por 200?":
@@ -137,7 +137,7 @@ func _test_resource_boosters() -> void:
 		_fail("resource_pack_confirm", ShopCatalogServiceScript.confirm_copy_for_pack(mix_pack))
 		return
 	var icons: PackedStringArray = ShopCatalogServiceScript.confirm_icon_keys(mix)
-	if icons.size() != 2 or icons[0] != "mix" or icons[1] != "stars":
+	if icons.size() != 2 or icons[0] != "mix" or icons[1] != "diamonds":
 		_fail("resource_icons", str(icons))
 		return
 	var types: PackedStringArray = ShopCatalogServiceScript.resource_column_types()
@@ -172,11 +172,11 @@ func _test_resource_boosters() -> void:
 	if not ShopCatalogServiceScript.can_buy_resource(ShopCatalogServiceScript.pack_by_id("res_glove"), 14):
 		_fail("glove_unlocked_at_14")
 		return
-	var spent: Dictionary = ShopCatalogServiceScript.spend_stars(250, 200)
-	if not bool(spent.get("ok", false)) or int(spent.get("player_stars", 0)) != 50:
+	var spent: Dictionary = ShopCatalogServiceScript.spend_diamonds(250, 200)
+	if not bool(spent.get("ok", false)) or int(spent.get("player_diamonds", 0)) != 50:
 		_fail("spend_ok", str(spent))
 		return
-	var poor: Dictionary = ShopCatalogServiceScript.spend_stars(100, 200)
+	var poor: Dictionary = ShopCatalogServiceScript.spend_diamonds(100, 200)
 	if bool(poor.get("ok", true)):
 		_fail("spend_poor", str(poor))
 		return
@@ -186,13 +186,13 @@ func _test_resource_boosters() -> void:
 		return
 	_ok("resource_boosters")
 
-func _test_grant_stars() -> void:
-	var bad: Dictionary = ShopCatalogServiceScript.grant_stars(10, 0)
+func _test_grant_diamonds() -> void:
+	var bad: Dictionary = ShopCatalogServiceScript.grant_diamonds(10, 0)
 	if bool(bad.get("ok", true)):
 		_fail("grant_zero", str(bad))
 		return
-	var ok: Dictionary = ShopCatalogServiceScript.grant_stars(100, 500)
-	if not bool(ok.get("ok", false)) or int(ok.get("player_stars", 0)) != 600:
+	var ok: Dictionary = ShopCatalogServiceScript.grant_diamonds(100, 500)
+	if not bool(ok.get("ok", false)) or int(ok.get("player_diamonds", 0)) != 600:
 		_fail("grant_500", str(ok))
 		return
-	_ok("grant_stars")
+	_ok("grant_diamonds")

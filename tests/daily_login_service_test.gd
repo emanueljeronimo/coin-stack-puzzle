@@ -93,9 +93,9 @@ func _test_slots_and_rotation() -> void:
 	if DailyLoginServiceScript.slot_label(free_slot) != "70":
 		_fail("free_label", DailyLoginServiceScript.slot_label(free_slot))
 		return
-	var ad_stars: Dictionary = slots[1] as Dictionary
-	if int(ad_stars.get("amount", 0)) != 100 or not bool(ad_stars.get("requires_ad", false)):
-		_fail("ad_stars", str(ad_stars))
+	var ad_diamonds: Dictionary = slots[1] as Dictionary
+	if int(ad_diamonds.get("amount", 0)) != 100 or not bool(ad_diamonds.get("requires_ad", false)):
+		_fail("ad_diamonds", str(ad_diamonds))
 		return
 	var lives: Dictionary = slots[3] as Dictionary
 	if int(lives.get("seconds", 0)) != 900:

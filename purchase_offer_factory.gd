@@ -1,7 +1,7 @@
 class_name PurchaseOfferFactory
 extends RefCounted
 
-static func build_offer_button(amount: int, cost: int, star_icon_tex: Texture2D, label_factory: Callable, on_pressed: Callable) -> Dictionary:
+static func build_offer_button(amount: int, cost: int, diamond_icon_tex: Texture2D, label_factory: Callable, on_pressed: Callable) -> Dictionary:
 	var btn := Button.new()
 	btn.focus_mode = Control.FOCUS_NONE
 	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
@@ -21,12 +21,12 @@ static func build_offer_button(amount: int, cost: int, star_icon_tex: Texture2D,
 	var qty_label: Label = label_factory.call("x%d" % amount, 52, Color(0.95, 0.98, 0.92))
 	content.add_child(qty_label)
 
-	var star_icon := TextureRect.new()
-	star_icon.texture = star_icon_tex
-	star_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	star_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	star_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	content.add_child(star_icon)
+	var diamond_icon := TextureRect.new()
+	diamond_icon.texture = diamond_icon_tex
+	diamond_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	diamond_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	diamond_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	content.add_child(diamond_icon)
 
 	var cost_label: Label = label_factory.call(str(cost), 56, Color(0.95, 0.98, 0.92))
 	content.add_child(cost_label)
@@ -36,6 +36,6 @@ static func build_offer_button(amount: int, cost: int, star_icon_tex: Texture2D,
 		"center": center,
 		"content": content,
 		"qty_label": qty_label,
-		"star_icon": star_icon,
+		"diamond_icon": diamond_icon,
 		"cost_label": cost_label,
 	}

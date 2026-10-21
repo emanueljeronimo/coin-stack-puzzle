@@ -3,8 +3,8 @@ extends RefCounted
 const GameBoosterServiceScript = preload("res://game_booster_service.gd")
 
 const SLOT_COUNT := 4
-const FREE_STARS := 70
-const AD_STARS := 100
+const FREE_DIAMONDS := 70
+const AD_DIAMONDS := 100
 const UNLIMITED_LIVES_SEC := 15 * 60
 const BOOSTER_TYPES: PackedStringArray = ["mix", "hammer", "glove"]
 
@@ -95,16 +95,16 @@ static func slot_defs(day_key: String, player_level: int = 9999) -> Array:
 	var booster_type: String = booster_for_day(day_key, player_level)
 	return [
 		{
-			"id": "free_stars",
-			"kind": "stars",
-			"amount": FREE_STARS,
+			"id": "free_diamonds",
+			"kind": "diamonds",
+			"amount": FREE_DIAMONDS,
 			"button": "Gratis",
 			"requires_ad": false,
 		},
 		{
-			"id": "ad_stars",
-			"kind": "stars",
-			"amount": AD_STARS,
+			"id": "ad_diamonds",
+			"kind": "diamonds",
+			"amount": AD_DIAMONDS,
 			"button": "Ver anuncio",
 			"requires_ad": true,
 		},
@@ -127,7 +127,7 @@ static func slot_defs(day_key: String, player_level: int = 9999) -> Array:
 
 static func slot_label(slot: Dictionary) -> String:
 	var kind: String = str(slot.get("kind", ""))
-	if kind == "stars":
+	if kind == "diamonds":
 		return str(int(slot.get("amount", 0)))
 	if kind == "booster":
 		return booster_title(str(slot.get("booster_type", "mix")))

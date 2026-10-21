@@ -24,7 +24,7 @@ func _fail(name: String, detail: String = "") -> void:
 	print("FAIL: ", name, (" - " + detail) if not detail.is_empty() else "")
 
 func _zero_arg_save() -> Dictionary:
-	return {"checkpoint_level": 7, "player_stars": 42}
+	return {"checkpoint_level": 7, "player_diamonds": 42}
 
 func _payload_save(payload: Dictionary) -> Dictionary:
 	var out := payload.duplicate(true)

@@ -42,9 +42,8 @@ const RainbowLabelShader = preload("res://rainbow_label.gdshader")
 const MixIconTexture = preload("res://Imagenes/icono-mezclar.png")
 const HammerIconTexture = preload("res://Imagenes/icono-martillo.png")
 const GloveIconTexture = preload("res://Imagenes/icono-mano.png")
-const DiamondIconTexture = preload("res://Imagenes/icono-estrella.png")
+const DiamondIconTexture = preload("res://Imagenes/icono-diamante.png")
 const LifeIconTexture = preload("res://Imagenes/icono-vidas.png")
-const StarIconTexture = preload("res://Imagenes/icono-estrella.png")
 const LevelUpStarsLeftTexture = preload("res://Imagenes/tres-estrellas-izq.png")
 const LevelUpStarsRightTexture = preload("res://Imagenes/tres-estrellas-der.png")
 const HomeIconTexture = preload("res://Imagenes/icono-home.png")
@@ -102,16 +101,16 @@ const BOARD_SLOT_BORDER_SELECTED := Color(0.42, 0.72, 0.98, 0.95)
 const BOARD_SLOT_SELECTED_FILL := Color(0.62, 0.86, 1.0, 0.22)
 const BOARD_SLOT_BORDER_WIDTH := 3
 const BOARD_SLOT_INSET := 3.0
-## Chips superiores (home, vidas, estrellas, settings).
+## Chips superiores (home, vidas, diamantes, settings).
 const HUD_SIZE_MULTIPLIER = 1.0
 const HUD_CHIP_HEIGHT = 50.0
 const HUD_CORNER_SIZE = 70.0
 const HUD_CHIP_STAT_W = 136.0
-## Pastillas de vidas/estrellas: cápsula baja, más larga que alta.
+## Pastillas de vidas/diamantes: cápsula baja, más larga que alta.
 const HUD_RESOURCE_PILL_H_RATIO := 0.62
 const HUD_LIFE_ICON_H_RATIO := 1.38
-const HUD_MONEY_ICON_H_RATIO := 1.48
-const HUD_MONEY_ICON_W_RATIO := 1.16
+const HUD_MONEY_ICON_H_RATIO := 1.26
+const HUD_MONEY_ICON_W_RATIO := 1.06
 const HUD_BOARD_STAT_FONT_SIZE = 30
 const HUD_BOARD_LONG_ICON_RATIO = 0.56
 const HUD_CHIP_GAP = 26.0
@@ -168,9 +167,9 @@ const AD_FOOTER_MIN_HEIGHT = 120.0
 const AD_FOOTER_MAX_HEIGHT = 200.0
 const BOOSTER_TYPES := ["hammer", "mix", "glove"]
 const BOOSTER_INITIAL_USES := 3
-const BOOSTER_COST_STARS := 200
+const BOOSTER_COST_DIAMONDS := 200
 const BOOSTER_PACK_AMOUNT := 3
-const BOOSTER_PACK_COST_STARS := 500
+const BOOSTER_PACK_COST_DIAMONDS := 500
 ## Nivel de checkpoint para desbloquear cada Booster (ver barra de progreso).
 const BOOSTER_UNLOCK_LEVEL := {
 	"mix": 9,
@@ -178,7 +177,7 @@ const BOOSTER_UNLOCK_LEVEL := {
 	"glove": 14,
 }
 const BOOSTER_LOCKED_MODULATE := Color(0.70, 0.70, 0.70, 0.82)
-const TEMP_SLOT_COST_STARS := 200
+const TEMP_SLOT_COST_DIAMONDS := 200
 const TEMP_SLOT_DURATION_SEC := 60.0
 const TEMP_LOCKED_PANEL_GREEN := Color(0.14, 0.38, 0.22, 1.0)
 const SLOT_OVERLAY_GRAD_CELESTE := Color(0.62, 0.82, 0.97, 0.94)
@@ -186,7 +185,7 @@ const SLOT_OVERLAY_GRAD_ROSA := Color(0.98, 0.68, 0.84, 0.94)
 const SLOT_OVERLAY_GRAD_VERDE := Color(0.66, 0.88, 0.68, 0.94)
 ## Ranura temporal: celda arriba a la derecha (fila 0, col 4 → índice 4). Bloqueada hasta pagar.
 const TEMP_SLOT_BOARD_INDEX := 4
-## Compra opcional al lado de la última pila habilitada (estrellas mock); precio se duplica en cada compra.
+## Compra opcional al lado de la última pila habilitada (diamantes mock); precio se duplica en cada compra.
 const ADJACENT_EXTRA_SLOT_BASE_PRICE := 600
 const INITIAL_PERMANENT_STACKS := 5
 ## Al reiniciar ciclo (fichas 15, 25, 35…) el tablero vuelve a esta cantidad de ranuras (GDD: 5).
@@ -331,7 +330,7 @@ var booster_unlock_granted := {
 }
 var undo_snapshot: Dictionary = {}
 ## Mock para compras de ranura extra adyacente (no es la ranura temporal).
-var player_stars: int = 1000000
+var player_diamonds: int = 1000000
 var adjacent_slot_next_price: int = ADJACENT_EXTRA_SLOT_BASE_PRICE
 var next_free_slot_unlock_level: int = 1
 ## Celda del tablero (0..14) donde se muestra la oferta; -1 si no aplica.
@@ -356,7 +355,7 @@ var temp_slot_locked_cost_row: HBoxContainer = null
 var temp_slot_locked_cost_icon: TextureRect = null
 ## Cuenta regresiva solo tras comprar; pequeña, en el borde superior derecho.
 var temp_slot_timer_label: Label = null
-## Oferta de ranura extra (panel crema como temporal; precio = número + icono-estrella).
+## Oferta de ranura extra (panel crema como temporal; precio = número + icono de diamante).
 var adjacent_slot_offer_root: Control = null
 var adjacent_slot_offer_panel: TextureRect = null
 var adjacent_slot_offer_hairline: Panel = null
@@ -365,8 +364,8 @@ var adjacent_slot_offer_lbl_lock: Label = null
 var adjacent_slot_offer_price_row: HBoxContainer = null
 var adjacent_slot_offer_lbl_cost: Label = null
 var adjacent_slot_offer_cost_icon: TextureRect = null
-var adjacent_slot_star_error_label: Label = null
-var adjacent_slot_star_error_tween: Tween = null
+var adjacent_slot_diamond_error_label: Label = null
+var adjacent_slot_diamond_error_tween: Tween = null
 ## Cartel confirmar compra de ranura temporal / extra.
 var slot_buy_overlay: ColorRect = null
 var slot_buy_card: Panel = null
@@ -378,11 +377,11 @@ var slot_buy_accept_button: Control = null
 var slot_buy_cancel_button: Control = null
 var pending_slot_buy_kind: String = ""
 var _slot_buy_opened_at_msec: int = 0
-var stars_chip_shadow: Panel = null
-var stars_chip: Control = null
-var stars_chip_icon: TextureRect = null
-var stars_chip_label: Label = null
-var stars_chip_parts: Dictionary = {}
+var diamonds_chip_shadow: Panel = null
+var diamonds_chip: Control = null
+var diamonds_chip_icon: TextureRect = null
+var diamonds_chip_label: Label = null
+var diamonds_chip_parts: Dictionary = {}
 var purchase_overlay: ColorRect = null
 var purchase_card: Panel = null
 var purchase_title_label: Label = null
@@ -393,13 +392,13 @@ var purchase_buy_button: Button = null
 var purchase_buy_center: CenterContainer = null
 var purchase_buy_content: HBoxContainer = null
 var purchase_buy_qty_label: Label = null
-var purchase_buy_star_icon: TextureRect = null
+var purchase_buy_diamond_icon: TextureRect = null
 var purchase_buy_cost_label: Label = null
 var purchase_buy_pack_button: Button = null
 var purchase_buy_pack_center: CenterContainer = null
 var purchase_buy_pack_content: HBoxContainer = null
 var purchase_buy_pack_qty_label: Label = null
-var purchase_buy_pack_star_icon: TextureRect = null
+var purchase_buy_pack_diamond_icon: TextureRect = null
 var purchase_buy_pack_cost_label: Label = null
 var purchase_close_button: Button = null
 var pending_purchase_type: String = ""
@@ -429,7 +428,7 @@ var level_up_claim_button: Control = null
 var level_up_ad_button: Control = null
 var level_up_continue_button: Control = null
 var level_up_burst: Control = null
-var _level_up_stars_claimed := false
+var _level_up_diamonds_claimed := false
 var _level_up_show_reward := false
 ## Cartel al desbloquear un Booster.
 var booster_unlock_overlay: ColorRect = null
@@ -470,7 +469,7 @@ func _ready() -> void:
 		setup_board()
 	else:
 		restore_checkpoint()
-	update_stars_display()
+	update_diamonds_display()
 	update_life_display()
 	_apply_theme_ui_colors()
 	save_game()
@@ -1003,7 +1002,7 @@ func save_game() -> void:
 	runtime_snapshot = capture_board_snapshot()
 	var session := collect_save_dict()
 	session["level"] = checkpoint_level
-	session["coins"] = player_stars
+	session["coins"] = player_diamonds
 	var pos := SaveManager.get_position()
 	session["position"] = {"x": pos.x, "y": pos.y}
 	SaveManager.merge_session_data(session)
@@ -1036,7 +1035,7 @@ func collect_save_dict(_payload: Dictionary = {}) -> Dictionary:
 		"next_free_slot_unlock_level": next_free_slot_unlock_level,
 		"temp_slot_actions_remaining": temp_slot_actions_remaining,
 		"lives": GameState.lives,
-		"player_stars": player_stars,
+		"player_diamonds": player_diamonds,
 	})
 
 func apply_save_dict(data: Dictionary) -> void:
@@ -1055,7 +1054,7 @@ func apply_save_dict(data: Dictionary) -> void:
 		"next_free_slot_unlock_level": GameRulesScript.initial_free_slot_unlock_level(get_cycle_base_level()),
 		"temp_slot_actions_remaining": temp_slot_actions_remaining,
 		"lives": lives,
-		"player_stars": player_stars,
+		"player_diamonds": player_diamonds,
 		"checkpoint_base_value": CHECKPOINT_BASE_VALUE,
 	})
 	checkpoint_level = int(parsed.get("checkpoint_level", checkpoint_level))
@@ -1069,7 +1068,7 @@ func apply_save_dict(data: Dictionary) -> void:
 	next_free_slot_unlock_level = int(parsed.get("next_free_slot_unlock_level", next_free_slot_unlock_level))
 	temp_slot_actions_remaining = int(parsed.get("temp_slot_actions_remaining", temp_slot_actions_remaining))
 	lives = GameState.lives
-	player_stars = int(parsed.get("player_stars", player_stars))
+	player_diamonds = int(parsed.get("player_diamonds", player_diamonds))
 	runtime_snapshot = (parsed.get("runtime_snapshot", {}) as Dictionary).duplicate(true)
 	if not data.has("roll_value_floor") and not checkpoint_snapshot.has("roll_value_floor"):
 		var milestone := get_cycle_base_level()
@@ -1092,7 +1091,7 @@ func _input(event: InputEvent) -> void:
 	if MainInputRouterScript.is_left_click(event):
 		if MainInputRouterScript.is_click_consumed_by_controls(
 			event.position,
-			[home_chip, shop_chip, settings_chip, life_chip, stars_chip]
+			[home_chip, shop_chip, settings_chip, life_chip, diamonds_chip]
 		):
 			return
 	if board_locked:
@@ -1329,13 +1328,13 @@ func _refresh_tutorial_overlay() -> void:
 
 func _sync_player_resources_from_game_state() -> void:
 	lives = GameState.lives
-	player_stars = GameState.player_stars
+	player_diamonds = GameState.player_diamonds
 	checkpoint_level = maxi(1, GameState.player_level)
 	if GameState.checkpoint_snapshot is Dictionary and not GameState.checkpoint_snapshot.is_empty():
 		checkpoint_snapshot = GameState.checkpoint_snapshot.duplicate(true)
 
 func _push_player_resources_to_game_state() -> void:
-	GameState.player_stars = player_stars
+	GameState.player_diamonds = player_diamonds
 	GameState.player_level = checkpoint_level
 	GameState.checkpoint_snapshot = checkpoint_snapshot.duplicate(true)
 
@@ -1728,37 +1727,37 @@ func refresh_all_stack_layout() -> void:
 func try_purchase_temp_slot() -> void:
 	_show_slot_buy_confirm("temp")
 
-func _try_open_temp_slot(cost_stars: int) -> bool:
+func _try_open_temp_slot(cost_diamonds: int) -> bool:
 	var request := TempSlotPurchaseServiceScript.build_purchase_request(
-		player_stars if cost_stars > 0 else maxi(player_stars, cost_stars),
+		player_diamonds if cost_diamonds > 0 else maxi(player_diamonds, cost_diamonds),
 		temp_slot_bonus_active,
 		has_active_temp_stack()
 	)
 	var rules := TempSlotPurchaseServiceScript.build_rules(
-		maxi(0, cost_stars),
+		maxi(0, cost_diamonds),
 		TEMP_SLOT_DURATION_SEC,
 		GameRulesScript.TEMP_SLOT_ACTIONS_TO_CLOSE if GameRulesScript.TEMP_SLOT_CLOSE_BY_ACTIONS else 0
 	)
 	var economy := GameEconomyServiceScript.purchase_temp_slot(request, rules)
 	if not bool(economy.get("ok", false)):
-		if cost_stars > 0:
+		if cost_diamonds > 0:
 			var reason := str(economy.get("reason", ""))
 			var message := TempSlotPurchaseServiceScript.message_for_rejection(
 				reason,
-				int(economy.get("required", TEMP_SLOT_COST_STARS)),
-				int(economy.get("current", player_stars))
+				int(economy.get("required", TEMP_SLOT_COST_DIAMONDS)),
+				int(economy.get("current", player_diamonds))
 			)
 			if not message.is_empty():
 				print(message)
 		return false
 
 	if temp_slot_bonus_active and has_active_temp_stack():
-		if cost_stars > 0:
+		if cost_diamonds > 0:
 			print("Ya tenés una ranura temporal activa.")
 		return false
-	if cost_stars > 0:
-		player_stars = int(economy.get("player_stars", player_stars))
-		update_stars_display()
+	if cost_diamonds > 0:
+		player_diamonds = int(economy.get("player_diamonds", player_diamonds))
+		update_diamonds_display()
 	_clear_undo_snapshot()
 	temp_slot_bonus_active = bool(economy.get("temp_slot_bonus_active", true))
 	append_new_stack_node()
@@ -3070,47 +3069,47 @@ func build_adjacent_slot_offer_ui() -> void:
 	adjacent_slot_offer_price_row.add_child(adjacent_slot_offer_cost_icon)
 
 
-func layout_adjacent_slot_star_error_label() -> void:
-	if adjacent_slot_star_error_label == null or not adjacent_slot_star_error_label.visible:
+func layout_adjacent_slot_diamond_error_label() -> void:
+	if adjacent_slot_diamond_error_label == null or not adjacent_slot_diamond_error_label.visible:
 		return
 	var gr := get_adjacent_extra_slot_offer_global_rect()
 	if gr.size == Vector2.ZERO:
 		return
 	var sc := get_layout_scale()
 	var fs := int(clampf(12.5 * sc, 11.0, 17.0))
-	adjacent_slot_star_error_label.add_theme_font_size_override("font_size", fs)
-	adjacent_slot_star_error_label.add_theme_color_override("font_color", Color.WHITE)
-	adjacent_slot_star_error_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	adjacent_slot_star_error_label.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
-	adjacent_slot_star_error_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	adjacent_slot_star_error_label.custom_minimum_size = Vector2(gr.size.x - 8.0 * sc, 0)
-	adjacent_slot_star_error_label.reset_size()
-	var sz := adjacent_slot_star_error_label.get_combined_minimum_size()
-	adjacent_slot_star_error_label.size = sz
+	adjacent_slot_diamond_error_label.add_theme_font_size_override("font_size", fs)
+	adjacent_slot_diamond_error_label.add_theme_color_override("font_color", Color.WHITE)
+	adjacent_slot_diamond_error_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	adjacent_slot_diamond_error_label.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+	adjacent_slot_diamond_error_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	adjacent_slot_diamond_error_label.custom_minimum_size = Vector2(gr.size.x - 8.0 * sc, 0)
+	adjacent_slot_diamond_error_label.reset_size()
+	var sz := adjacent_slot_diamond_error_label.get_combined_minimum_size()
+	adjacent_slot_diamond_error_label.size = sz
 	var pad := 6.0 * sc
-	adjacent_slot_star_error_label.global_position = Vector2(
+	adjacent_slot_diamond_error_label.global_position = Vector2(
 		gr.position.x + (gr.size.x - sz.x) * 0.5,
 		gr.position.y - sz.y - pad
 	)
 
 
-func show_adjacent_slot_insufficient_stars_message() -> void:
-	if adjacent_slot_star_error_label == null:
+func show_adjacent_slot_insufficient_diamonds_message() -> void:
+	if adjacent_slot_diamond_error_label == null:
 		return
-	if adjacent_slot_star_error_tween != null:
-		adjacent_slot_star_error_tween.kill()
-		adjacent_slot_star_error_tween = null
-	adjacent_slot_star_error_label.text = "No tienes suficientes estrellas"
-	adjacent_slot_star_error_label.modulate = Color.WHITE
-	adjacent_slot_star_error_label.visible = true
-	layout_adjacent_slot_star_error_label()
+	if adjacent_slot_diamond_error_tween != null:
+		adjacent_slot_diamond_error_tween.kill()
+		adjacent_slot_diamond_error_tween = null
+	adjacent_slot_diamond_error_label.text = "No tienes suficientes diamantes"
+	adjacent_slot_diamond_error_label.modulate = Color.WHITE
+	adjacent_slot_diamond_error_label.visible = true
+	layout_adjacent_slot_diamond_error_label()
 	var tw := create_tween()
-	adjacent_slot_star_error_tween = tw
-	tw.tween_property(adjacent_slot_star_error_label, "modulate", Color(1, 1, 1, 0), 2.0)
+	adjacent_slot_diamond_error_tween = tw
+	tw.tween_property(adjacent_slot_diamond_error_label, "modulate", Color(1, 1, 1, 0), 2.0)
 	tw.tween_callback(func() -> void:
-		if is_instance_valid(adjacent_slot_star_error_label):
-			adjacent_slot_star_error_label.visible = false
-			adjacent_slot_star_error_label.modulate = Color.WHITE
+		if is_instance_valid(adjacent_slot_diamond_error_label):
+			adjacent_slot_diamond_error_label.visible = false
+			adjacent_slot_diamond_error_label.modulate = Color.WHITE
 	)
 
 
@@ -3134,20 +3133,20 @@ func _execute_adjacent_slot_purchase() -> void:
 		MAX_PERMANENT_STACKS,
 		checkpoint_level,
 		get_adjacent_slot_free_unlock_level(),
-		player_stars,
+		player_diamonds,
 		adjacent_slot_next_price
 	)
 	var economy := GameEconomyServiceScript.purchase_adjacent_slot(request)
 	if not bool(economy.get("ok", false)):
-		if AdjacentSlotPurchaseServiceScript.is_insufficient_stars(str(economy.get("reason", ""))):
-			show_adjacent_slot_insufficient_stars_message()
+		if AdjacentSlotPurchaseServiceScript.is_insufficient_diamonds(str(economy.get("reason", ""))):
+			show_adjacent_slot_insufficient_diamonds_message()
 		return
 	if AdjacentSlotPurchaseServiceScript.is_free_unlock(str(economy.get("reason", ""))):
 		try_unlock_adjacent_slots_by_level()
 		_sync_slot_overlay_controls()
 		queue_redraw()
 		return
-	player_stars = int(economy.get("player_stars", player_stars))
+	player_diamonds = int(economy.get("player_diamonds", player_diamonds))
 	adjacent_slot_next_price = int(economy.get("adjacent_slot_next_price", adjacent_slot_next_price))
 	# Si compraste antes del hito gratis, consume también ese hito para evitar doble premio.
 	next_free_slot_unlock_level = GameRulesScript.next_free_slot_unlock_level(
@@ -3159,11 +3158,11 @@ func _execute_adjacent_slot_purchase() -> void:
 	active_stacks += 1
 	refresh_all_stack_layout()
 	board_locked = false
-	update_stars_display()
+	update_diamonds_display()
 	_sync_slot_overlay_controls()
 	queue_redraw()
 	save_game()
-	print("Ranura extra comprada. Próximo precio (estrellas): ", adjacent_slot_next_price)
+	print("Ranura extra comprada. Próximo precio (diamantes): ", adjacent_slot_next_price)
 
 
 func update_adjacent_slot_offer_ui() -> void:
@@ -3172,7 +3171,7 @@ func update_adjacent_slot_offer_ui() -> void:
 	adjacent_offer_board_index = find_adjacent_extra_slot_offer_board_index()
 	if adjacent_offer_board_index < 0:
 		adjacent_slot_offer_root.visible = false
-		layout_adjacent_slot_star_error_label()
+		layout_adjacent_slot_diamond_error_label()
 		return
 	var gr := get_adjacent_extra_slot_offer_global_rect()
 	var inset: float = maxf(2.0, gr.size.x * 0.025)
@@ -3197,21 +3196,21 @@ func update_adjacent_slot_offer_ui() -> void:
 		_reconcile_future_free_slot_unlock_cursor()
 		var free_level := get_adjacent_slot_free_unlock_level()
 		adjacent_slot_offer_lbl_level.text = "Gratis al nivel %d" % free_level
-		adjacent_slot_offer_lbl_level.add_theme_font_size_override("font_size", int(clampf(fit * 0.15, 16.0, 30.0)))
+		adjacent_slot_offer_lbl_level.add_theme_font_size_override("font_size", int(clampf(fit * 0.20, 20.0, 42.0)))
 		adjacent_slot_offer_lbl_level.add_theme_color_override("font_color", g)
 	if adjacent_slot_offer_lbl_lock != null:
 		adjacent_slot_offer_lbl_lock.add_theme_font_size_override("font_size", int(clampf(fit * 0.40, 52.0, 82.0)))
 		adjacent_slot_offer_lbl_lock.add_theme_color_override("font_color", g)
 	if adjacent_slot_offer_lbl_cost != null:
 		adjacent_slot_offer_lbl_cost.text = str(adjacent_slot_next_price)
-		adjacent_slot_offer_lbl_cost.add_theme_font_size_override("font_size", int(clampf(fit * 0.22, 20.0, 38.0)))
+		adjacent_slot_offer_lbl_cost.add_theme_font_size_override("font_size", int(clampf(fit * 0.28, 24.0, 48.0)))
 		adjacent_slot_offer_lbl_cost.add_theme_color_override("font_color", g)
 	if adjacent_slot_offer_cost_icon != null:
 		var icon_px := int(clampf(fit * 0.24, 24.0, 42.0))
 		adjacent_slot_offer_cost_icon.custom_minimum_size = Vector2(icon_px, icon_px)
 	if adjacent_slot_offer_price_row != null:
 		adjacent_slot_offer_price_row.add_theme_constant_override("separation", int(clampf(fit * 0.04, 5.0, 10.0)))
-	layout_adjacent_slot_star_error_label()
+	layout_adjacent_slot_diamond_error_label()
 
 
 func _sync_slot_overlay_controls() -> void:
@@ -3356,7 +3355,7 @@ func update_temp_slot_overlay_label() -> void:
 		temp_slot_locked_lbl_60.add_theme_constant_override("outline_size", 2)
 		temp_slot_locked_lbl_60.add_theme_color_override("font_outline_color", Color(1, 1, 1, 0.35))
 
-		temp_slot_locked_lbl_cost.text = str(TEMP_SLOT_COST_STARS)
+		temp_slot_locked_lbl_cost.text = str(TEMP_SLOT_COST_DIAMONDS)
 		temp_slot_locked_lbl_cost.add_theme_font_size_override("font_size", cost_fs)
 		temp_slot_locked_lbl_cost.add_theme_color_override("font_color", g)
 		if temp_slot_locked_cost_icon != null:
@@ -3501,20 +3500,20 @@ func _ensure_shop_ui() -> void:
 		add_child(shop_layer)
 	shop_ui = ShopOverlay.new()
 	shop_layer.add_child(shop_ui)
-	if not shop_ui.stars_purchased.is_connected(_on_shop_stars_purchased):
-		shop_ui.stars_purchased.connect(_on_shop_stars_purchased)
+	if not shop_ui.diamonds_purchased.is_connected(_on_shop_diamonds_purchased):
+		shop_ui.diamonds_purchased.connect(_on_shop_diamonds_purchased)
 	if not shop_ui.combo_purchased.is_connected(_on_shop_combo_purchased):
 		shop_ui.combo_purchased.connect(_on_shop_combo_purchased)
 	if not shop_ui.booster_purchased.is_connected(_on_shop_booster_purchased):
 		shop_ui.booster_purchased.connect(_on_shop_booster_purchased)
 
-func _on_shop_stars_purchased(_amount: int) -> void:
-	player_stars = GameState.player_stars
-	update_stars_display()
+func _on_shop_diamonds_purchased(_amount: int) -> void:
+	player_diamonds = GameState.player_diamonds
+	update_diamonds_display()
 
 func _on_shop_combo_purchased(pack: Dictionary) -> void:
-	player_stars = GameState.player_stars
-	update_stars_display()
+	player_diamonds = GameState.player_diamonds
+	update_diamonds_display()
 	lives = GameState.lives
 	update_life_display()
 	var boosters: int = int(pack.get("boosters", pack.get("wildcards", 0)))
@@ -3525,8 +3524,8 @@ func _on_shop_combo_purchased(pack: Dictionary) -> void:
 			_consume_pending_temp_slot()
 
 func _on_shop_booster_purchased(booster_type: String, amount: int) -> void:
-	player_stars = GameState.player_stars
-	update_stars_display()
+	player_diamonds = GameState.player_diamonds
+	update_diamonds_display()
 	if amount > 0 and not booster_type.is_empty():
 		add_booster_use(booster_type, amount, false)
 	save_game()
@@ -3645,7 +3644,7 @@ func _build_lives_chip() -> Dictionary:
 	var lbl := create_hud_text_label(GameState.get_life_chip_text(), HUD_BOARD_STAT_FONT_SIZE)
 	row.add_child(lbl)
 	if badge.count != null:
-		(badge.count as Label).text = GameState.get_life_count_text()
+		HudTextureButtons.set_life_count_text(badge.count as Label, GameState.get_life_count_text())
 	return {
 		"shadow": shadow,
 		"panel": panel,
@@ -3689,15 +3688,15 @@ func build_mock_ui() -> void:
 	if life_parts.plus != null:
 		(life_parts.plus as Button).pressed.connect(_on_shop_pressed)
 		GameState.hook_button_sound(life_parts.plus as Button)
-	var stars_parts := HudTextureButtons.create_resource_chip(StarIconTexture, false)
-	stars_chip_parts = stars_parts
-	stars_chip = stars_parts.panel
-	stars_chip_icon = stars_parts.icon
-	stars_chip_label = stars_parts.label
-	_bind_hud_chip_click(stars_chip, _on_shop_pressed)
-	if stars_parts.plus != null:
-		(stars_parts.plus as Button).pressed.connect(_on_shop_pressed)
-		GameState.hook_button_sound(stars_parts.plus as Button)
+	var diamonds_parts := HudTextureButtons.create_resource_chip(DiamondIconTexture, false)
+	diamonds_chip_parts = diamonds_parts
+	diamonds_chip = diamonds_parts.panel
+	diamonds_chip_icon = diamonds_parts.icon
+	diamonds_chip_label = diamonds_parts.label
+	_bind_hud_chip_click(diamonds_chip, _on_shop_pressed)
+	if diamonds_parts.plus != null:
+		(diamonds_parts.plus as Button).pressed.connect(_on_shop_pressed)
+		GameState.hook_button_sound(diamonds_parts.plus as Button)
 	var settings_parts := _build_icon_only_chip(SettingsIconTexture)
 	settings_chip_shadow = settings_parts.shadow
 	settings_chip = settings_parts.panel
@@ -3706,7 +3705,7 @@ func build_mock_ui() -> void:
 	hud_root.add_child(home_chip)
 	hud_root.add_child(shop_chip)
 	hud_root.add_child(life_chip)
-	hud_root.add_child(stars_chip)
+	hud_root.add_child(diamonds_chip)
 	hud_root.add_child(settings_chip)
 
 	progress_container = create_panel(PROGRESS_TRACK_BG, HUD_HAIRLINE, 24, HUD_HAIRLINE_W, false)
@@ -3798,15 +3797,15 @@ func build_mock_ui() -> void:
 	_ensure_shop_ui()
 	_build_tutorial_overlay()
 
-	adjacent_slot_star_error_label = Label.new()
-	adjacent_slot_star_error_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	adjacent_slot_star_error_label.visible = false
-	adjacent_slot_star_error_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	adjacent_slot_star_error_label.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
-	adjacent_slot_star_error_label.z_index = 32
-	hud_layer.add_child(adjacent_slot_star_error_label)
+	adjacent_slot_diamond_error_label = Label.new()
+	adjacent_slot_diamond_error_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	adjacent_slot_diamond_error_label.visible = false
+	adjacent_slot_diamond_error_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	adjacent_slot_diamond_error_label.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+	adjacent_slot_diamond_error_label.z_index = 32
+	hud_layer.add_child(adjacent_slot_diamond_error_label)
 
-	update_stars_display()
+	update_diamonds_display()
 	update_life_display()
 	update_booster_badges()
 	layout_mock_ui()
@@ -3829,7 +3828,7 @@ func layout_mock_ui() -> void:
 	var edge_margin: float = float(topbar.get("edge_margin", HUD_EDGE_MARGIN * scale))
 	var stat_w: float = float(topbar.get("stat_w", HUD_CHIP_STAT_W * scale))
 	var chip_h: float = float(topbar.get("chip_h", HUD_CHIP_HEIGHT * scale))
-	# Home/tienda/ajustes: círculos del mismo alto que las pastillas de vidas/estrellas.
+	# Home/tienda/ajustes: círculos del mismo alto que las pastillas de vidas/diamantes.
 	var corner_w: float = chip_h
 	var inner_gap: float = 10.0 * scale
 	var col_gap: float = float(topbar.get("col_gap", HUD_CHIP_GAP * scale))
@@ -3877,7 +3876,7 @@ func layout_mock_ui() -> void:
 	var stat_size := Vector2(stat_w, chip_h)
 	var pill_radius := int(chip_h * 0.5)
 
-	# Tres columnas: home+shop | vidas+estrellas | settings.
+	# Tres columnas: home+shop | vidas+diamantes | settings.
 	var left_x: float = edge_margin
 	layout_hud_pill_pair(null, home_chip, Vector2(left_x, chip_y), corner_size, scale)
 
@@ -3897,18 +3896,18 @@ func layout_mock_ui() -> void:
 		life_chip_parts,
 		Vector2(center_x + life_hang, chip_y),
 		stat_size,
-		0.36,
-		38,
+		HudTextureButtons.LIFE_COUNT_FONT_RATIO,
+		HudTextureButtons.LIFE_COUNT_FONT_MAX,
 		HUD_RESOURCE_PILL_H_RATIO,
 		HUD_LIFE_ICON_H_RATIO
 	)
-	if not stars_chip_parts.is_empty():
+	if not diamonds_chip_parts.is_empty():
 		HudTextureButtons.layout_resource_chip(
-			stars_chip_parts,
+			diamonds_chip_parts,
 			Vector2(center_x + life_w + pair_gap + money_hang, chip_y),
 			stat_size,
-			0.36,
-			38,
+			HudTextureButtons.LIFE_COUNT_FONT_RATIO,
+			HudTextureButtons.LIFE_COUNT_FONT_MAX,
 			HUD_RESOURCE_PILL_H_RATIO,
 			HUD_MONEY_ICON_H_RATIO,
 			HUD_MONEY_ICON_W_RATIO
@@ -4002,7 +4001,7 @@ func layout_mock_ui() -> void:
 func update_life_display() -> void:
 	lives = GameState.lives
 	if life_chip_count_label != null:
-		life_chip_count_label.text = GameState.get_life_count_text()
+		HudTextureButtons.set_life_count_text(life_chip_count_label, GameState.get_life_count_text())
 	if not life_chip_parts.is_empty():
 		HudTextureButtons.set_resource_chip_value(life_chip_parts, GameState.get_life_chip_text())
 
@@ -4289,11 +4288,11 @@ func update_booster_badges() -> void:
 			else:
 				action_count_labels[i].text = str(uses_left) if uses_left > 0 else "+"
 
-func update_stars_display() -> void:
-	if not stars_chip_parts.is_empty():
+func update_diamonds_display() -> void:
+	if not diamonds_chip_parts.is_empty():
 		HudTextureButtons.set_resource_chip_value(
-			stars_chip_parts,
-			HudTextureButtons.format_stat_number(player_stars)
+			diamonds_chip_parts,
+			HudTextureButtons.format_stat_number(player_diamonds)
 		)
 
 func build_purchase_dialog() -> void:
@@ -4324,21 +4323,21 @@ func build_purchase_dialog() -> void:
 	purchase_card.add_child(purchase_icon_texture_rect)
 	purchase_icon_circle = null
 
-	var offer_one := _create_purchase_offer_button(1, BOOSTER_COST_STARS)
+	var offer_one := _create_purchase_offer_button(1, BOOSTER_COST_DIAMONDS)
 	purchase_buy_button = offer_one.button
 	purchase_buy_center = offer_one.center
 	purchase_buy_content = offer_one.content
 	purchase_buy_qty_label = offer_one.qty_label
-	purchase_buy_star_icon = offer_one.star_icon
+	purchase_buy_diamond_icon = offer_one.diamond_icon
 	purchase_buy_cost_label = offer_one.cost_label
 	purchase_card.add_child(purchase_buy_button)
 
-	var offer_pack := _create_purchase_offer_button(BOOSTER_PACK_AMOUNT, BOOSTER_PACK_COST_STARS)
+	var offer_pack := _create_purchase_offer_button(BOOSTER_PACK_AMOUNT, BOOSTER_PACK_COST_DIAMONDS)
 	purchase_buy_pack_button = offer_pack.button
 	purchase_buy_pack_center = offer_pack.center
 	purchase_buy_pack_content = offer_pack.content
 	purchase_buy_pack_qty_label = offer_pack.qty_label
-	purchase_buy_pack_star_icon = offer_pack.star_icon
+	purchase_buy_pack_diamond_icon = offer_pack.diamond_icon
 	purchase_buy_pack_cost_label = offer_pack.cost_label
 	purchase_card.add_child(purchase_buy_pack_button)
 
@@ -4359,7 +4358,7 @@ func _create_purchase_offer_button(amount: int, cost: int) -> Dictionary:
 	return PurchaseOfferFactoryScript.build_offer_button(
 		amount,
 		cost,
-		StarIconTexture,
+		DiamondIconTexture,
 		Callable(self, "create_label"),
 		_on_purchase_confirmed.bind(amount, cost)
 	)
@@ -4381,15 +4380,15 @@ func _on_purchase_confirmed(amount: int, cost: int) -> void:
 		return
 	if amount <= 0 or cost <= 0:
 		return
-	if player_stars < cost:
+	if player_diamonds < cost:
 		print(
-			"No alcanza: tenés %d estrellas, necesitás %d."
-			% [player_stars, cost]
+			"No alcanza: tenés %d diamantes, necesitás %d."
+			% [player_diamonds, cost]
 		)
 		return
-	player_stars -= cost
+	player_diamonds -= cost
 	add_booster_use(pending_purchase_type, amount)
-	update_stars_display()
+	update_diamonds_display()
 	pending_purchase_type = ""
 	if purchase_overlay != null:
 		purchase_overlay.visible = false
@@ -4446,7 +4445,7 @@ func layout_purchase_dialog_controls() -> void:
 		purchase_buy_center,
 		purchase_buy_content,
 		purchase_buy_qty_label,
-		purchase_buy_star_icon,
+		purchase_buy_diamond_icon,
 		purchase_buy_cost_label,
 		Vector2(one_x, btn_y),
 		Vector2(btn_w, btn_h),
@@ -4457,7 +4456,7 @@ func layout_purchase_dialog_controls() -> void:
 		purchase_buy_pack_center,
 		purchase_buy_pack_content,
 		purchase_buy_pack_qty_label,
-		purchase_buy_pack_star_icon,
+		purchase_buy_pack_diamond_icon,
 		purchase_buy_pack_cost_label,
 		Vector2(pack_x, btn_y),
 		Vector2(btn_w, btn_h),
@@ -4473,7 +4472,7 @@ func _layout_purchase_offer_button(
 	center: CenterContainer,
 	content: HBoxContainer,
 	qty_label: Label,
-	star_icon: TextureRect,
+	diamond_icon: TextureRect,
 	cost_label: Label,
 	pos: Vector2,
 	size: Vector2,
@@ -4493,10 +4492,10 @@ func _layout_purchase_offer_button(
 		content.add_theme_constant_override("separation", int(10 * scale))
 	if qty_label != null:
 		qty_label.add_theme_font_size_override("font_size", int(36 * scale))
-	if star_icon != null:
-		var star_icon_size := 42.0 * scale
-		star_icon.custom_minimum_size = Vector2(star_icon_size, star_icon_size)
-		star_icon.size = Vector2(star_icon_size, star_icon_size)
+	if diamond_icon != null:
+		var diamond_icon_side := 42.0 * scale
+		diamond_icon.custom_minimum_size = Vector2(diamond_icon_side, diamond_icon_side)
+		diamond_icon.size = Vector2(diamond_icon_side, diamond_icon_side)
 	if cost_label != null:
 		cost_label.add_theme_font_size_override("font_size", int(40 * scale))
 
@@ -4519,11 +4518,11 @@ func update_purchase_dialog_content(booster_type: String) -> void:
 	if purchase_buy_qty_label != null:
 		purchase_buy_qty_label.text = "x1"
 	if purchase_buy_cost_label != null:
-		purchase_buy_cost_label.text = str(BOOSTER_COST_STARS)
+		purchase_buy_cost_label.text = str(BOOSTER_COST_DIAMONDS)
 	if purchase_buy_pack_qty_label != null:
 		purchase_buy_pack_qty_label.text = "x%d" % BOOSTER_PACK_AMOUNT
 	if purchase_buy_pack_cost_label != null:
-		purchase_buy_pack_cost_label.text = str(BOOSTER_PACK_COST_STARS)
+		purchase_buy_pack_cost_label.text = str(BOOSTER_PACK_COST_DIAMONDS)
 
 func get_booster_display_name(booster_type: String) -> String:
 	match booster_type:
@@ -4676,7 +4675,7 @@ func _layout_level_up_star_icon(icon: TextureRect, icon_size: Vector2) -> void:
 	icon.size = icon_size
 	icon.visible = true
 
-func _make_dialog_star_button(text: String) -> Control:
+func _make_dialog_diamond_button(text: String) -> Control:
 	var btn := HudTextureButtons.create_gradient_pill()
 	btn.focus_mode = Control.FOCUS_NONE
 	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
@@ -4698,7 +4697,7 @@ func _make_dialog_star_button(text: String) -> Control:
 	content.add_theme_constant_override("separation", 6)
 	btn.add_child(content)
 	var icon := TextureRect.new()
-	icon.texture = StarIconTexture
+	icon.texture = DiamondIconTexture
 	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -4714,16 +4713,16 @@ func _make_dialog_star_button(text: String) -> Control:
 	lbl.z_index = 2
 	content.add_child(lbl)
 	btn.set_meta("label", lbl)
-	btn.set_meta("star_icon", icon)
-	btn.set_meta("star_content", content)
+	btn.set_meta("diamond_icon", icon)
+	btn.set_meta("diamond_content", content)
 	return btn
 
 func _raise_dialog_button_content(btn: Control) -> void:
 	if btn == null:
 		return
 	var front: Node = null
-	if btn.has_meta("star_content"):
-		front = btn.get_meta("star_content")
+	if btn.has_meta("diamond_content"):
+		front = btn.get_meta("diamond_content")
 	elif btn.has_meta("label"):
 		front = btn.get_meta("label")
 	if front is Node and (front as Node).get_parent() == btn:
@@ -4747,8 +4746,8 @@ func _layout_dialog_gradient_button(btn: Control, btn_w: float, scale: float, fo
 		if bool(btn.get_meta("use_candy_frame", false)):
 			lbl.add_theme_color_override("font_outline_color", Color(0.0, 0.0, 0.0, 1.0))
 			lbl.add_theme_constant_override("outline_size", int(clampf(round(4.0 * scale), 3.0, 6.0)))
-	if btn.has_meta("star_content"):
-		var content: HBoxContainer = btn.get_meta("star_content")
+	if btn.has_meta("diamond_content"):
+		var content: HBoxContainer = btn.get_meta("diamond_content")
 		if content != null:
 			var pad: float = LevelUpCartelLayoutServiceScript.BUTTON_PAD * scale
 			content.offset_left = pad
@@ -4759,12 +4758,12 @@ func _layout_dialog_gradient_button(btn: Control, btn_w: float, scale: float, fo
 				"separation",
 				int(LevelUpCartelLayoutServiceScript.BUTTON_ICON_SEP * scale)
 			)
-	if btn.has_meta("star_icon"):
-		var star_icon: TextureRect = btn.get_meta("star_icon")
-		if star_icon != null:
+	if btn.has_meta("diamond_icon"):
+		var diamond_icon: TextureRect = btn.get_meta("diamond_icon")
+		if diamond_icon != null:
 			var icon_side := btn_h * LevelUpCartelLayoutServiceScript.BUTTON_ICON_RATIO
-			star_icon.custom_minimum_size = Vector2(icon_side, icon_side)
-			star_icon.size = Vector2(icon_side, icon_side)
+			diamond_icon.custom_minimum_size = Vector2(icon_side, icon_side)
+			diamond_icon.size = Vector2(icon_side, icon_side)
 	if bool(btn.get_meta("use_candy_frame", false)):
 		var border_w: int = int(clampf(5.0 * scale, 4.0, 7.0))
 		_apply_candy_button_frame(btn, radius, border_w, Vector2(actual_w, btn_h))
@@ -4883,7 +4882,7 @@ func build_slot_buy_confirm_dialog() -> void:
 	slot_buy_margin.add_child(slot_buy_vbox)
 
 	slot_buy_icon = TextureRect.new()
-	slot_buy_icon.texture = StarIconTexture
+	slot_buy_icon.texture = DiamondIconTexture
 	slot_buy_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	slot_buy_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	slot_buy_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -4948,7 +4947,7 @@ func _show_slot_buy_confirm(kind: String) -> void:
 	pending_slot_buy_kind = kind
 	var title := ""
 	if kind == "temp":
-		title = TempSlotPurchaseServiceScript.confirm_copy(TEMP_SLOT_COST_STARS)
+		title = TempSlotPurchaseServiceScript.confirm_copy(TEMP_SLOT_COST_DIAMONDS)
 	else:
 		title = AdjacentSlotPurchaseServiceScript.confirm_copy(adjacent_slot_next_price)
 	if slot_buy_title_label != null:
@@ -4983,7 +4982,7 @@ func _on_slot_buy_accept_pressed() -> void:
 	var kind: String = pending_slot_buy_kind
 	_hide_slot_buy_confirm()
 	if kind == "temp":
-		_try_open_temp_slot(TEMP_SLOT_COST_STARS)
+		_try_open_temp_slot(TEMP_SLOT_COST_DIAMONDS)
 	elif kind == "adjacent":
 		_execute_adjacent_slot_purchase()
 
@@ -5055,14 +5054,14 @@ func _on_no_moves_restart_pressed() -> void:
 	_restart_after_no_moves()
 
 func _on_no_moves_buy_lives_pressed() -> void:
-	if player_stars < BUY_LIVES_COST:
+	if player_diamonds < BUY_LIVES_COST:
 		print("No alcanza: necesitas %d para comprar vidas." % BUY_LIVES_COST)
 		return
-	player_stars -= BUY_LIVES_COST
+	player_diamonds -= BUY_LIVES_COST
 	GameState.add_lives(BUY_LIVES_AMOUNT)
 	lives = GameState.lives
 	update_life_display()
-	update_stars_display()
+	update_diamonds_display()
 	_restart_after_no_moves()
 
 func _on_no_moves_watch_ad_pressed() -> void:
@@ -5134,14 +5133,14 @@ func build_level_up_dialog() -> void:
 	level_up_button_row.visible = false
 	level_up_vbox.add_child(level_up_button_row)
 
-	level_up_claim_button = _make_dialog_star_button("20")
+	level_up_claim_button = _make_dialog_diamond_button("20")
 	level_up_claim_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	level_up_claim_button.set_meta("light_candy_border", true)
 	_bind_hud_chip_click(level_up_claim_button, _on_level_up_continue_pressed)
 	level_up_claim_button.visible = false
 	level_up_button_row.add_child(level_up_claim_button)
 
-	level_up_ad_button = _make_dialog_star_button(LevelUpCartelLayoutServiceScript.AD_LABEL)
+	level_up_ad_button = _make_dialog_diamond_button(LevelUpCartelLayoutServiceScript.AD_LABEL)
 	level_up_ad_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	level_up_ad_button.set_meta("light_candy_border", true)
 	_bind_hud_chip_click(level_up_ad_button, _on_level_up_ad_pressed)
@@ -5193,6 +5192,9 @@ func layout_level_up_dialog_controls() -> void:
 			true,
 			true
 		)
+		var title_font := level_up_title_label.get_theme_font("font") as FontVariation
+		if title_font != null:
+			title_font.spacing_glyph = int(round(float(LevelUpCartelLayoutServiceScript.TITLE_LETTER_SPACING) * scale))
 		level_up_title_label.visible = true
 		level_up_title_label.custom_minimum_size.y = LevelUpCartelLayoutServiceScript.TITLE_H * scale
 		_apply_rainbow_label(level_up_title_label, card_size.x - float(margins.left) - float(margins.right))
@@ -5262,13 +5264,13 @@ func show_level_up_panel(level: int) -> void:
 		level_up_title_label.text = "¡Subiste de nivel!"
 	if level_up_subtitle_label != null:
 		level_up_subtitle_label.text = "Nivel %d" % level
-	_level_up_stars_claimed = false
+	_level_up_diamonds_claimed = false
 	_level_up_show_reward = LevelUpRewardServiceScript.should_grant(level)
 	if level_up_claim_button != null:
 		level_up_claim_button.visible = _level_up_show_reward
 		var claim_lbl: Label = level_up_claim_button.get_meta("label")
 		if claim_lbl != null:
-			claim_lbl.text = str(LevelUpRewardServiceScript.base_stars(level))
+			claim_lbl.text = str(LevelUpRewardServiceScript.base_diamonds(level))
 	if level_up_ad_button != null:
 		level_up_ad_button.visible = _level_up_show_reward
 	if level_up_button_row != null:
@@ -5300,17 +5302,17 @@ func hide_level_up_panel() -> void:
 		board_locked = false
 	update_progress_bar(false)
 
-func _claim_level_up_stars(doubled: bool) -> void:
-	if _level_up_stars_claimed:
+func _claim_level_up_diamonds(doubled: bool) -> void:
+	if _level_up_diamonds_claimed:
 		return
-	var amount := LevelUpRewardServiceScript.claim_stars(_visible_level_up_alert, doubled)
-	_level_up_stars_claimed = true
+	var amount := LevelUpRewardServiceScript.claim_diamonds(_visible_level_up_alert, doubled)
+	_level_up_diamonds_claimed = true
 	if amount <= 0:
 		return
-	player_stars += amount
+	player_diamonds += amount
 	if GameState != null:
-		GameState.player_stars = player_stars
-	update_stars_display()
+		GameState.player_diamonds = player_diamonds
+	update_diamonds_display()
 
 func _finish_level_up_alert() -> void:
 	if _visible_level_up_alert > 0:
@@ -5330,14 +5332,14 @@ func _finish_level_up_alert() -> void:
 func _on_level_up_ad_pressed() -> void:
 	if Time.get_ticks_msec() - _level_up_opened_at_msec < 250:
 		return
-	# Mock: ver un anuncio duplica las estrellas de la subida.
-	_claim_level_up_stars(true)
+	# Mock: ver un anuncio duplica los diamantes de la subida.
+	_claim_level_up_diamonds(true)
 	_finish_level_up_alert()
 
 func _on_level_up_continue_pressed() -> void:
 	if Time.get_ticks_msec() - _level_up_opened_at_msec < 250:
 		return
-	_claim_level_up_stars(false)
+	_claim_level_up_diamonds(false)
 	_finish_level_up_alert()
 
 func build_booster_unlock_dialog() -> void:

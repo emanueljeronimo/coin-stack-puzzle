@@ -14,6 +14,7 @@ const SAVE_PATH := "user://player_save.json"
 const AUTOSAVE_INTERVAL_SEC := 30.0
 const SAVE_VERSION := 1
 const GameEngineScript = preload("res://game_engine.gd")
+const GameEconomyServiceScript = preload("res://game_economy_service.gd")
 const ProfileRepositoryScript = preload("res://profile_repository.gd")
 const SaveFileRepositoryScript = preload("res://save_file_repository.gd")
 const MainSessionAdapterScript = preload("res://main_session_adapter.gd")
@@ -259,7 +260,7 @@ func set_position(pos: Vector2) -> void:
 
 
 func add_coins(amount: int) -> void:
-	_set_stars(_current_stars() + amount)
+	_set_diamonds(_current_diamonds() + amount)
 	player_data_changed.emit()
 	save_game()
 
@@ -267,27 +268,26 @@ func add_coins(amount: int) -> void:
 func spend_coins(amount: int) -> bool:
 	if amount <= 0:
 		return false
-	var current: int = _current_stars()
+	var current: int = _current_diamonds()
 	if current < amount:
 		return false
-	_set_stars(current - amount)
+	_set_diamonds(current - amount)
 	player_data_changed.emit()
 	save_game()
 	return true
 
 
-func _current_stars() -> int:
+func _current_diamonds() -> int:
 	if GameState != null:
-		return int(GameState.player_stars)
-	return int(player_data.get("coins", player_data.get("player_stars", 0)))
+		return int(GameState.player_diamonds)
+	return GameEconomyServiceScript.read_diamonds(player_data, 0)
 
 
-func _set_stars(value: int) -> void:
+func _set_diamonds(value: int) -> void:
 	var next: int = maxi(0, value)
-	player_data["coins"] = next
-	player_data["player_stars"] = next
+	GameEconomyServiceScript.write_diamonds(player_data, next)
 	if GameState != null:
-		GameState.player_stars = next
+		GameState.player_diamonds = next
 
 
 func register_session_collector(collector: Callable) -> void:
@@ -344,7 +344,7 @@ func _create_default_player_data() -> Dictionary:
 		SAVE_VERSION,
 		_generate_random_username(),
 		DEFAULT_CUSTOM_BORDER_COLOR,
-		GameState.INITIAL_STARS,
+		GameState.INITIAL_DIAMONDS,
 		GameState.INITIAL_LIVES
 	)
 
@@ -392,8 +392,7 @@ func _sync_core_fields_to_player_data() -> void:
 	player_data["checkpoint_level"] = level
 	if GameState.checkpoint_snapshot is Dictionary and not GameState.checkpoint_snapshot.is_empty():
 		player_data["checkpoint_snapshot"] = GameState.checkpoint_snapshot.duplicate(true)
-	player_data["coins"] = GameState.player_stars
-	player_data["player_stars"] = GameState.player_stars
+	GameEconomyServiceScript.write_diamonds(player_data, GameState.player_diamonds)
 	player_data["lives"] = GameState.lives
 	player_data["next_free_life_unix"] = GameState.next_free_life_unix
 	player_data["unlimited_lives_until_unix"] = GameState.unlimited_lives_until_unix
@@ -410,7 +409,10 @@ func _apply_to_game_state(had_life_timer: bool = true) -> void:
 		maxi(1, int(player_data.get("level", player_data.get("checkpoint_level", 1)))),
 		player_data
 	)
-	GameState.player_stars = int(player_data.get("coins", player_data.get("player_stars", GameState.INITIAL_STARS)))
+	GameState.player_diamonds = GameEconomyServiceScript.read_diamonds(
+		player_data,
+		GameState.INITIAL_DIAMONDS
+	)
 	GameState.lives = int(player_data.get("lives", GameState.INITIAL_LIVES))
 	GameState.next_free_life_unix = int(player_data.get("next_free_life_unix", 0))
 	GameState.unlimited_lives_until_unix = int(player_data.get("unlimited_lives_until_unix", 0))

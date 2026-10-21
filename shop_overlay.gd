@@ -1,14 +1,14 @@
 class_name ShopOverlay
 extends Control
 
-signal stars_purchased(amount: int)
+signal diamonds_purchased(amount: int)
 signal combo_purchased(pack: Dictionary)
 signal booster_purchased(booster_type: String, amount: int)
 
 const ShopTabServiceScript = preload("res://shop_tab_service.gd")
 const ShopCatalogServiceScript = preload("res://shop_catalog_service.gd")
 const GameBoosterServiceScript = preload("res://game_booster_service.gd")
-const StarIconTexture = preload("res://Imagenes/icono-estrella.png")
+const DiamondIconTexture = preload("res://Imagenes/icono-diamante.png")
 const LifeIconTexture = preload("res://Imagenes/icono-vidas.png")
 const MixIconTexture = preload("res://Imagenes/icono-mezclar.png")
 const HammerIconTexture = preload("res://Imagenes/icono-martillo.png")
@@ -33,8 +33,8 @@ var content_margin: MarginContainer = null
 var _tab_btns: Array[Button] = []
 var _pages: Array[Control] = []
 var _placeholder_labels: Array[Label] = []
-var _star_list: VBoxContainer = null
-var _star_offer_rows: Array[Dictionary] = []
+var _diamond_list: VBoxContainer = null
+var _diamond_offer_rows: Array[Dictionary] = []
 var _resource_list: HBoxContainer = null
 var _resource_rows: Array[Dictionary] = []
 var _combo_list: VBoxContainer = null
@@ -156,7 +156,7 @@ func layout_for_viewport(viewport_size: Vector2) -> void:
 	card_h = mini(card_h, viewport_size.y * 0.96)
 	card.size = Vector2(card_w, card_h)
 	card.position = Vector2((viewport_size.x - card_w) * 0.5, (viewport_size.y - card_h) * 0.5)
-	_layout_star_offers(scale)
+	_layout_diamond_offers(scale)
 	_layout_resource_offers(scale)
 	_layout_combo_offers(scale)
 	if _confirm_root != null and _confirm_root.visible:
@@ -243,10 +243,10 @@ func _build_ui() -> void:
 
 	_pages.clear()
 	_placeholder_labels.clear()
-	_star_offer_rows.clear()
+	_diamond_offer_rows.clear()
 	_resource_rows.clear()
 	_combo_cards.clear()
-	_pages.append(_build_stars_page())
+	_pages.append(_build_diamonds_page())
 	_pages.append(_build_resources_page())
 	_pages.append(_build_combos_page())
 	for page in _pages:
@@ -258,7 +258,7 @@ func _build_ui() -> void:
 
 	_build_buy_confirm()
 	_apply_theme_colors()
-	_set_active_tab(ShopTabServiceScript.TAB_STARS)
+	_set_active_tab(ShopTabServiceScript.TAB_DIAMONDS)
 
 func _build_placeholder_page(copy: String) -> Control:
 	var page := _make_outlined_label(copy, 44)
@@ -270,7 +270,7 @@ func _build_placeholder_page(copy: String) -> Control:
 	_placeholder_labels.append(page)
 	return page
 
-func _build_stars_page() -> Control:
+func _build_diamonds_page() -> Control:
 	var scroll := ScrollContainer.new()
 	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
 	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -283,15 +283,15 @@ func _build_stars_page() -> Control:
 	list.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	list.add_theme_constant_override("separation", 10)
 	scroll.add_child(list)
-	_star_list = list
+	_diamond_list = list
 
-	var packs: Array = ShopCatalogServiceScript.star_packs()
+	var packs: Array = ShopCatalogServiceScript.diamond_packs()
 	for pack in packs:
 		if not (pack is Dictionary):
 			continue
-		var row: Dictionary = _make_star_offer_row(pack as Dictionary)
+		var row: Dictionary = _make_diamond_offer_row(pack as Dictionary)
 		list.add_child(row.get("root") as Control)
-		_star_offer_rows.append(row)
+		_diamond_offer_rows.append(row)
 	return scroll
 
 func _build_resources_page() -> Control:
@@ -389,7 +389,7 @@ func _make_resource_column(booster_type: String, packs: Array) -> Dictionary:
 func _make_resource_offer_button(pack: Dictionary) -> Dictionary:
 	var pack_id: String = str(pack.get("id", ""))
 	var amount: int = int(pack.get("amount", 1))
-	var star_cost: int = int(pack.get("star_cost", 0))
+	var diamond_cost: int = int(pack.get("diamond_cost", 0))
 
 	var buy := Button.new()
 	buy.focus_mode = Control.FOCUS_NONE
@@ -397,7 +397,7 @@ func _make_resource_offer_button(pack: Dictionary) -> Dictionary:
 	buy.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	buy.custom_minimum_size = Vector2(0, 64)
 	buy.set_meta("pack_id", pack_id)
-	buy.pressed.connect(_on_buy_star_pack.bind(pack_id))
+	buy.pressed.connect(_on_buy_diamond_pack.bind(pack_id))
 	GameState.hook_button_sound(buy)
 
 	var center := CenterContainer.new()
@@ -416,14 +416,14 @@ func _make_resource_offer_button(pack: Dictionary) -> Dictionary:
 	row.add_child(qty)
 
 	var cost_icon := TextureRect.new()
-	cost_icon.texture = StarIconTexture
+	cost_icon.texture = DiamondIconTexture
 	cost_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	cost_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	cost_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	cost_icon.custom_minimum_size = Vector2(32, 32)
 	row.add_child(cost_icon)
 
-	var cost := _make_outlined_label(ShopCatalogServiceScript.format_amount(star_cost), 38)
+	var cost := _make_outlined_label(ShopCatalogServiceScript.format_amount(diamond_cost), 38)
 	cost.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	row.add_child(cost)
 
@@ -490,7 +490,7 @@ func _make_combo_card(pack: Dictionary) -> Dictionary:
 	vbox.add_child(lines_box)
 
 	var line_texts: PackedStringArray = ShopCatalogServiceScript.combo_line_texts(pack)
-	var line_icons: Array[Texture2D] = [StarIconTexture, LifeIconTexture, MixIconTexture, CartIconTexture]
+	var line_icons: Array[Texture2D] = [DiamondIconTexture, LifeIconTexture, MixIconTexture, CartIconTexture]
 	var line_labels: Array[Label] = []
 	var line_icon_nodes: Array[TextureRect] = []
 	for i in range(line_texts.size()):
@@ -500,7 +500,7 @@ func _make_combo_card(pack: Dictionary) -> Dictionary:
 		row.alignment = BoxContainer.ALIGNMENT_CENTER
 		lines_box.add_child(row)
 		var icon := TextureRect.new()
-		icon.texture = line_icons[i] if i < line_icons.size() else StarIconTexture
+		icon.texture = line_icons[i] if i < line_icons.size() else DiamondIconTexture
 		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -515,7 +515,7 @@ func _make_combo_card(pack: Dictionary) -> Dictionary:
 
 	var buy := _make_action_button(ShopCatalogServiceScript.format_price_usd(int(pack.get("price_cents", 0))))
 	buy.custom_minimum_size = Vector2(0, 62)
-	buy.pressed.connect(_on_buy_star_pack.bind(pack_id))
+	buy.pressed.connect(_on_buy_diamond_pack.bind(pack_id))
 	vbox.add_child(buy)
 
 	return {
@@ -526,7 +526,7 @@ func _make_combo_card(pack: Dictionary) -> Dictionary:
 		"line_labels": line_labels,
 	}
 
-func _make_star_offer_row(pack: Dictionary) -> Dictionary:
+func _make_diamond_offer_row(pack: Dictionary) -> Dictionary:
 	var pack_id: String = str(pack.get("id", ""))
 	var amount: int = int(pack.get("amount", 0))
 	var favorite: bool = bool(pack.get("favorite", false))
@@ -549,7 +549,7 @@ func _make_star_offer_row(pack: Dictionary) -> Dictionary:
 	root.add_child(row)
 
 	var icon := TextureRect.new()
-	icon.texture = StarIconTexture
+	icon.texture = DiamondIconTexture
 	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -576,7 +576,7 @@ func _make_star_offer_row(pack: Dictionary) -> Dictionary:
 	var buy := _make_action_button(price_text)
 	buy.custom_minimum_size = Vector2(150, 56)
 	buy.size_flags_horizontal = Control.SIZE_SHRINK_END
-	buy.pressed.connect(_on_buy_star_pack.bind(pack_id))
+	buy.pressed.connect(_on_buy_diamond_pack.bind(pack_id))
 	row.add_child(buy)
 
 	return {
@@ -588,12 +588,12 @@ func _make_star_offer_row(pack: Dictionary) -> Dictionary:
 		"favorite": favorite,
 	}
 
-func _layout_star_offers(ui_scale: float) -> void:
+func _layout_diamond_offers(ui_scale: float) -> void:
 	var s: float = maxf(ui_scale, 0.5)
-	if _star_list != null and content_well != null:
+	if _diamond_list != null and content_well != null:
 		var inner_w: float = maxf(content_well.size.x - 28.0 * s, 200.0 * s)
-		_star_list.custom_minimum_size.x = inner_w
-	for row in _star_offer_rows:
+		_diamond_list.custom_minimum_size.x = inner_w
+	for row in _diamond_offer_rows:
 		var root: Panel = row.get("root") as Panel
 		var icon: TextureRect = row.get("icon") as TextureRect
 		var amount_lbl: Label = row.get("amount") as Label
@@ -694,7 +694,7 @@ func _layout_combo_offers(ui_scale: float) -> void:
 			buy.custom_minimum_size = Vector2(0, 74.0 * s)
 			buy.add_theme_font_size_override("font_size", int(42.0 * s))
 
-func _style_star_offer_rows(
+func _style_diamond_offer_rows(
 	_palette: Dictionary,
 	btn_on: Color,
 	btn_border: Color,
@@ -702,7 +702,7 @@ func _style_star_offer_rows(
 	card_border: Color,
 	text_marble: Color
 ) -> void:
-	for row in _star_offer_rows:
+	for row in _diamond_offer_rows:
 		var root: Panel = row.get("root") as Panel
 		var amount_lbl: Label = row.get("amount") as Label
 		var badge: Label = row.get("badge") as Label
@@ -784,7 +784,7 @@ func _style_combo_cards(
 				lbl.add_theme_color_override("font_color", text_marble)
 		_apply_button_style(buy, btn_on, btn_border, 16, text_marble)
 
-func _on_buy_star_pack(pack_id: String) -> void:
+func _on_buy_diamond_pack(pack_id: String) -> void:
 	var pack: Dictionary = ShopCatalogServiceScript.pack_by_id(pack_id)
 	if ShopCatalogServiceScript.is_resource_booster(pack):
 		if not ShopCatalogServiceScript.can_buy_resource(pack, _player_shop_level()):
@@ -830,7 +830,7 @@ func _sync_resource_locks() -> void:
 			else:
 				_apply_button_style(buy, off_bg, off_border.darkened(0.2), 16, text_marble)
 
-func _grant_star_pack(pack_id: String) -> void:
+func _grant_diamond_pack(pack_id: String) -> void:
 	var pack: Dictionary = ShopCatalogServiceScript.pack_by_id(pack_id)
 	if pack.is_empty():
 		return
@@ -841,17 +841,17 @@ func _grant_star_pack(pack_id: String) -> void:
 		_grant_resource_pack(pack)
 		return
 	var amount: int = int(pack.get("amount", 0))
-	var result: Dictionary = ShopCatalogServiceScript.grant_stars(GameState.player_stars, amount)
+	var result: Dictionary = ShopCatalogServiceScript.grant_diamonds(GameState.player_diamonds, amount)
 	if not bool(result.get("ok", false)):
 		return
-	_apply_star_grant(amount, result)
+	_apply_diamond_grant(amount, result)
 
 func _grant_combo_pack(pack: Dictionary) -> void:
-	var stars: int = int(pack.get("stars", 0))
-	if stars > 0:
-		var result: Dictionary = ShopCatalogServiceScript.grant_stars(GameState.player_stars, stars)
+	var diamonds: int = int(pack.get("diamonds", 0))
+	if diamonds > 0:
+		var result: Dictionary = ShopCatalogServiceScript.grant_diamonds(GameState.player_diamonds, diamonds)
 		if bool(result.get("ok", false)):
-			_apply_star_grant(stars, result)
+			_apply_diamond_grant(diamonds, result)
 	var lives: int = int(pack.get("lives", 0))
 	if lives > 0 and GameState != null:
 		GameState.add_lives(lives)
@@ -869,32 +869,32 @@ func _grant_combo_pack(pack: Dictionary) -> void:
 func _grant_resource_pack(pack: Dictionary) -> bool:
 	if not ShopCatalogServiceScript.can_buy_resource(pack, _player_shop_level()):
 		return false
-	var cost: int = int(pack.get("star_cost", 0))
+	var cost: int = int(pack.get("diamond_cost", 0))
 	var amount: int = int(pack.get("amount", 1))
 	var booster_type: String = str(pack.get("booster_type", ""))
 	var current: int = 0
 	if GameState != null:
-		current = GameState.player_stars
-	var preview: Dictionary = ShopCatalogServiceScript.spend_stars(current, cost)
+		current = GameState.player_diamonds
+	var preview: Dictionary = ShopCatalogServiceScript.spend_diamonds(current, cost)
 	if not bool(preview.get("ok", false)):
 		return false
 	if SaveManager != null:
 		if not SaveManager.spend_coins(cost):
 			return false
 	elif GameState != null:
-		GameState.player_stars = int(preview.get("player_stars", current))
-	stars_purchased.emit(0)
+		GameState.player_diamonds = int(preview.get("player_diamonds", current))
+	diamonds_purchased.emit(0)
 	if amount > 0 and not booster_type.is_empty():
 		_persist_booster_uses(booster_type, amount)
 		booster_purchased.emit(booster_type, amount)
 	return true
 
-func _apply_star_grant(amount: int, result: Dictionary) -> void:
+func _apply_diamond_grant(amount: int, result: Dictionary) -> void:
 	if SaveManager != null:
 		SaveManager.add_coins(amount)
 	elif GameState != null:
-		GameState.player_stars = int(result.get("player_stars", GameState.player_stars))
-	stars_purchased.emit(amount)
+		GameState.player_diamonds = int(result.get("player_diamonds", GameState.player_diamonds))
+	diamonds_purchased.emit(amount)
 
 func _persist_booster_uses(booster_type: String, amount: int) -> void:
 	if amount <= 0 or booster_type.is_empty():
@@ -967,7 +967,7 @@ func _build_buy_confirm() -> void:
 	_confirm_icon_nodes.clear()
 	for _i in range(3):
 		var icon := TextureRect.new()
-		icon.texture = StarIconTexture
+		icon.texture = DiamondIconTexture
 		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1028,7 +1028,7 @@ func _texture_for_confirm_key(key: String) -> Texture2D:
 		"glove":
 			return GloveIconTexture
 		_:
-			return StarIconTexture
+			return DiamondIconTexture
 
 func _hide_buy_confirm() -> void:
 	_pending_pack_id = ""
@@ -1091,7 +1091,7 @@ func _on_confirm_accept_pressed() -> void:
 		_hide_buy_confirm()
 		return
 	_hide_buy_confirm()
-	_grant_star_pack(pack_id)
+	_grant_diamond_pack(pack_id)
 
 func _on_confirm_cancel_pressed() -> void:
 	_hide_buy_confirm()
@@ -1216,7 +1216,7 @@ func _apply_theme_colors() -> void:
 		if lbl != null:
 			lbl.add_theme_color_override("font_color", p.get("settings_section", text_marble))
 	_apply_button_style(_close_menu_btn, btn_on, btn_border, 22, text_marble)
-	_style_star_offer_rows(p, btn_on, btn_border, well, card_border, text_marble)
+	_style_diamond_offer_rows(p, btn_on, btn_border, well, card_border, text_marble)
 	_style_resource_rows(btn_on, btn_border, well, card_border, text_marble)
 	_style_combo_cards(btn_on, btn_border, well, text_marble)
 	if _confirm_card != null:

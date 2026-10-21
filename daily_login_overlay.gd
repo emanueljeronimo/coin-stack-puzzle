@@ -7,7 +7,7 @@ const DialogBuilderServiceScript = preload("res://dialog_builder_service.gd")
 const DailyLoginServiceScript = preload("res://daily_login_service.gd")
 const ShopCatalogServiceScript = preload("res://shop_catalog_service.gd")
 const GameBoosterServiceScript = preload("res://game_booster_service.gd")
-const StarIconTexture = preload("res://Imagenes/icono-estrella.png")
+const DiamondIconTexture = preload("res://Imagenes/icono-diamante.png")
 const LifeIconTexture = preload("res://Imagenes/icono-vidas.png")
 const MixIconTexture = preload("res://Imagenes/icono-mezclar.png")
 const HammerIconTexture = preload("res://Imagenes/icono-martillo.png")
@@ -215,7 +215,7 @@ func _make_slot_cell(index: int) -> Dictionary:
 	margin.add_child(vbox)
 
 	var icon := TextureRect.new()
-	icon.texture = StarIconTexture
+	icon.texture = DiamondIconTexture
 	icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -349,7 +349,7 @@ func _icon_for_slot(slot: Dictionary) -> Texture2D:
 				return GloveIconTexture
 			_:
 				return MixIconTexture
-	return StarIconTexture
+	return DiamondIconTexture
 
 func _on_slot_pressed(index: int) -> void:
 	if GameState != null and not DailyLoginServiceScript.is_unlocked(GameState.player_level):
@@ -372,12 +372,12 @@ func _on_slot_pressed(index: int) -> void:
 
 func _apply_grant(slot: Dictionary) -> void:
 	var kind: String = str(slot.get("kind", ""))
-	if kind == "stars":
+	if kind == "diamonds":
 		var amount: int = int(slot.get("amount", 0))
 		if amount > 0 and SaveManager != null:
 			SaveManager.add_coins(amount)
 		elif amount > 0 and GameState != null:
-			GameState.player_stars += amount
+			GameState.player_diamonds += amount
 		return
 	if kind == "booster":
 		_persist_booster_uses(str(slot.get("booster_type", "")), int(slot.get("amount", 1)))
