@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Comodin — vista previa</title>
   <style>
-    @font-face {
-      font-family: Chewy;
-      src: url("Fonts/Chewy-Regular.ttf") format("truetype");
-    }
-
     * { box-sizing: border-box; }
+
+    :root {
+      /* Color de la ficha. Cambialo aca o con el picker. No afecta el juego. */
+      --ficha-color: #00ffee;
+    }
 
     body {
       margin: 0;
@@ -20,8 +20,8 @@
       align-items: center;
       justify-content: center;
       gap: 28px;
-      font-family: Chewy, "Segoe UI", sans-serif;
-      color: #2a2a32;
+      font-family: "Segoe UI", sans-serif;
+      color: #0505e9;
       background: linear-gradient(180deg, #eef1f6, #d7dde8);
     }
 
@@ -29,17 +29,42 @@
       margin: 0;
       font-size: 28px;
       font-weight: 400;
-      letter-spacing: 0.5px;
     }
 
     p {
       margin: 0;
       max-width: 520px;
       text-align: center;
-      font-family: "Segoe UI", sans-serif;
       font-size: 14px;
       line-height: 1.45;
-      color: #4a4e58;
+      color: #0048ff;
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      color: #2a2a32;
+    }
+
+    .controls input[type="color"] {
+      width: 42px;
+      height: 32px;
+      padding: 0;
+      border: 1px solid #9aa3b2;
+      background: #fff;
+      cursor: pointer;
+    }
+
+    .controls input[type="text"] {
+      width: 96px;
+      height: 32px;
+      padding: 0 8px;
+      border: 1px solid #9aa3b2;
+      border-radius: 4px;
+      font: inherit;
+      letter-spacing: 0.04em;
     }
 
     .row {
@@ -56,57 +81,32 @@
     }
 
     .coin-wrap span {
-      font-family: "Segoe UI", sans-serif;
       font-size: 13px;
-      color: #5a5e68;
+      color: #0f48d8;
     }
 
     .coin {
       position: relative;
       width: var(--side);
       height: var(--side);
-      filter: drop-shadow(0 2px 0 rgba(130, 118, 140, 0.18));
+      filter: drop-shadow(0 2px 0 rgba(91, 4, 161, 0.18));
     }
 
-    .coin .tex,
-    .coin .rainbow {
-      position: absolute;
-      inset: 0;
+    .coin .tex {
+      display: block;
       width: 100%;
       height: 100%;
     }
 
-    .coin .tex {
-      z-index: 1;
-    }
-
-    .coin .rainbow {
-      z-index: 2;
-      mix-blend-mode: color;
-      -webkit-mask-image: url("Imagenes/ficha.png");
-      mask-image: url("Imagenes/ficha.png");
-      -webkit-mask-size: 100% 100%;
-      mask-size: 100% 100%;
-      -webkit-mask-repeat: no-repeat;
-      mask-repeat: no-repeat;
-    }
-
-    .coin .q {
+    .coin .center {
       position: absolute;
-      inset: 0;
-      z-index: 3;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: Chewy, sans-serif;
-      font-size: calc(var(--side) * 0.36);
-      line-height: 1;
-      color: #fcfcfc;
-      transform: translateY(-2%);
-      -webkit-text-stroke: 2px #000;
-      text-shadow: 0 0 0 #000;
+      z-index: 2;
+      width: 48%;
+      height: 45%;
+      left: 25%;
+      top: 25%;
+      object-fit: contain;
       pointer-events: none;
-      user-select: none;
     }
 
     .big { --side: 280px; }
@@ -116,67 +116,83 @@
 <body>
   <h1>Ficha comodin</h1>
   <p>
-    Asi se ve ahora en el tablero: arcoiris fijo alrededor del centro
-    (no gira), sin brillo extra, y un <strong>?</strong> blanco con borde negro.
+    Cambiá <code>--ficha-color</code> o usá el picker. Solo este HTML, no el juego.
   </p>
+  <label class="controls">
+    Color de la ficha
+    <input id="ficha-color" type="color" value="#dcdce1" />
+    <input id="ficha-hex" type="text" value="#dcdce1" spellcheck="false" />
+  </label>
   <div class="row">
     <div class="coin-wrap">
       <div class="coin big">
-        <img class="tex" src="Imagenes/ficha.png" alt="" />
-        <div class="rainbow" id="rainbow-big"></div>
-        <div class="q">?</div>
+        <canvas class="tex"></canvas>
+        <img class="center" src="Imagenes/centro-comodin.png" alt="" />
       </div>
       <span>grande</span>
     </div>
     <div class="coin-wrap">
       <div class="coin board">
-        <img class="tex" src="Imagenes/ficha.png" alt="" />
-        <div class="rainbow" id="rainbow-board"></div>
-        <div class="q">?</div>
+        <canvas class="tex"></canvas>
+        <img class="center" src="Imagenes/centro-comodin.png" alt="" />
       </div>
       <span>tamano tablero</span>
     </div>
   </div>
-
   <script>
-    function hsv2rgb(h, s, v) {
-      const i = Math.floor(h * 6);
-      const f = h * 6 - i;
-      const p = v * (1 - s);
-      const q = v * (1 - f * s);
-      const t = v * (1 - (1 - f) * s);
-      let r = 0, g = 0, b = 0;
-      switch (i % 6) {
-        case 0: r = v; g = t; b = p; break;
-        case 1: r = q; g = v; b = p; break;
-        case 2: r = p; g = v; b = t; break;
-        case 3: r = p; g = q; b = v; break;
-        case 4: r = t; g = p; b = v; break;
-        case 5: r = v; g = p; b = q; break;
+    const fichaImg = new Image();
+    const colorInput = document.getElementById("ficha-color");
+    const hexInput = document.getElementById("ficha-hex");
+
+    function fichaColor() {
+      return getComputedStyle(document.documentElement)
+        .getPropertyValue("--ficha-color")
+        .trim() || "#dcdce1";
+    }
+
+    function paint(canvas) {
+      const ctx = canvas.getContext("2d");
+      canvas.width = fichaImg.naturalWidth;
+      canvas.height = fichaImg.naturalHeight;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(fichaImg, 0, 0);
+      ctx.globalCompositeOperation = "multiply";
+      ctx.fillStyle = fichaColor();
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.globalCompositeOperation = "destination-in";
+      ctx.drawImage(fichaImg, 0, 0);
+      ctx.globalCompositeOperation = "source-over";
+    }
+
+    function paintAll() {
+      document.querySelectorAll("canvas.tex").forEach(paint);
+    }
+
+    function setColor(value) {
+      const color = value.trim();
+      if (!/^#([0-9a-fA-F]{6})$/.test(color)) {
+        return;
       }
-      return [r, g, b];
+      document.documentElement.style.setProperty("--ficha-color", color);
+      colorInput.value = color;
+      hexInput.value = color;
+      paintAll();
     }
 
-    function shaderColor(hue) {
-      const sat = 0.52;
-      const val = 0.88;
-      const pastel = 0.16;
-      let [r, g, b] = hsv2rgb(hue, sat, val);
-      r = r + (1 - r) * pastel;
-      g = g + (1 - g) * pastel;
-      b = b + (1 - b) * pastel;
-      return `rgb(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)})`;
-    }
-
-    const stops = [];
-    for (let i = 0; i <= 12; i++) {
-      const t = i / 12;
-      stops.push(`${shaderColor(t)} ${(t * 360).toFixed(1)}deg`);
-    }
-    const gradient = `conic-gradient(from 90deg, ${stops.join(", ")})`;
-    document.querySelectorAll(".rainbow").forEach((el) => {
-      el.style.background = gradient;
+    colorInput.addEventListener("input", function () {
+      setColor(colorInput.value);
     });
+    hexInput.addEventListener("change", function () {
+      setColor(hexInput.value);
+    });
+    hexInput.addEventListener("keydown", function (event) {
+      if (event.key === "Enter") {
+        setColor(hexInput.value);
+      }
+    });
+
+    fichaImg.onload = paintAll;
+    fichaImg.src = "Imagenes/ficha.png";
   </script>
 </body>
 </html>

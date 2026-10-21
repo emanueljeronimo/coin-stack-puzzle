@@ -3,6 +3,7 @@ extends Area2D
 const GameRulesScript = preload("res://game_rules.gd")
 const CoinWildcardShader = preload("res://coin_wildcard.gdshader")
 const CoinNumberFont = preload("res://Fonts/Chewy-Regular.ttf")
+const WildcardCenterTexture = preload("res://Imagenes/centro-comodin.png")
 
 var value: int = 1
 var number_visible: bool = true
@@ -44,13 +45,18 @@ const NUMBER_OUTLINE_COLOR := Color(0, 0, 0, 1)
 const NUMBER_GLYPH_SPACING := -2
 const NUMBER_WIDTH_SCALE := 0.76
 const NUMBER_NUDGE := Vector2(0.0, -1.2)
-const WILDCARD_LABEL := "?"
+const WILDCARD_COIN_COLOR := Color("#00ffee")
+const WILDCARD_CENTER_WIDTH_RATIO := 0.48
+const WILDCARD_CENTER_HEIGHT_RATIO := 0.45
+const WILDCARD_CENTER_LEFT_RATIO := 0.25
+const WILDCARD_CENTER_TOP_RATIO := 0.25
 var coin_color: Color = VALUE_COLORS[0]
 var is_wildcard := false
 var wildcard_original_row := -1
 var _transform_tween: Tween = null
 var _number_font: FontVariation = null
 var _number_root: Node2D = null
+var _wildcard_center: Sprite2D = null
 
 func _ready() -> void:
 	input_pickable = false
@@ -69,7 +75,11 @@ func _ready() -> void:
 	update_display()
 
 
-func _process(_delta: float) -> void:center_number()
+func _process(_delta: float) -> void:
+	if is_wildcard:
+		_layout_wildcard_center()
+	else:
+		center_number()
 
 func _ensure_number_root() -> void:
 	if label == null or _number_root != null:
@@ -113,13 +123,7 @@ func center_number() -> void:
 
 func update_display() -> void:
 	apply_color_by_value()
-	if label:
-		if is_wildcard:
-			label.text = WILDCARD_LABEL
-		else:
-			label.text = str(value)
-		label.visible = number_visible
-		center_number()
+	_sync_center_mark()
 
 func set_value(new_value: int) -> void:
 	value = new_value
@@ -171,17 +175,15 @@ func get_shadow_tint(base: Color) -> Color:
 
 func apply_color_by_value() -> void:
 	if is_wildcard:
-		_ensure_wildcard_material()
-		coin_color = Color.WHITE
+		_clear_wildcard_material()
+		coin_color = WILDCARD_COIN_COLOR
 		if sprite:
-			sprite.self_modulate = Color.WHITE
+			sprite.self_modulate = coin_color
 		if shadow_sprite:
-			shadow_sprite.self_modulate = get_shadow_tint(Color(0.82, 0.74, 0.88))
+			shadow_sprite.self_modulate = get_shadow_tint(coin_color)
 		if highlight_sprite:
-			highlight_sprite.visible = false
-		if label:
-			label.add_theme_color_override("font_outline_color", NUMBER_OUTLINE_COLOR)
-			label.add_theme_color_override("font_color", Color(1.0, 0.99, 1.0, 0.98))
+			highlight_sprite.visible = true
+			highlight_sprite.self_modulate = Color(1.0, 1.0, 1.0, HIGHLIGHT_ALPHA)
 		return
 	_clear_wildcard_material()
 	coin_color = get_color_for_value(value)
@@ -198,9 +200,7 @@ func apply_color_by_value() -> void:
 
 func set_number_visible(visible: bool) -> void:
 	number_visible = visible
-	if label:
-		label.visible = number_visible
-		center_number()
+	_sync_center_mark()
 
 func configure_collision() -> void:
 	if collision_shape == null:
@@ -223,6 +223,51 @@ func configure_sprite_scale() -> void:
 		shadow_sprite.scale = final_scale * 0.98
 	if highlight_sprite:
 		highlight_sprite.scale = final_scale
+
+func _sync_center_mark() -> void:
+	if is_wildcard:
+		if label != null:
+			label.visible = false
+		_ensure_wildcard_center()
+		_layout_wildcard_center()
+		return
+	if _wildcard_center != null:
+		_wildcard_center.visible = false
+	if label != null:
+		label.text = str(value)
+		label.visible = number_visible
+		center_number()
+
+
+func _ensure_wildcard_center() -> void:
+	if _wildcard_center != null:
+		return
+	_wildcard_center = Sprite2D.new()
+	_wildcard_center.name = "WildcardCenter"
+	_wildcard_center.texture = WildcardCenterTexture
+	_wildcard_center.centered = true
+	_wildcard_center.z_index = 6
+	add_child(_wildcard_center)
+
+
+func _layout_wildcard_center() -> void:
+	if _wildcard_center == null or _wildcard_center.texture == null:
+		return
+	var tex_size: Vector2 = _wildcard_center.texture.get_size()
+	if tex_size.x <= 0.0 or tex_size.y <= 0.0:
+		return
+	var diameter: float = COIN_RADIUS * 2.0
+	var box_size := Vector2(
+		diameter * WILDCARD_CENTER_WIDTH_RATIO,
+		diameter * WILDCARD_CENTER_HEIGHT_RATIO
+	)
+	var scale_factor: float = minf(box_size.x / tex_size.x, box_size.y / tex_size.y)
+	_wildcard_center.scale = Vector2.ONE * scale_factor
+	var box_left: float = -COIN_RADIUS + diameter * WILDCARD_CENTER_LEFT_RATIO
+	var box_top: float = -COIN_RADIUS + diameter * WILDCARD_CENTER_TOP_RATIO
+	_wildcard_center.position = Vector2(box_left + box_size.x * 0.5, box_top + box_size.y * 0.5)
+	_wildcard_center.visible = number_visible
+
 
 func _ensure_wildcard_material() -> void:
 	if sprite == null:
