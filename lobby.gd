@@ -6,7 +6,8 @@ const DiamondIconTexture = preload("res://Imagenes/icono-diamante.png")
 const CartIconTexture = preload("res://Imagenes/icono-cart.png")
 const SettingsIconTexture = preload("res://Imagenes/icono-settings.png")
 const DailyLoginIconTexture = preload("res://Imagenes/icono-login-diario.png")
-const CoinScene = preload("res://coin.tscn")
+const ShowcaseCoinTexture = preload("res://Imagenes/ficha-portada.png")
+const LevelLabelShader = preload("res://lobby_level_label.gdshader")
 const ShopScene = preload("res://Shop.tscn")
 const LogoFont = preload("res://Fonts/Chewy-Regular.ttf")
 const LevelFont = preload("res://Fonts/FredokaOne-Regular.ttf")
@@ -17,14 +18,19 @@ const REF_WIDTH := 1080.0
 const EDGE_MARGIN := 14.0
 const CHIP_TOP_RATIO := 0.075
 const LEVEL_Y_RATIO := 0.405
-const LEVEL_FONT_SIZE := 96
-const LEVEL_FILL := Color(0.99, 0.96, 0.88)
-const LEVEL_OUTLINE := Color(0.14, 0.40, 0.20)
-const LEVEL_SHADOW := Color(0.05, 0.20, 0.09, 0.88)
+const LEVEL_FONT_SIZE := 110
+const LEVEL_LETTER_SPACING := 8
+const LEVEL_FILL := Color(0.99, 0.92, 0.72)
+const LEVEL_OUTLINE := Color(0.48, 0.28, 0.16)
+const LEVEL_SHADOW := Color(0.46, 0.24, 0.32, 0.72)
 ## Centro de la moneda sobre el pedestal/cojin del fondo home-nueva.
 const PEDESTAL_COIN_X_RATIO := 0.50
 const PEDESTAL_COIN_Y_RATIO := 0.568
-const PEDESTAL_COIN_SCALE := 4.35
+const PEDESTAL_COIN_SCALE := 5.55
+## Diametro local de la ficha de tablero (52 * FACE_SCALE 0.86).
+const SHOWCASE_COIN_LOCAL_DIAMETER := 44.72
+## Multiplica el oro para bajar brillo y acercarlo a los pasteles del juego.
+const SHOWCASE_COIN_MODULATE := Color(0.82, 0.74, 0.64)
 const BTN_GAP := 16.0
 const CORNER_BTN_WIDTH_RATIO := 0.12
 const STAT_BTN_WIDTH_RATIO := 0.19
@@ -67,7 +73,8 @@ var settings_button_icon: TextureRect = null
 var daily_login_button: Control = null
 var daily_login_button_icon: TextureRect = null
 var level_label: Label = null
-var showcase_coin: Node2D = null
+var _level_font_variation: FontVariation = null
+var showcase_coin: Sprite2D = null
 var play_button: TextureButton = null
 var settings_layer: CanvasLayer = null
 var settings_ui: SettingsOverlay = null
@@ -189,11 +196,13 @@ func build_ui() -> void:
 	_apply_level_label_style(1.0)
 	hud_root.add_child(level_label)
 
-	showcase_coin = CoinScene.instantiate()
+	showcase_coin = Sprite2D.new()
+	showcase_coin.name = "ShowcaseCoin"
+	showcase_coin.texture = ShowcaseCoinTexture
+	showcase_coin.centered = true
+	showcase_coin.modulate = SHOWCASE_COIN_MODULATE
 	showcase_coin.z_index = 5
 	hud_root.add_child(showcase_coin)
-	if showcase_coin.has_method("set_value"):
-		showcase_coin.set_value(SaveManager.get_max_unlocked_coin_value())
 
 	build_settings_dialog()
 	build_shop_dialog()
@@ -276,8 +285,6 @@ func update_displays() -> void:
 		)
 	if level_label != null:
 		level_label.text = "Nivel %d" % GameState.player_level
-	if showcase_coin != null and showcase_coin.has_method("set_value"):
-		showcase_coin.set_value(SaveManager.get_max_unlocked_coin_value())
 	if profile_avatar != null and profile_button != null:
 		HudTextureButtons.set_avatar_chip_texture(
 			profile_button,
@@ -316,10 +323,28 @@ func create_hud_text_label(text: String, font_size: int) -> Label:
 		lbl.add_theme_font_override("font", LogoFont)
 	return lbl
 
+func _showcase_coin_scale(ui_scale: float) -> float:
+	if showcase_coin == null or showcase_coin.texture == null:
+		return PEDESTAL_COIN_SCALE * ui_scale
+	var tex_size: Vector2 = showcase_coin.texture.get_size()
+	var tex_side: float = maxf(tex_size.x, tex_size.y)
+	if tex_side <= 0.0:
+		return PEDESTAL_COIN_SCALE * ui_scale
+	var target: float = SHOWCASE_COIN_LOCAL_DIAMETER * PEDESTAL_COIN_SCALE * ui_scale
+	return target / tex_side
+
 func _apply_level_label_style(ui_scale: float) -> void:
 	if level_label == null:
 		return
 	var s: float = maxf(ui_scale, 0.5)
+	if _level_font_variation == null:
+		_level_font_variation = FontVariation.new()
+		if LevelFont != null:
+			_level_font_variation.base_font = LevelFont
+		elif LogoFont != null:
+			_level_font_variation.base_font = LogoFont
+		level_label.add_theme_font_override("font", _level_font_variation)
+	_level_font_variation.spacing_glyph = int(round(float(LEVEL_LETTER_SPACING) * s))
 	level_label.add_theme_font_size_override("font_size", int(float(LEVEL_FONT_SIZE) * s))
 	level_label.add_theme_color_override("font_color", LEVEL_FILL)
 	level_label.add_theme_color_override("font_outline_color", LEVEL_OUTLINE)
@@ -328,6 +353,17 @@ func _apply_level_label_style(ui_scale: float) -> void:
 	level_label.add_theme_constant_override("shadow_offset_x", int(round(2.0 * s)))
 	level_label.add_theme_constant_override("shadow_offset_y", int(round(7.0 * s)))
 	level_label.add_theme_constant_override("shadow_outline_size", int(round(5.0 * s)))
+	_apply_level_label_shader()
+
+func _apply_level_label_shader() -> void:
+	if level_label == null:
+		return
+	var mat: ShaderMaterial = level_label.material as ShaderMaterial
+	if mat == null or mat.shader != LevelLabelShader:
+		mat = ShaderMaterial.new()
+		mat.shader = LevelLabelShader
+		level_label.material = mat
+	mat.set_shader_parameter("span_px", maxf(level_label.size.x, 1.0))
 
 func layout_hud_pill_pair(shadow: Panel, panel: Control, pos: Vector2, size: Vector2, scale: float) -> void:
 	if panel != null:
@@ -524,7 +560,7 @@ func layout_ui() -> void:
 
 	if level_label != null:
 		var level_w := cover.size.x * 0.72
-		var level_h := 150.0 * scale
+		var level_h := 172.0 * scale
 		var level_x := cover.position.x + (cover.size.x - level_w) * 0.5
 		var level_y := cover.position.y + cover.size.y * LEVEL_Y_RATIO
 		level_label.position = Vector2(level_x, level_y)
@@ -535,7 +571,7 @@ func layout_ui() -> void:
 		var coin_x := cover.position.x + cover.size.x * PEDESTAL_COIN_X_RATIO
 		var coin_y := cover.position.y + cover.size.y * PEDESTAL_COIN_Y_RATIO
 		showcase_coin.position = Vector2(coin_x, coin_y)
-		showcase_coin.scale = Vector2.ONE * (PEDESTAL_COIN_SCALE * scale)
+		showcase_coin.scale = Vector2.ONE * _showcase_coin_scale(scale)
 
 	var play_pos := Vector2.ZERO
 	var play_size := Vector2.ZERO
