@@ -98,6 +98,12 @@ func _test_early_roll_ramp() -> void:
 	if GameTurnEngineScript.early_roll_value_max(1, 0, 1, 4) != 2:
 		_fail("first_deal_ones_twos", str(GameTurnEngineScript.early_roll_value_max(1, 0, 1, 4)))
 		return
+	if GameTurnEngineScript.early_roll_value_max(1, 0, 31, 34) != 32:
+		_fail("prestige_first_deal_floor_plus_one", str(GameTurnEngineScript.early_roll_value_max(1, 0, 31, 34)))
+		return
+	if GameTurnEngineScript.early_roll_value_max(41, 0, 31, 34) != 34:
+		_fail("raw_checkpoint_still_full_range", str(GameTurnEngineScript.early_roll_value_max(41, 0, 31, 34)))
+		return
 	if GameTurnEngineScript.early_roll_value_max(1, 1, 1, 4) != 3:
 		_fail("second_deal_threes", str(GameTurnEngineScript.early_roll_value_max(1, 1, 1, 4)))
 		return

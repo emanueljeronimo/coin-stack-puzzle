@@ -18,6 +18,7 @@ $GODOT_BIN --headless --path . --import >/dev/null 2>&1 || true
 
 TEST_SCRIPTS=(
   "res://tests/cycle_reset_test.gd"
+  "res://tests/board_play_bot_service_test.gd"
   "res://tests/crash_stress_test.gd"
   "res://tests/game_engine_test.gd"
   "res://tests/game_board_engine_test.gd"
@@ -29,6 +30,7 @@ TEST_SCRIPTS=(
   "res://tests/game_economy_service_test.gd"
   "res://tests/game_lives_service_test.gd"
   "res://tests/ui_style_utils_test.gd"
+  "res://tests/coin_number_mark_test.gd"
   "res://tests/main_input_router_test.gd"
   "res://tests/main_turn_resolution_service_test.gd"
   "res://tests/main_board_render_service_test.gd"

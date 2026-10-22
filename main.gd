@@ -589,8 +589,14 @@ func fill_board_initial_random() -> void:
 		+ maxi(0, active_stacks - 2)
 	)
 	var pool: Array = []
+	var fill_max: int = GameTurnEngineScript.early_roll_value_max(
+		GameEngineScript.cycle_play_level(checkpoint_level, cycle_checkpoint_origin),
+		0,
+		get_roll_min_value(),
+		get_roll_max_value()
+	)
 	for _i in range(total_coins):
-		pool.append(get_roll_value())
+		pool.append(randi_range(get_roll_min_value(), fill_max))
 	# Empaqueta maximizando pilas homogéneas (sin colapsar fusiones) para un arranque jugable.
 	# El azar puro intercalaba 5 valores en pocas ranuras y dejaba el post-prestige casi trabado.
 	var plan: Array = GameRulesScript.build_mix_stack_plan(
@@ -838,6 +844,7 @@ func _migrate_legacy_cycle_roll_range() -> bool:
 		"cycle_reset_stacks": CYCLE_RESET_STACKS,
 		"adjacent_slot_next_price": adjacent_slot_next_price,
 		"adjacent_slot_base_price": ADJACENT_EXTRA_SLOT_BASE_PRICE,
+		"cycle_checkpoint_origin": cycle_checkpoint_origin,
 	})
 	var start_changed := bool(start_heal.get("changed", false))
 	if start_changed:
@@ -852,9 +859,27 @@ func _migrate_legacy_cycle_roll_range() -> bool:
 			_pending_level_up_alerts.clear()
 			if _last_acked_checkpoint_level > checkpoint_level:
 				_last_acked_checkpoint_level = checkpoint_level
-	if not progress_changed and not slots_changed and not start_changed:
+	var cramped_heal := GameRulesScript.heal_cramped_prestige_opening({
+		"roll_value_floor": roll_value_floor,
+		"max_value": max_value,
+		"highest_board_coin": highest_coin_value_on_board(),
+		"milestone_level": milestone,
+		"active_stacks": active_stacks,
+		"cycle_reset_stacks": CYCLE_RESET_STACKS,
+		"cycle_checkpoint_origin": cycle_checkpoint_origin,
+		"checkpoint_level": checkpoint_level,
+		"next_free_slot_unlock_level": next_free_slot_unlock_level,
+	})
+	var cramped_changed := bool(cramped_heal.get("changed", false))
+	if cramped_changed:
+		max_value = int(cramped_heal.get("max_value", max_value))
+		next_free_slot_unlock_level = int(
+			cramped_heal.get("next_free_slot_unlock_level", next_free_slot_unlock_level)
+		)
+		board_deal_count = 0
+	if not progress_changed and not slots_changed and not start_changed and not cramped_changed:
 		return false
-	var refill := bool(healed.get("refill", false))
+	var refill := bool(healed.get("refill", false)) or bool(cramped_heal.get("refill", false))
 	if refill:
 		if stacks.size() != active_stacks:
 			clear_board_stacks()
@@ -1406,8 +1431,9 @@ func perform_roll() -> bool:
 		return false
 
 	var max_roll_value = maxi(roll_value_floor, max_value - 1)
+	var play_level := GameEngineScript.cycle_play_level(checkpoint_level, cycle_checkpoint_origin)
 	var deal_max: int = GameTurnEngineScript.early_roll_value_max(
-		checkpoint_level,
+		play_level,
 		board_deal_count,
 		roll_value_floor,
 		max_roll_value
@@ -1426,7 +1452,7 @@ func perform_roll() -> bool:
 		)
 		values_to_roll.shuffle()
 		roll_count = GameTurnEngineScript.compute_level_roll_count(
-			checkpoint_level,
+			play_level,
 			values_to_roll.size(),
 			total_free_slots,
 			true
@@ -1890,12 +1916,6 @@ func get_roll_value() -> int:
 ## Meta de progreso del ciclo (piso de tirada / objetivo). No toca el tablero visible.
 func _apply_cycle_reset_meta(milestone_level: int, cycle_state: Dictionary) -> void:
 	adjacent_slot_next_price = int(cycle_state.get("adjacent_slot_next_price", ADJACENT_EXTRA_SLOT_BASE_PRICE))
-	# Si el checkpoint ya pasó el primer hito del ciclo (p.ej. 21 al crear la ficha 15),
-	# no dejar el cursor en el pasado ni otorgar ranuras retroactivas.
-	next_free_slot_unlock_level = GameRulesScript.first_future_free_slot_unlock_level(
-		milestone_level,
-		checkpoint_level
-	)
 	current_level = int(cycle_state.get("current_level", 1))
 	max_value = int(cycle_state.get("max_value", GameEngineScript.cycle_reset_max_value(milestone_level)))
 	roll_value_floor = int(cycle_state.get(
@@ -1907,6 +1927,11 @@ func _apply_cycle_reset_meta(milestone_level: int, cycle_state: Dictionary) -> v
 		"cycle_checkpoint_origin",
 		GameEngineScript.cycle_checkpoint_origin(milestone_level, checkpoint_level)
 	))
+	# Curva 2/3/4 del ciclo 1, corrida al origen (no al hito 15/25/35).
+	next_free_slot_unlock_level = GameRulesScript.first_future_play_unlock_level(
+		cycle_checkpoint_origin,
+		checkpoint_level
+	)
 	cycle_rules_revision = GameEngineScript.CYCLE_RULES_REVISION
 
 ## Reinicia el tablero al conseguir la ficha hito (15, 25, 35…).

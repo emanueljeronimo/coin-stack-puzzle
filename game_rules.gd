@@ -154,6 +154,13 @@ static func first_future_free_slot_unlock_level(cycle_base_level: int, reached_l
 		reached_level
 	)
 
+## Misma curva 2/3/4/7… del ciclo 1, corrida al origen de prestige (20+2=22, 39+2=41).
+static func first_future_play_unlock_level(cycle_origin: int, reached_level: int) -> int:
+	var origin := maxi(0, cycle_origin)
+	var rel_reached := maxi(0, reached_level - origin)
+	var rel_unlock := first_future_free_slot_unlock_level(0, rel_reached)
+	return origin + rel_unlock
+
 ## Cuántas ranuras gratis del ciclo actual ya se ganaron (p.ej. 42 y 44 a nivel 44 → 2).
 static func earned_cycle_free_slot_count(
 	cycle_base_level: int,
@@ -244,7 +251,10 @@ static func heal_prestige_start_desync(state: Dictionary) -> Dictionary:
 		return result
 	if base_price > 0 and price > base_price:
 		return result
-	var expected_unlock := first_future_free_slot_unlock_level(milestone, prestige_level)
+	var origin := int(state.get("cycle_checkpoint_origin", 0))
+	if origin <= 0:
+		origin = milestone
+	var expected_unlock := first_future_play_unlock_level(origin, prestige_level)
 	var changed := false
 	if active_stacks > cycle_reset_stacks:
 		active_stacks = cycle_reset_stacks
@@ -259,6 +269,40 @@ static func heal_prestige_start_desync(state: Dictionary) -> Dictionary:
 	result["checkpoint_level"] = checkpoint_level
 	result["active_stacks"] = active_stacks
 	result["next_free_slot_unlock_level"] = next_free
+	return result
+
+## 5 ranuras con mazo 31-40 (u 11-20, etc.): el prestige viejo no reabría el ciclo.
+## Rehace el tablero de apertura y deja nivel/origen. No toca diamantes ni boosters.
+const CRAMPED_CYCLE_VALUE_SPAN := 5
+
+static func heal_cramped_prestige_opening(state: Dictionary) -> Dictionary:
+	var floor_v := int(state.get("roll_value_floor", 1))
+	var max_value := int(state.get("max_value", 0))
+	var highest := int(state.get("highest_board_coin", 0))
+	var milestone := int(state.get("milestone_level", 0))
+	var active_stacks := int(state.get("active_stacks", 1))
+	var cycle_reset_stacks := int(state.get("cycle_reset_stacks", 5))
+	var origin := int(state.get("cycle_checkpoint_origin", 0))
+	var checkpoint_level := int(state.get("checkpoint_level", 1))
+	var result := {
+		"changed": false,
+		"refill": false,
+		"max_value": max_value,
+		"next_free_slot_unlock_level": int(state.get("next_free_slot_unlock_level", 1)),
+	}
+	if milestone <= 0 or floor_v <= 1:
+		return result
+	if active_stacks > cycle_reset_stacks + 1:
+		return result
+	var span := maxi(highest, max_value) - floor_v
+	if span < CRAMPED_CYCLE_VALUE_SPAN:
+		return result
+	if origin <= 0:
+		origin = milestone
+	result["changed"] = true
+	result["refill"] = true
+	result["max_value"] = milestone
+	result["next_free_slot_unlock_level"] = first_future_play_unlock_level(origin, checkpoint_level)
 	return result
 
 static func normalize_temp_state(

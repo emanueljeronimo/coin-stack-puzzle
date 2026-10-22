@@ -5,10 +5,10 @@ const CoinScene = preload("res://coin.tscn")
 const GameRulesScript = preload("res://game_rules.gd")
 const STACK_WIDTH := 122.0
 const COIN_BASE_DIAMETER := 52.0
-const COIN_TARGET_WIDTH := 99.0
+const COIN_TARGET_WIDTH := 120.0
 const COIN_SCALE := COIN_TARGET_WIDTH / COIN_BASE_DIAMETER
 const COIN_STEP_Y := 16.0
-## Altura visual de 10 monedas apiladas: 9 pasos + diámetro de ficha.
+## Altura visual de 10 monedas apiladas: 9 pasos + diámetro de ficha = 264.
 const STACK_HEIGHT := float(MAX_CAPACITY - 1) * COIN_STEP_Y + COIN_TARGET_WIDTH
 const COIN_TOP_OFFSET := -STACK_HEIGHT + 1.0
 

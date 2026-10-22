@@ -3,8 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Comodin — vista previa</title>
+  <title>Fichas — vista previa</title>
   <style>
+    @font-face {
+      font-family: "Chewy";
+      src: url("Fonts/Chewy-Regular.ttf") format("truetype");
+    }
+
     * { box-sizing: border-box; }
 
     body {
@@ -15,6 +20,7 @@
       align-items: center;
       justify-content: center;
       gap: 28px;
+      padding: 32px 16px;
       font-family: "Segoe UI", sans-serif;
       color: #2a2a32;
       background: linear-gradient(180deg, #eef1f6, #d7dde8);
@@ -28,7 +34,7 @@
 
     p {
       margin: 0;
-      max-width: 520px;
+      max-width: 560px;
       text-align: center;
       font-size: 14px;
       line-height: 1.45;
@@ -37,8 +43,31 @@
 
     .row {
       display: flex;
-      align-items: flex-end;
+      align-items: flex-start;
+      justify-content: center;
+      flex-wrap: wrap;
       gap: 48px;
+    }
+
+    .col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 28px;
+    }
+
+    .col h2 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .commons {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 28px;
+      max-width: 420px;
     }
 
     .coin-wrap {
@@ -57,7 +86,14 @@
       position: relative;
       width: var(--side);
       height: var(--side);
+    }
+
+    .coin.wildcard {
       filter: drop-shadow(0 2px 0 rgba(150, 118, 40, 0.22));
+    }
+
+    .coin.common {
+      filter: drop-shadow(0 2px 0 rgba(80, 70, 90, 0.18));
     }
 
     .coin .tex {
@@ -68,37 +104,115 @@
 
     .big { --side: 240px; }
     .board { --side: 89px; }
+    .sample { --side: 160px; }
   </style>
 </head>
 <body>
-  <h1>Ficha comodin</h1>
+  <h1>Comparacion de fichas</h1>
   <p>
-    Usa <strong>ficha-comodin</strong> y el barrido de luz en diagonal.
+    El borde del numero es el color de esa ficha, mas oscuro.
+    Ajustalo con <strong>NUMBER_OUTLINE_DARKEN</strong>.
   </p>
   <div class="row">
-    <div class="coin-wrap">
-      <div class="coin big">
-        <canvas class="tex"></canvas>
+    <div class="col">
+      <h2>Comodin</h2>
+      <div class="coin-wrap">
+        <div class="coin wildcard big">
+          <canvas class="tex" data-kind="wildcard"></canvas>
+        </div>
+        <span>grande</span>
       </div>
-      <span>grande</span>
+      <div class="coin-wrap">
+        <div class="coin wildcard board">
+          <canvas class="tex" data-kind="wildcard"></canvas>
+        </div>
+        <span>tamano tablero</span>
+      </div>
     </div>
-    <div class="coin-wrap">
-      <div class="coin board">
-        <canvas class="tex"></canvas>
-      </div>
-      <span>tamano tablero</span>
+    <div class="col">
+      <h2>Comunes</h2>
+      <div class="commons" id="commons"></div>
     </div>
   </div>
   <script>
     const SWEEP_DURATION = 0.8;
     const SWEEP_PERIOD = 3.6;
-    const fichaImg = new Image();
+    const NUMBER_TO_DIAMETER = 0.55;
+    const NUMBER_WIDTH_SCALE = 0.76;
+    const NUMBER_NUDGE_X = 0.0;
+    const NUMBER_NUDGE_Y = 0.05;
+    const PASTEL_SOFTEN = 0.14;
+    const COIN_TINT_LIGHTEN = 0.04;
+    const NUMBER_OUTLINE_DARKEN = 0.50;
+    const COMMON_SAMPLES = [
+      { value: 1, base: [0.95, 0.45, 0.55] },
+      { value: 2, base: [0.25, 0.75, 0.40] },
+      { value: 8, base: [0.30, 0.55, 0.90] },
+      { value: 9, base: [0.95, 0.85, 0.35] }
+    ];
+    const wildcardImg = new Image();
+    const commonImg = new Image();
     let start = 0;
+    let ready = 0;
 
-    function paint(canvas, t) {
+    function lerp(a, b, t) {
+      return a + (b - a) * t;
+    }
+
+    function mixWhite(rgb, amount) {
+      return [
+        lerp(rgb[0], 1, amount),
+        lerp(rgb[1], 1, amount),
+        lerp(rgb[2], 1, amount)
+      ];
+    }
+
+    function darken(rgb, amount) {
+      return [
+        rgb[0] * (1 - amount),
+        rgb[1] * (1 - amount),
+        rgb[2] * (1 - amount)
+      ];
+    }
+
+    function cssRgb(rgb) {
+      return "rgb(" +
+        Math.round(rgb[0] * 255) + ", " +
+        Math.round(rgb[1] * 255) + ", " +
+        Math.round(rgb[2] * 255) + ")";
+    }
+
+    function coinTint(base) {
+      return mixWhite(mixWhite(base, PASTEL_SOFTEN), COIN_TINT_LIGHTEN);
+    }
+
+    function mountCommons() {
+      const host = document.getElementById("commons");
+      COMMON_SAMPLES.forEach(function (sample) {
+        const wrap = document.createElement("div");
+        wrap.className = "coin-wrap";
+        wrap.innerHTML =
+          '<div class="coin common sample">' +
+            '<canvas class="tex" data-kind="common" data-value="' + sample.value + '"></canvas>' +
+          "</div>" +
+          "<span>valor " + sample.value + "</span>";
+        host.appendChild(wrap);
+      });
+    }
+
+    function sampleForValue(value) {
+      for (let i = 0; i < COMMON_SAMPLES.length; i += 1) {
+        if (COMMON_SAMPLES[i].value === value) {
+          return COMMON_SAMPLES[i];
+        }
+      }
+      return COMMON_SAMPLES[0];
+    }
+
+    function paintWildcard(canvas, t) {
       const ctx = canvas.getContext("2d");
-      const w = fichaImg.naturalWidth;
-      const h = fichaImg.naturalHeight;
+      const w = wildcardImg.naturalWidth;
+      const h = wildcardImg.naturalHeight;
       if (canvas.width !== w || canvas.height !== h) {
         canvas.width = w;
         canvas.height = h;
@@ -106,7 +220,7 @@
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.globalCompositeOperation = "source-over";
       ctx.clearRect(0, 0, w, h);
-      ctx.drawImage(fichaImg, 0, 0);
+      ctx.drawImage(wildcardImg, 0, 0);
       const phase = t % SWEEP_PERIOD;
       if (phase < SWEEP_DURATION) {
         const u = phase / SWEEP_DURATION;
@@ -129,8 +243,56 @@
         ctx.restore();
       }
       ctx.globalCompositeOperation = "destination-in";
-      ctx.drawImage(fichaImg, 0, 0);
+      ctx.drawImage(wildcardImg, 0, 0);
       ctx.globalCompositeOperation = "source-over";
+    }
+
+    function paintCommon(canvas) {
+      const sample = sampleForValue(Number(canvas.dataset.value));
+      const tint = coinTint(sample.base);
+      const outlineColor = darken(tint, NUMBER_OUTLINE_DARKEN);
+      const ctx = canvas.getContext("2d");
+      const w = commonImg.naturalWidth;
+      const h = commonImg.naturalHeight;
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
+      }
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalCompositeOperation = "source-over";
+      ctx.clearRect(0, 0, w, h);
+      ctx.drawImage(commonImg, 0, 0);
+      ctx.globalCompositeOperation = "multiply";
+      ctx.fillStyle = cssRgb(tint);
+      ctx.fillRect(0, 0, w, h);
+      ctx.globalCompositeOperation = "source-over";
+      ctx.globalAlpha = 0.14;
+      ctx.drawImage(commonImg, 0, 0);
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = "destination-in";
+      ctx.drawImage(commonImg, 0, 0);
+      ctx.globalCompositeOperation = "source-over";
+
+      const side = Math.min(w, h);
+      const fontSize = Math.max(8, Math.round(side * NUMBER_TO_DIAMETER));
+      const outline = Math.max(2, Math.round(side * (2 / 45)));
+      ctx.save();
+      ctx.translate(
+        w * 0.5 + side * NUMBER_NUDGE_X,
+        h * 0.5 + side * NUMBER_NUDGE_Y
+      );
+      ctx.scale(NUMBER_WIDTH_SCALE, 1);
+      ctx.font = fontSize + "px Chewy, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.lineJoin = "round";
+      ctx.miterLimit = 2;
+      ctx.lineWidth = outline;
+      ctx.strokeStyle = cssRgb(outlineColor);
+      ctx.fillStyle = "rgba(255, 252, 255, 0.98)";
+      ctx.strokeText(String(sample.value), 0, 0);
+      ctx.fillText(String(sample.value), 0, 0);
+      ctx.restore();
     }
 
     function frame(now) {
@@ -139,15 +301,28 @@
       }
       const t = (now - start) / 1000;
       document.querySelectorAll("canvas.tex").forEach(function (canvas) {
-        paint(canvas, t);
+        if (canvas.dataset.kind === "common") {
+          paintCommon(canvas);
+        } else {
+          paintWildcard(canvas, t);
+        }
       });
       requestAnimationFrame(frame);
     }
 
-    fichaImg.onload = function () {
+    function maybeStart() {
+      ready += 1;
+      if (ready < 2) {
+        return;
+      }
       requestAnimationFrame(frame);
-    };
-    fichaImg.src = "Imagenes/ficha-comodin.png";
+    }
+
+    mountCommons();
+    wildcardImg.onload = maybeStart;
+    commonImg.onload = maybeStart;
+    wildcardImg.src = "Imagenes/ficha-comodin.png";
+    commonImg.src = "Imagenes/ficha.png";
   </script>
 </body>
 </html>

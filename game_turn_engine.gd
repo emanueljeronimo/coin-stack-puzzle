@@ -56,7 +56,8 @@ static func early_roll_target(checkpoint_level: int) -> int:
 static func should_group_early_rolls(checkpoint_level: int) -> bool:
 	return EARLY_GROUP_LEVELS > 0 and checkpoint_level >= 1 and checkpoint_level <= EARLY_GROUP_LEVELS
 
-## Primera tirada 1-2, segunda 3. Despues el tope sigue al mazo real (max_value-1).
+## Primera tirada piso..piso+1, segunda piso+2. Despues el tope sigue al mazo real.
+## El piso post-prestige (31) tiene que capear 31-32, no el absoluto 1-2.
 static func early_roll_value_max(
 	checkpoint_level: int,
 	deal_index: int,
@@ -67,9 +68,9 @@ static func early_roll_value_max(
 		return max_roll
 	var cap := max_roll
 	if deal_index <= 0:
-		cap = 2
+		cap = roll_floor + 1
 	elif deal_index == 1 or checkpoint_level <= 2:
-		cap = 3
+		cap = roll_floor + 2
 	return clampi(mini(cap, max_roll), roll_floor, max_roll)
 
 static func early_pad_max(checkpoint_level: int, roll_floor: int, max_roll: int) -> int:

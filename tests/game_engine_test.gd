@@ -51,6 +51,12 @@ func _test_cycle_math() -> void:
 	if GameEngineScript.cycle_checkpoint_origin(15, 21) != 20:
 		_fail("origin_ahead_21")
 		return
+	if GameEngineScript.cycle_play_level(8, 0) != 8:
+		_fail("play_level_cycle1", str(GameEngineScript.cycle_play_level(8, 0)))
+		return
+	if GameEngineScript.cycle_play_level(41, 40) != 1:
+		_fail("play_level_after_prestige_35", str(GameEngineScript.cycle_play_level(41, 40)))
+		return
 	if GameEngineScript.cycle_reset_roll_value_floor(25, 5) != 21:
 		_fail("reset_floor_25")
 		return

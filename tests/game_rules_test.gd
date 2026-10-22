@@ -118,6 +118,18 @@ func _test_unlock_levels() -> void:
 	if GameRulesScript.first_future_free_slot_unlock_level(0, 100) != 104:
 		_fail("future_after_100", str(GameRulesScript.first_future_free_slot_unlock_level(0, 100)))
 		return
+	if GameRulesScript.first_future_play_unlock_level(0, 1) != 2:
+		_fail("play_unlock_cycle1", str(GameRulesScript.first_future_play_unlock_level(0, 1)))
+		return
+	if GameRulesScript.first_future_play_unlock_level(20, 21) != 22:
+		_fail("play_unlock_origin20", str(GameRulesScript.first_future_play_unlock_level(20, 21)))
+		return
+	if GameRulesScript.first_future_play_unlock_level(40, 41) != 42:
+		_fail("play_unlock_origin40", str(GameRulesScript.first_future_play_unlock_level(40, 41)))
+		return
+	if GameRulesScript.first_future_play_unlock_level(39, 40) != 41:
+		_fail("play_unlock_origin39", str(GameRulesScript.first_future_play_unlock_level(39, 40)))
+		return
 	var false_23 := GameRulesScript.heal_inflated_cycle_free_slots(6, 25, 21, 15, 5)
 	if not bool(false_23.get("changed", false)):
 		_fail("heal_slots_detects_false_23", str(false_23))
@@ -171,6 +183,40 @@ func _test_unlock_levels() -> void:
 	})
 	if bool(has_16.get("changed", true)):
 		_fail("desync_keeps_real_16", str(has_16))
+		return
+	var cramped := GameRulesScript.heal_cramped_prestige_opening({
+		"roll_value_floor": 31,
+		"max_value": 40,
+		"highest_board_coin": 40,
+		"milestone_level": 35,
+		"active_stacks": 5,
+		"cycle_reset_stacks": 5,
+		"cycle_checkpoint_origin": 40,
+		"checkpoint_level": 41,
+		"next_free_slot_unlock_level": 46,
+	})
+	if not bool(cramped.get("changed", false)) or not bool(cramped.get("refill", false)):
+		_fail("cramped_detects_31_40", str(cramped))
+		return
+	if int(cramped.get("max_value", 0)) != 35:
+		_fail("cramped_max_35", str(cramped))
+		return
+	if int(cramped.get("next_free_slot_unlock_level", 0)) != 42:
+		_fail("cramped_unlock_42", str(cramped.get("next_free_slot_unlock_level", 0)))
+		return
+	var wide_ok := GameRulesScript.heal_cramped_prestige_opening({
+		"roll_value_floor": 31,
+		"max_value": 40,
+		"highest_board_coin": 40,
+		"milestone_level": 35,
+		"active_stacks": 12,
+		"cycle_reset_stacks": 5,
+		"cycle_checkpoint_origin": 40,
+		"checkpoint_level": 41,
+		"next_free_slot_unlock_level": 46,
+	})
+	if bool(wide_ok.get("changed", true)):
+		_fail("cramped_keeps_wide_board", str(wide_ok))
 		return
 	_ok("unlock_levels")
 

@@ -41,6 +41,10 @@ static func cycle_coin_offset(roll_value_floor: int, checkpoint_base_value: int,
 		return 0
 	return base - checkpoint_base_value
 
+## Nivel "de este ciclo" para easing de repartida/ranuras. Ciclo 1 (origen 0) = checkpoint.
+static func cycle_play_level(checkpoint_level: int, cycle_origin: int) -> int:
+	return maxi(1, checkpoint_level - maxi(0, cycle_origin))
+
 ## El ancla guardada solo vale en el ciclo del piso actual.
 ## Si no, origen 40 + piso 11 hace que un 21 cuente como 16 y suba 2 niveles de golpe.
 static func effective_cycle_origin(

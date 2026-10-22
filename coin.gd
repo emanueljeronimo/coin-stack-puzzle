@@ -5,6 +5,7 @@ const CoinWildcardShader = preload("res://coin_wildcard.gdshader")
 const CoinNumberFont = preload("res://Fonts/Chewy-Regular.ttf")
 const CoinFaceTexture = preload("res://Imagenes/ficha.png")
 const WildcardFaceTexture = preload("res://Imagenes/ficha-comodin.png")
+const CoinNumberMarkScript = preload("res://coin_number_mark.gd")
 
 var value: int = 1
 var number_visible: bool = true
@@ -40,18 +41,20 @@ const COIN_TINT_LIGHTEN := 0.04
 const SHADOW_ALPHA := 0.09
 const HIGHLIGHT_ALPHA := 0.14
 const COIN_RADIUS := 26.0
-const NUMBER_TO_DIAMETER := 0.36
-const NUMBER_OUTLINE_PX := 2
-const NUMBER_OUTLINE_COLOR := Color(0, 0, 0, 1)
-const NUMBER_GLYPH_SPACING := -2
+const NUMBER_TO_DIAMETER := 0.55
+const NUMBER_OUTLINE_DARKEN := 0.50
 const NUMBER_WIDTH_SCALE := 0.76
-const NUMBER_NUDGE := Vector2(0.0, -1.2)
+const NUMBER_NUDGE_X := 0.0
+## El HTML usa 0.05 por metricas de canvas; en Godot ese valor baja de mas el digito.
+const NUMBER_NUDGE_Y := 0.0
+const NUMBER_FILL_COLOR := Color(1.0, 0.99, 1.0, 0.98)
+const FACE_SCALE := 0.86
 var coin_color: Color = VALUE_COLORS[0]
 var is_wildcard := false
 var wildcard_original_row := -1
 var _transform_tween: Tween = null
 var _number_font: FontVariation = null
-var _number_root: Node2D = null
+var _number_root = null
 
 func _ready() -> void:
 	input_pickable = false
@@ -59,60 +62,82 @@ func _ready() -> void:
 	monitorable = false
 	configure_sprite_scale()
 	if label:
-		label.z_index = 5
+		label.visible = false
 		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_ensure_number_root()
-		_ensure_number_font()
-		center_number()
-	else:
-		print("ERROR: No se encontró el Label en coin.tscn")
+		label.queue_free()
+		label = null
+	_ensure_number_font()
+	_ensure_number_root()
 	configure_collision()
 	update_display()
 
-
-func _process(_delta: float) -> void:
-	if not is_wildcard:
-		center_number()
-
 func _ensure_number_root() -> void:
-	if label == null or _number_root != null:
+	if _number_root != null and is_instance_valid(_number_root):
+		_attach_number_root()
 		return
-	_number_root = Node2D.new()
+	if sprite == null:
+		return
+	_number_root = CoinNumberMarkScript.new()
 	_number_root.name = "NumberRoot"
 	_number_root.z_index = 5
-	add_child(_number_root)
-	label.reparent(_number_root, false)
-	_number_root.scale = Vector2(NUMBER_WIDTH_SCALE, 1.0)
+	sprite.add_child(_number_root)
+
+func _attach_number_root() -> void:
+	if _number_root == null or sprite == null:
+		return
+	if _number_root.get_parent() == sprite:
+		return
+	if _number_root.get_parent() != null:
+		_number_root.reparent(sprite, false)
+	else:
+		sprite.add_child(_number_root)
 
 func _ensure_number_font() -> void:
-	if label == null or _number_font != null:
+	if _number_font != null:
 		return
 	var base: Font = CoinNumberFont
-	if base == null:
-		base = label.get_theme_font("font")
 	if base == null:
 		base = ThemeDB.fallback_font
 	_number_font = FontVariation.new()
 	_number_font.base_font = base
-	_number_font.spacing_glyph = NUMBER_GLYPH_SPACING
-	label.add_theme_font_override("font", _number_font)
 
-func center_number() -> void:
-	if label == null:
+func _number_tex_side() -> float:
+	var side: float = CoinNumberMarkScript.texture_side(sprite.texture if sprite else null)
+	if side > 0.0:
+		return side
+	return CoinNumberMarkScript.face_side(COIN_RADIUS, FACE_SCALE)
+
+func _refresh_number_mark() -> void:
+	_ensure_number_font()
+	_ensure_number_root()
+	if _number_root == null:
 		return
-	var side: float = COIN_RADIUS * 2.0
-	var font_size: int = maxi(8, int(round(side * NUMBER_TO_DIAMETER)))
-	label.set_anchors_preset(Control.PRESET_TOP_LEFT)
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", font_size)
-	label.add_theme_constant_override("outline_size", NUMBER_OUTLINE_PX)
-	label.custom_minimum_size = Vector2(side, side)
-	label.size = Vector2(side, side)
-	label.pivot_offset = Vector2(side, side) * 0.5
-	label.scale = Vector2.ONE
-	label.rotation = 0.0
-	label.position = Vector2(-side, -side) * 0.5 + NUMBER_NUDGE
+	if is_wildcard or not number_visible:
+		_number_root.configure(
+			"",
+			_number_font,
+			8,
+			2,
+			Color.BLACK,
+			NUMBER_FILL_COLOR,
+			NUMBER_WIDTH_SCALE,
+			Vector2.ZERO,
+			false
+		)
+		return
+	var side: float = _number_tex_side()
+	var font_size: int = CoinNumberMarkScript.font_size_for_side(side, NUMBER_TO_DIAMETER)
+	_number_root.configure(
+		str(value),
+		_number_font,
+		font_size,
+		CoinNumberMarkScript.outline_px_for_side(side),
+		get_number_outline_color(coin_color),
+		NUMBER_FILL_COLOR,
+		NUMBER_WIDTH_SCALE,
+		Vector2(side * NUMBER_NUDGE_X, side * NUMBER_NUDGE_Y),
+		true
+	)
 
 func update_display() -> void:
 	apply_color_by_value()
@@ -166,6 +191,9 @@ func get_shadow_tint(base: Color) -> Color:
 	tinted.a = SHADOW_ALPHA
 	return tinted
 
+func get_number_outline_color(base: Color) -> Color:
+	return CoinNumberMarkScript.outline_from_tint(get_sprite_tint(base), NUMBER_OUTLINE_DARKEN)
+
 func apply_color_by_value() -> void:
 	if is_wildcard:
 		_set_face_texture(WildcardFaceTexture)
@@ -188,9 +216,6 @@ func apply_color_by_value() -> void:
 	if highlight_sprite:
 		highlight_sprite.visible = true
 		highlight_sprite.self_modulate = Color(1.0, 1.0, 1.0, HIGHLIGHT_ALPHA)
-	if label:
-		label.add_theme_color_override("font_outline_color", NUMBER_OUTLINE_COLOR)
-		label.add_theme_color_override("font_color", Color(1.0, 0.99, 1.0, 0.98))
 
 func set_number_visible(visible: bool) -> void:
 	number_visible = visible
@@ -209,7 +234,7 @@ func configure_sprite_scale() -> void:
 	var tex_size: Vector2 = sprite.texture.get_size()
 	if tex_size.x <= 0.0 or tex_size.y <= 0.0:
 		return
-	var target_diameter := COIN_RADIUS * 2.0
+	var target_diameter := COIN_RADIUS * 2.0 * FACE_SCALE
 	var scale_factor := target_diameter / maxf(tex_size.x, tex_size.y)
 	var final_scale := Vector2.ONE * scale_factor
 	sprite.scale = final_scale
@@ -219,14 +244,9 @@ func configure_sprite_scale() -> void:
 		highlight_sprite.scale = final_scale
 
 func _sync_center_mark() -> void:
-	if is_wildcard:
-		if label != null:
-			label.visible = false
-		return
 	if label != null:
-		label.text = str(value)
-		label.visible = number_visible
-		center_number()
+		label.visible = false
+	_refresh_number_mark()
 
 
 func _set_face_texture(face: Texture2D) -> void:

@@ -117,8 +117,8 @@ func _advance_checkpoint(
 				)
 			))
 			state["adjacent_slot_next_price"] = int(cycle_state.get("adjacent_slot_next_price", ADJACENT_BASE_PRICE))
-			state["next_free_slot_unlock_level"] = GameRulesScript.first_future_free_slot_unlock_level(
-				milestone,
+			state["next_free_slot_unlock_level"] = GameRulesScript.first_future_play_unlock_level(
+				int(state.get("cycle_checkpoint_origin", 0)),
 				int(state.get("checkpoint_level", milestone))
 			)
 	else:
@@ -171,7 +171,7 @@ func _test_progression_purchase_and_cycle_reset() -> void:
 	if int(state.get("max_value", 0)) != 15:
 		_fail("cycle_reset_max", str(state))
 		return
-	if int(state.get("next_free_slot_unlock_level", 0)) != 18:
+	if int(state.get("next_free_slot_unlock_level", 0)) != 17:
 		_fail("cycle_reset_unlock_cursor", str(state))
 		return
 
@@ -265,7 +265,7 @@ func _test_cycle_reset_skips_stale_unlocks_when_checkpoint_ahead() -> void:
 	if int(state.get("active_stacks", 0)) != CYCLE_RESET_STACKS:
 		_fail("prestige_25_resets_stacks", str(state))
 		return
-	if int(state.get("next_free_slot_unlock_level", 0)) != 42:
+	if int(state.get("next_free_slot_unlock_level", 0)) != 41:
 		_fail("prestige_25_unlock_cursor", str(state.get("next_free_slot_unlock_level", 0)))
 		return
 	if int(state.get("cycle_checkpoint_origin", 0)) != 39:
