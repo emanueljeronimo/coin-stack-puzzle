@@ -205,4 +205,26 @@ func _test_round_wildcard_once() -> void:
 	if only_dealt != [1, 0, 3, 4, 5]:
 		_fail("wildcard_only_in_dealt", str(only_dealt))
 		return
+	var forced := GameTurnEngineScript.apply_round_wildcard(
+		[1, 2, 3, 4],
+		4,
+		0.10,
+		func() -> float: return 0.99,
+		func(_n: int) -> int: return 0,
+		true
+	)
+	if forced != [0, 2, 3, 4]:
+		_fail("wildcard_force_first", str(forced))
+		return
+	var locked := GameTurnEngineScript.apply_round_wildcard(
+		[1, 2, 3, 4],
+		4,
+		0.0,
+		func() -> float: return 0.0,
+		func(_n: int) -> int: return 0,
+		true
+	)
+	if locked != [1, 2, 3, 4]:
+		_fail("wildcard_force_ignored_when_locked", str(locked))
+		return
 	_ok("round_wildcard_once")

@@ -237,4 +237,13 @@ func _test_deal_wildcard_unlock() -> void:
 	if GameRulesScript.deal_wildcard_chance(7) != GameRulesScript.WILDCARD_ROUND_CHANCE:
 		_fail("unlocks_at_7")
 		return
+	if GameRulesScript.should_force_deal_wildcard(0.0, false):
+		_fail("no_force_while_locked")
+		return
+	if not GameRulesScript.should_force_deal_wildcard(0.10, false):
+		_fail("force_first_unseen")
+		return
+	if GameRulesScript.should_force_deal_wildcard(0.10, true):
+		_fail("no_force_after_seen")
+		return
 	_ok("deal_wildcard_unlock")

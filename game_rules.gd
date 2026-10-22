@@ -11,12 +11,19 @@ const FUSION_OUTPUT_COUNT := 2
 const WILDCARD_ROUND_CHANCE := 0.10
 ## El comodin de mazo no aparece hasta este checkpoint.
 const WILDCARD_ROUND_UNLOCK_LEVEL := 7
+## La primera repartida elegible siempre trae uno; si no, 10% se come muchas tiradas.
+const WILDCARD_GUARANTEE_FIRST := true
 const COIN_WILDCARD_VALUE := 0
 
 static func deal_wildcard_chance(checkpoint_level: int) -> float:
 	if checkpoint_level < WILDCARD_ROUND_UNLOCK_LEVEL:
 		return 0.0
 	return WILDCARD_ROUND_CHANCE
+
+static func should_force_deal_wildcard(chance: float, already_seen: bool) -> bool:
+	if chance <= 0.0:
+		return false
+	return WILDCARD_GUARANTEE_FIRST and not already_seen
 
 const ADJACENT_SLOT_FREE_FIRST_LEVEL := 2
 const ADJACENT_SLOT_FREE_LEVEL_INTERVAL := 2

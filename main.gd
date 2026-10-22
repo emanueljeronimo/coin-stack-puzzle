@@ -228,6 +228,8 @@ var max_value: int = 5
 var roll_value_floor: int = 1
 ## Tiradas de esta partida (0 = primera: solo 1-2).
 var board_deal_count: int = 0
+## True cuando esta sesion ya mostro un comodin de mazo.
+var _deal_wildcard_seen: bool = false
 ## Ancla de checkpoints post-prestige si el nivel ya iba por delante del hito (0 = ciclo 1).
 var cycle_checkpoint_origin: int = 0
 ## Revisión de reglas de ciclo (cura el salto 21→23 de saves viejos).
@@ -626,6 +628,7 @@ func setup_board() -> void:
 	max_value = CHECKPOINT_BASE_VALUE
 	roll_value_floor = 1
 	board_deal_count = 0
+	_deal_wildcard_seen = false
 	cycle_checkpoint_origin = 0
 	cycle_rules_revision = GameEngineScript.CYCLE_RULES_REVISION
 	active_stacks = INITIAL_PERMANENT_STACKS
@@ -1436,15 +1439,21 @@ func perform_roll() -> bool:
 		)
 		if not GameTurnEngineScript.should_group_early_rolls(checkpoint_level):
 			values_to_roll.shuffle()
+		var wildcard_chance: float = GameRulesScript.deal_wildcard_chance(checkpoint_level)
 		values_to_roll = GameTurnEngineScript.apply_round_wildcard(
 			values_to_roll,
 			roll_count,
-			GameRulesScript.deal_wildcard_chance(checkpoint_level),
+			wildcard_chance,
 			func() -> float:
 				return randf(),
 			func(n: int) -> int:
-				return randi() % maxi(1, n)
+				return randi() % maxi(1, n),
+			GameRulesScript.should_force_deal_wildcard(wildcard_chance, _deal_wildcard_seen)
 		)
+		for i in range(mini(roll_count, values_to_roll.size())):
+			if GameRulesScript.is_coin_wildcard_value(int(values_to_roll[i])):
+				_deal_wildcard_seen = true
+				break
 	_place_roll_values(values_to_roll, roll_count, target_stacks)
 	board_deal_count += 1
 

@@ -193,12 +193,15 @@ static func apply_round_wildcard(
 	dealt_count: int,
 	chance: float,
 	roll01: Callable,
-	pick_index: Callable
+	pick_index: Callable,
+	force: bool = false
 ) -> Array:
 	var n := mini(dealt_count, values.size())
 	if n <= 0:
 		return values
-	if float(roll01.call()) >= chance:
+	if chance <= 0.0:
+		return values
+	if not force and float(roll01.call()) >= chance:
 		return values
 	var idx := int(pick_index.call(n))
 	idx = clampi(idx, 0, n - 1)
