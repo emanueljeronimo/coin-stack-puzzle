@@ -3,7 +3,8 @@ extends Area2D
 const GameRulesScript = preload("res://game_rules.gd")
 const CoinWildcardShader = preload("res://coin_wildcard.gdshader")
 const CoinNumberFont = preload("res://Fonts/Chewy-Regular.ttf")
-const WildcardCenterTexture = preload("res://Imagenes/centro-comodin.png")
+const CoinFaceTexture = preload("res://Imagenes/ficha.png")
+const WildcardFaceTexture = preload("res://Imagenes/ficha-comodin.png")
 
 var value: int = 1
 var number_visible: bool = true
@@ -45,18 +46,12 @@ const NUMBER_OUTLINE_COLOR := Color(0, 0, 0, 1)
 const NUMBER_GLYPH_SPACING := -2
 const NUMBER_WIDTH_SCALE := 0.76
 const NUMBER_NUDGE := Vector2(0.0, -1.2)
-const WILDCARD_COIN_COLOR := Color("#00ffee")
-const WILDCARD_CENTER_WIDTH_RATIO := 0.48
-const WILDCARD_CENTER_HEIGHT_RATIO := 0.45
-const WILDCARD_CENTER_LEFT_RATIO := 0.25
-const WILDCARD_CENTER_TOP_RATIO := 0.25
 var coin_color: Color = VALUE_COLORS[0]
 var is_wildcard := false
 var wildcard_original_row := -1
 var _transform_tween: Tween = null
 var _number_font: FontVariation = null
 var _number_root: Node2D = null
-var _wildcard_center: Sprite2D = null
 
 func _ready() -> void:
 	input_pickable = false
@@ -76,9 +71,7 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	if is_wildcard:
-		_layout_wildcard_center()
-	else:
+	if not is_wildcard:
 		center_number()
 
 func _ensure_number_root() -> void:
@@ -175,16 +168,17 @@ func get_shadow_tint(base: Color) -> Color:
 
 func apply_color_by_value() -> void:
 	if is_wildcard:
-		_clear_wildcard_material()
-		coin_color = WILDCARD_COIN_COLOR
+		_set_face_texture(WildcardFaceTexture)
+		_ensure_wildcard_material()
+		coin_color = Color.WHITE
 		if sprite:
-			sprite.self_modulate = coin_color
+			sprite.self_modulate = Color.WHITE
 		if shadow_sprite:
-			shadow_sprite.self_modulate = get_shadow_tint(coin_color)
+			shadow_sprite.self_modulate = get_shadow_tint(Color(0.86, 0.68, 0.28))
 		if highlight_sprite:
-			highlight_sprite.visible = true
-			highlight_sprite.self_modulate = Color(1.0, 1.0, 1.0, HIGHLIGHT_ALPHA)
+			highlight_sprite.visible = false
 		return
+	_set_face_texture(CoinFaceTexture)
 	_clear_wildcard_material()
 	coin_color = get_color_for_value(value)
 	if sprite:
@@ -228,45 +222,23 @@ func _sync_center_mark() -> void:
 	if is_wildcard:
 		if label != null:
 			label.visible = false
-		_ensure_wildcard_center()
-		_layout_wildcard_center()
 		return
-	if _wildcard_center != null:
-		_wildcard_center.visible = false
 	if label != null:
 		label.text = str(value)
 		label.visible = number_visible
 		center_number()
 
 
-func _ensure_wildcard_center() -> void:
-	if _wildcard_center != null:
+func _set_face_texture(face: Texture2D) -> void:
+	if face == null:
 		return
-	_wildcard_center = Sprite2D.new()
-	_wildcard_center.name = "WildcardCenter"
-	_wildcard_center.texture = WildcardCenterTexture
-	_wildcard_center.centered = true
-	_wildcard_center.z_index = 6
-	add_child(_wildcard_center)
-
-
-func _layout_wildcard_center() -> void:
-	if _wildcard_center == null or _wildcard_center.texture == null:
-		return
-	var tex_size: Vector2 = _wildcard_center.texture.get_size()
-	if tex_size.x <= 0.0 or tex_size.y <= 0.0:
-		return
-	var diameter: float = COIN_RADIUS * 2.0
-	var box_size := Vector2(
-		diameter * WILDCARD_CENTER_WIDTH_RATIO,
-		diameter * WILDCARD_CENTER_HEIGHT_RATIO
-	)
-	var scale_factor: float = minf(box_size.x / tex_size.x, box_size.y / tex_size.y)
-	_wildcard_center.scale = Vector2.ONE * scale_factor
-	var box_left: float = -COIN_RADIUS + diameter * WILDCARD_CENTER_LEFT_RATIO
-	var box_top: float = -COIN_RADIUS + diameter * WILDCARD_CENTER_TOP_RATIO
-	_wildcard_center.position = Vector2(box_left + box_size.x * 0.5, box_top + box_size.y * 0.5)
-	_wildcard_center.visible = number_visible
+	if sprite and sprite.texture != face:
+		sprite.texture = face
+	if shadow_sprite and shadow_sprite.texture != face:
+		shadow_sprite.texture = face
+	if highlight_sprite and highlight_sprite.texture != face:
+		highlight_sprite.texture = face
+	configure_sprite_scale()
 
 
 func _ensure_wildcard_material() -> void:

@@ -7,11 +7,6 @@
   <style>
     * { box-sizing: border-box; }
 
-    :root {
-      /* Color de la ficha. Cambialo aca o con el picker. No afecta el juego. */
-      --ficha-color: #00ffee;
-    }
-
     body {
       margin: 0;
       min-height: 100vh;
@@ -21,7 +16,7 @@
       justify-content: center;
       gap: 28px;
       font-family: "Segoe UI", sans-serif;
-      color: #0505e9;
+      color: #2a2a32;
       background: linear-gradient(180deg, #eef1f6, #d7dde8);
     }
 
@@ -37,34 +32,7 @@
       text-align: center;
       font-size: 14px;
       line-height: 1.45;
-      color: #0048ff;
-    }
-
-    .controls {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 14px;
-      color: #2a2a32;
-    }
-
-    .controls input[type="color"] {
-      width: 42px;
-      height: 32px;
-      padding: 0;
-      border: 1px solid #9aa3b2;
-      background: #fff;
-      cursor: pointer;
-    }
-
-    .controls input[type="text"] {
-      width: 96px;
-      height: 32px;
-      padding: 0 8px;
-      border: 1px solid #9aa3b2;
-      border-radius: 4px;
-      font: inherit;
-      letter-spacing: 0.04em;
+      color: #4a4e58;
     }
 
     .row {
@@ -82,14 +50,14 @@
 
     .coin-wrap span {
       font-size: 13px;
-      color: #0f48d8;
+      color: #5a5e68;
     }
 
     .coin {
       position: relative;
       width: var(--side);
       height: var(--side);
-      filter: drop-shadow(0 2px 0 rgba(91, 4, 161, 0.18));
+      filter: drop-shadow(0 2px 0 rgba(150, 118, 40, 0.22));
     }
 
     .coin .tex {
@@ -98,101 +66,88 @@
       height: 100%;
     }
 
-    .coin .center {
-      position: absolute;
-      z-index: 2;
-      width: 48%;
-      height: 45%;
-      left: 25%;
-      top: 25%;
-      object-fit: contain;
-      pointer-events: none;
-    }
-
-    .big { --side: 280px; }
-    .board { --side: 104px; }
+    .big { --side: 240px; }
+    .board { --side: 89px; }
   </style>
 </head>
 <body>
   <h1>Ficha comodin</h1>
   <p>
-    Cambiá <code>--ficha-color</code> o usá el picker. Solo este HTML, no el juego.
+    Usa <strong>ficha-comodin</strong> y el barrido de luz en diagonal.
   </p>
-  <label class="controls">
-    Color de la ficha
-    <input id="ficha-color" type="color" value="#dcdce1" />
-    <input id="ficha-hex" type="text" value="#dcdce1" spellcheck="false" />
-  </label>
   <div class="row">
     <div class="coin-wrap">
       <div class="coin big">
         <canvas class="tex"></canvas>
-        <img class="center" src="Imagenes/centro-comodin.png" alt="" />
       </div>
       <span>grande</span>
     </div>
     <div class="coin-wrap">
       <div class="coin board">
         <canvas class="tex"></canvas>
-        <img class="center" src="Imagenes/centro-comodin.png" alt="" />
       </div>
       <span>tamano tablero</span>
     </div>
   </div>
   <script>
+    const SWEEP_DURATION = 0.8;
+    const SWEEP_PERIOD = 3.6;
     const fichaImg = new Image();
-    const colorInput = document.getElementById("ficha-color");
-    const hexInput = document.getElementById("ficha-hex");
+    let start = 0;
 
-    function fichaColor() {
-      return getComputedStyle(document.documentElement)
-        .getPropertyValue("--ficha-color")
-        .trim() || "#dcdce1";
-    }
-
-    function paint(canvas) {
+    function paint(canvas, t) {
       const ctx = canvas.getContext("2d");
-      canvas.width = fichaImg.naturalWidth;
-      canvas.height = fichaImg.naturalHeight;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const w = fichaImg.naturalWidth;
+      const h = fichaImg.naturalHeight;
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
+      }
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalCompositeOperation = "source-over";
+      ctx.clearRect(0, 0, w, h);
       ctx.drawImage(fichaImg, 0, 0);
-      ctx.globalCompositeOperation = "multiply";
-      ctx.fillStyle = fichaColor();
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      const phase = t % SWEEP_PERIOD;
+      if (phase < SWEEP_DURATION) {
+        const u = phase / SWEEP_DURATION;
+        const len = Math.sqrt(w * w + h * h);
+        const pos = (-0.28 + u * 1.56) * len;
+        const half = len * 0.12;
+        const fade = Math.min(u / 0.08, 1) * Math.min((1 - u) / 0.08, 1);
+        ctx.save();
+        ctx.translate(w * 0.5, h * 0.5);
+        ctx.rotate(Math.PI / 4);
+        const g = ctx.createLinearGradient(pos - half, 0, pos + half, 0);
+        g.addColorStop(0, "rgba(255, 255, 247, 0)");
+        g.addColorStop(0.32, "rgba(255, 255, 247, " + (0.10 * fade).toFixed(3) + ")");
+        g.addColorStop(0.5, "rgba(255, 255, 247, " + (0.28 * fade).toFixed(3) + ")");
+        g.addColorStop(0.68, "rgba(255, 255, 247, " + (0.10 * fade).toFixed(3) + ")");
+        g.addColorStop(1, "rgba(255, 255, 247, 0)");
+        ctx.globalCompositeOperation = "screen";
+        ctx.fillStyle = g;
+        ctx.fillRect(-len, -len, len * 2, len * 2);
+        ctx.restore();
+      }
       ctx.globalCompositeOperation = "destination-in";
       ctx.drawImage(fichaImg, 0, 0);
       ctx.globalCompositeOperation = "source-over";
     }
 
-    function paintAll() {
-      document.querySelectorAll("canvas.tex").forEach(paint);
+    function frame(now) {
+      if (!start) {
+        start = now;
+      }
+      const t = (now - start) / 1000;
+      document.querySelectorAll("canvas.tex").forEach(function (canvas) {
+        paint(canvas, t);
+      });
+      requestAnimationFrame(frame);
     }
 
-    function setColor(value) {
-      const color = value.trim();
-      if (!/^#([0-9a-fA-F]{6})$/.test(color)) {
-        return;
-      }
-      document.documentElement.style.setProperty("--ficha-color", color);
-      colorInput.value = color;
-      hexInput.value = color;
-      paintAll();
-    }
-
-    colorInput.addEventListener("input", function () {
-      setColor(colorInput.value);
-    });
-    hexInput.addEventListener("change", function () {
-      setColor(hexInput.value);
-    });
-    hexInput.addEventListener("keydown", function (event) {
-      if (event.key === "Enter") {
-        setColor(hexInput.value);
-      }
-    });
-
-    fichaImg.onload = paintAll;
-    fichaImg.src = "Imagenes/ficha.png";
+    fichaImg.onload = function () {
+      requestAnimationFrame(frame);
+    };
+    fichaImg.src = "Imagenes/ficha-comodin.png";
   </script>
 </body>
 </html>
