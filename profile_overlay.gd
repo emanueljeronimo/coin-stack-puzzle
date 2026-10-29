@@ -6,7 +6,7 @@ extends Control
 signal profile_saved
 
 const REF_WIDTH := 1080.0
-const LogoFont = preload("res://Fonts/Chewy-Regular.ttf")
+const LogoFont = preload("res://Fonts/Lobster-Regular.ttf")
 const CLOSE_RED := Color(0.90, 0.22, 0.24, 1.0)
 const CLOSE_RED_BORDER := Color(0.55, 0.10, 0.12, 1.0)
 const SELECT_GREEN := Color(0.32, 0.86, 0.28, 1.0)

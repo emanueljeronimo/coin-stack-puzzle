@@ -1,7 +1,7 @@
 class_name BoardTutorialOverlay
 extends Control
 
-const SpeechFont = preload("res://Fonts/FredokaOne-Regular.ttf")
+const SpeechFont = preload("res://Fonts/Lobster-Regular.ttf")
 const ArrowTexture = preload("res://Imagenes/flecha-abajo.png")
 const BubbleTexture = preload("res://Imagenes/globo-dialogo.png")
 const REF_WIDTH := 1080.0

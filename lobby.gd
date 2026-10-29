@@ -6,10 +6,11 @@ const DiamondIconTexture = preload("res://Imagenes/icono-diamante.png")
 const CartIconTexture = preload("res://Imagenes/icono-cart.png")
 const SettingsIconTexture = preload("res://Imagenes/icono-settings.png")
 const DailyLoginIconTexture = preload("res://Imagenes/icono-login-diario.png")
-const ShowcaseCoinTexture = preload("res://Imagenes/ficha-portada.png")
+const ShowcaseCoinTexture = preload("res://Imagenes/ficha-portada2.png")
+const ShowcaseCoinShader = preload("res://coin_wildcard.gdshader")
 const LevelLabelShader = preload("res://lobby_level_label.gdshader")
 const ShopScene = preload("res://Shop.tscn")
-const LogoFont = preload("res://Fonts/Chewy-Regular.ttf")
+const LogoFont = preload("res://Fonts/Lobster-Regular.ttf")
 const LevelFont = preload("res://Fonts/FredokaOne-Regular.ttf")
 const GameScenePath := "res://Main.tscn"
 const DailyLoginServiceScript = preload("res://daily_login_service.gd")
@@ -29,8 +30,9 @@ const PEDESTAL_COIN_Y_RATIO := 0.568
 const PEDESTAL_COIN_SCALE := 5.55
 ## Diametro local de la ficha de tablero (52 * FACE_SCALE 0.86).
 const SHOWCASE_COIN_LOCAL_DIAMETER := 44.72
-## Multiplica el oro para bajar brillo y acercarlo a los pasteles del juego.
-const SHOWCASE_COIN_MODULATE := Color(0.82, 0.74, 0.64)
+const SHOWCASE_COIN_PASTEL_MIX := 0.48
+const SHOWCASE_COIN_PASTEL_TINT := Color(0.95, 0.86, 0.96)
+const SHOWCASE_COIN_SWEEP_STRENGTH := 0.22
 const BTN_GAP := 16.0
 const CORNER_BTN_WIDTH_RATIO := 0.12
 const STAT_BTN_WIDTH_RATIO := 0.19
@@ -200,8 +202,9 @@ func build_ui() -> void:
 	showcase_coin.name = "ShowcaseCoin"
 	showcase_coin.texture = ShowcaseCoinTexture
 	showcase_coin.centered = true
-	showcase_coin.modulate = SHOWCASE_COIN_MODULATE
+	showcase_coin.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	showcase_coin.z_index = 5
+	_apply_showcase_coin_look()
 	hud_root.add_child(showcase_coin)
 
 	build_settings_dialog()
@@ -319,9 +322,22 @@ func create_hud_text_label(text: String, font_size: int) -> Label:
 	var lbl := create_label(text, font_size, HUD_PILL_TEXT)
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	if LogoFont != null:
-		lbl.add_theme_font_override("font", LogoFont)
+	if UiFontService.ui_font() != null:
+		lbl.add_theme_font_override("font", UiFontService.ui_font())
 	return lbl
+
+func _apply_showcase_coin_look() -> void:
+	if showcase_coin == null:
+		return
+	var mat := showcase_coin.material as ShaderMaterial
+	if mat == null or mat.shader != ShowcaseCoinShader:
+		mat = ShaderMaterial.new()
+		mat.shader = ShowcaseCoinShader
+		showcase_coin.material = mat
+	mat.set_shader_parameter("pastel_mix", SHOWCASE_COIN_PASTEL_MIX)
+	mat.set_shader_parameter("pastel_tint", SHOWCASE_COIN_PASTEL_TINT)
+	mat.set_shader_parameter("sweep_strength", SHOWCASE_COIN_SWEEP_STRENGTH)
+	mat.set_shader_parameter("use_luma_mask", 0.0)
 
 func _showcase_coin_scale(ui_scale: float) -> float:
 	if showcase_coin == null or showcase_coin.texture == null:

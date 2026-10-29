@@ -12,6 +12,7 @@ func _run() -> void:
 	print("=== wildcard_flow_service test ===")
 	_test_has_uses()
 	_test_action_kind()
+	_test_tool_hud_click()
 	print("=== RESULT: %d passed, %d failed ===" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -43,3 +44,30 @@ func _test_action_kind() -> void:
 		_fail("kind_unknown")
 		return
 	_ok("action_kind")
+
+func _test_tool_hud_click() -> void:
+	if BoosterFlowServiceScript.should_spend_on_hud("mix") != true:
+		_fail("mix_spends_on_hud")
+		return
+	if BoosterFlowServiceScript.should_spend_on_hud("hammer"):
+		_fail("hammer_does_not_spend_on_hud")
+		return
+	if BoosterFlowServiceScript.should_spend_on_hud("glove"):
+		_fail("glove_does_not_spend_on_hud")
+		return
+	if BoosterFlowServiceScript.tool_hud_click("", "hammer") != "enter":
+		_fail("enter_hammer")
+		return
+	if BoosterFlowServiceScript.tool_hud_click("hammer", "hammer") != "cancel":
+		_fail("cancel_hammer")
+		return
+	if BoosterFlowServiceScript.tool_hud_click("hammer", "glove") != "switch":
+		_fail("switch_to_glove")
+		return
+	if BoosterFlowServiceScript.tool_hud_click("glove", "hammer") != "switch":
+		_fail("switch_to_hammer")
+		return
+	if BoosterFlowServiceScript.tool_hud_click("", "mix") != "ignore":
+		_fail("mix_ignore")
+		return
+	_ok("tool_hud_click")

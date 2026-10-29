@@ -13,7 +13,7 @@ const MixIconTexture = preload("res://Imagenes/icono-mezclar.png")
 const HammerIconTexture = preload("res://Imagenes/icono-martillo.png")
 const GloveIconTexture = preload("res://Imagenes/icono-mano.png")
 const REF_WIDTH := 1080.0
-const LogoFont = preload("res://Fonts/Chewy-Regular.ttf")
+const LogoFont = preload("res://Fonts/Lobster-Regular.ttf")
 const CLOSE_RED := Color(0.90, 0.22, 0.24, 1.0)
 const CLOSE_RED_BORDER := Color(0.55, 0.10, 0.12, 1.0)
 

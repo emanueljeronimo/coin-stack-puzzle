@@ -39,6 +39,10 @@ func _test_font_size() -> void:
 	if small != 25:
 		_fail("font_size_small", str(small))
 		return
+	var lobster: int = MarkScript.font_size_for_side(44.72, 0.50)
+	if lobster != 22:
+		_fail("font_size_050", str(lobster))
+		return
 	var big: int = MarkScript.font_size_for_side(1024.0, 0.55)
 	if big != 563:
 		_fail("font_size_texture", str(big))

@@ -30,6 +30,7 @@ TEST_SCRIPTS=(
   "res://tests/game_economy_service_test.gd"
   "res://tests/game_lives_service_test.gd"
   "res://tests/ui_style_utils_test.gd"
+  "res://tests/ui_font_service_test.gd"
   "res://tests/coin_number_mark_test.gd"
   "res://tests/main_input_router_test.gd"
   "res://tests/main_turn_resolution_service_test.gd"

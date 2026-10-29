@@ -89,7 +89,7 @@ func _test_grant_to_max_clears_timer() -> void:
 	_ok("grant_to_max_clears_timer")
 
 func _test_chip_format() -> void:
-	if GameLivesServiceScript.format_chip_text(5, 0) != "full":
+	if GameLivesServiceScript.format_chip_text(5, 0) != "Full":
 		_fail("chip_full", GameLivesServiceScript.format_chip_text(5, 0))
 		return
 	if GameLivesServiceScript.format_chip_text(3, 1787) != "29:47":

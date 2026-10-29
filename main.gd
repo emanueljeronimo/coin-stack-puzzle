@@ -49,7 +49,7 @@ const LevelUpStarsRightTexture = preload("res://Imagenes/tres-estrellas-der.png"
 const HomeIconTexture = preload("res://Imagenes/icono-home.png")
 const CartIconTexture = preload("res://Imagenes/icono-cart.png")
 const SettingsIconTexture = preload("res://Imagenes/icono-settings.png")
-const UiFont = preload("res://Fonts/Chewy-Regular.ttf")
+const UiFont = preload("res://Fonts/Lobster-Regular.ttf")
 const LobbyScenePath := "res://Lobby.tscn"
 
 const TOTAL_SLOTS = 15
@@ -518,6 +518,7 @@ func _update_temp_slot_timer_only() -> void:
 	var sc := get_layout_scale()
 	var tfs := int(14 * sc)
 	temp_slot_timer_label.text = "%d s" % maxi(0, secs)
+	_apply_ui_font(temp_slot_timer_label)
 	temp_slot_timer_label.add_theme_font_size_override("font_size", tfs)
 	temp_slot_timer_label.add_theme_color_override("font_color", Color(0.1, 0.34, 0.14, 0.96))
 	temp_slot_timer_label.add_theme_color_override("font_outline_color", Color(1, 1, 1, 0.75))
@@ -1143,14 +1144,20 @@ func _input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return
 		if hammer_mode_active:
+			if MainInputRouterScript.is_click_consumed_by_controls(event.position, action_pills):
+				return
 			var hammer_stack = get_stack_at_point(event.position)
 			if hammer_stack != null:
 				apply_hammer_on_stack(hammer_stack)
 			else:
 				print("Martillo: toca una pila para vaciarla.")
+			get_viewport().set_input_as_handled()
 			return
 		if glove_mode_active:
+			if MainInputRouterScript.is_click_consumed_by_controls(event.position, action_pills):
+				return
 			handle_glove_click(event.position)
+			get_viewport().set_input_as_handled()
 			return
 		if MainInputRouterScript.is_click_consumed_by_controls(event.position, action_pills):
 			return
@@ -1178,9 +1185,14 @@ func handle_glove_click(mouse_pos: Vector2) -> void:
 	if selected_stack == clicked_stack:
 		clear_selection()
 		return
-	# No pisar undo_snapshot: se capturó al activar el guante (tablero + Booster previos).
+	if not BoosterFlowServiceScript.has_uses(booster_counts, "glove"):
+		_cancel_pending_tool_mode()
+		return
+	_clear_undo_snapshot()
+	undo_snapshot = capture_board_snapshot()
 	var moved = selected_stack.move_top_block_to(clicked_stack, true)
 	if moved > 0:
+		consume_booster("glove")
 		GameState.play_coin_sound(int(moved))
 		_update_undo_button_state()
 		glove_mode_active = false
@@ -1189,6 +1201,7 @@ func handle_glove_click(mouse_pos: Vector2) -> void:
 		clear_selection(false)
 		print("Guante: moviste %d ficha(s)." % moved)
 	else:
+		_clear_undo_snapshot()
 		print("Guante: destino sin espacio.")
 
 func handle_click(mouse_pos: Vector2) -> void:
@@ -3111,6 +3124,7 @@ func layout_adjacent_slot_diamond_error_label() -> void:
 		return
 	var sc := get_layout_scale()
 	var fs := int(clampf(12.5 * sc, 11.0, 17.0))
+	_apply_ui_font(adjacent_slot_diamond_error_label)
 	adjacent_slot_diamond_error_label.add_theme_font_size_override("font_size", fs)
 	adjacent_slot_diamond_error_label.add_theme_color_override("font_color", Color.WHITE)
 	adjacent_slot_diamond_error_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -3230,6 +3244,7 @@ func update_adjacent_slot_offer_ui() -> void:
 		_reconcile_future_free_slot_unlock_cursor()
 		var free_level := get_adjacent_slot_free_unlock_level()
 		adjacent_slot_offer_lbl_level.text = "Gratis al nivel %d" % free_level
+		_apply_ui_font(adjacent_slot_offer_lbl_level)
 		adjacent_slot_offer_lbl_level.add_theme_font_size_override("font_size", int(clampf(fit * 0.20, 20.0, 42.0)))
 		adjacent_slot_offer_lbl_level.add_theme_color_override("font_color", g)
 	if adjacent_slot_offer_lbl_lock != null:
@@ -3237,6 +3252,7 @@ func update_adjacent_slot_offer_ui() -> void:
 		adjacent_slot_offer_lbl_lock.add_theme_color_override("font_color", g)
 	if adjacent_slot_offer_lbl_cost != null:
 		adjacent_slot_offer_lbl_cost.text = str(adjacent_slot_next_price)
+		_apply_ui_font(adjacent_slot_offer_lbl_cost)
 		adjacent_slot_offer_lbl_cost.add_theme_font_size_override("font_size", int(clampf(fit * 0.28, 24.0, 48.0)))
 		adjacent_slot_offer_lbl_cost.add_theme_color_override("font_color", g)
 	if adjacent_slot_offer_cost_icon != null:
@@ -3384,12 +3400,14 @@ func update_temp_slot_overlay_label() -> void:
 		temp_slot_locked_hourglass.add_theme_color_override("font_color", g)
 
 		temp_slot_locked_lbl_60.text = "60 seg"
+		_apply_ui_font(temp_slot_locked_lbl_60)
 		temp_slot_locked_lbl_60.add_theme_font_size_override("font_size", duration_fs)
 		temp_slot_locked_lbl_60.add_theme_color_override("font_color", g)
 		temp_slot_locked_lbl_60.add_theme_constant_override("outline_size", 2)
 		temp_slot_locked_lbl_60.add_theme_color_override("font_outline_color", Color(1, 1, 1, 0.35))
 
 		temp_slot_locked_lbl_cost.text = str(TEMP_SLOT_COST_DIAMONDS)
+		_apply_ui_font(temp_slot_locked_lbl_cost)
 		temp_slot_locked_lbl_cost.add_theme_font_size_override("font_size", cost_fs)
 		temp_slot_locked_lbl_cost.add_theme_color_override("font_color", g)
 		if temp_slot_locked_cost_icon != null:
@@ -3498,10 +3516,16 @@ func _apply_repartir_button_style(btn_size: Vector2, scale: float) -> void:
 	_apply_candy_hud_button_style(cta_button, btn_size, scale)
 	_style_candy_hud_label(cta_label, scale)
 
+func _apply_ui_font(lbl: Label) -> void:
+	if lbl == null:
+		return
+	var font: Font = UiFontService.ui_font()
+	if font != null:
+		lbl.add_theme_font_override("font", font)
+
 func create_hud_text_label(text: String, font_size: int) -> Label:
 	var lbl := create_label(text, font_size, HUD_PILL_TEXT)
-	if UiFont != null:
-		lbl.add_theme_font_override("font", UiFont)
+	_apply_ui_font(lbl)
 	return lbl
 
 func layout_hud_pill_pair(shadow: Panel, panel: Control, pos: Vector2, size: Vector2, scale: float) -> void:
@@ -3625,12 +3649,13 @@ func _build_undo_button() -> Dictionary:
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.add_child(center)
-	# Sin Chewy: esa fuente no tiene el glifo ↩ y el botón parece vacío.
+	# Lobster no tiene ↩; el fallback de UiFontService cubre el glifo.
 	var icon := Label.new()
 	icon.text = "↩"
 	icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	icon.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_apply_ui_font(icon)
 	icon.add_theme_font_size_override("font_size", int(UNDO_ICON_FONT_SIZE))
 	icon.add_theme_color_override("font_color", CTA_ICON_TEXT)
 	center.add_child(icon)
@@ -4082,8 +4107,7 @@ func create_label(text: String, font_size: int, color: Color) -> Label:
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	if UiFont != null:
-		lbl.add_theme_font_override("font", UiFont)
+	_apply_ui_font(lbl)
 	lbl.add_theme_font_size_override("font_size", font_size)
 	lbl.add_theme_color_override("font_color", color)
 	return lbl
@@ -4206,13 +4230,35 @@ func perform_glove_action() -> void:
 func apply_hammer_on_stack(target_stack: Node) -> void:
 	if target_stack == null:
 		return
-	# Conservar undo_snapshot de la activación (incluye el Booster antes de gastarlo).
+	if target_stack.is_empty():
+		print("Martillo: toca una pila para vaciarla.")
+		return
+	if not BoosterFlowServiceScript.has_uses(booster_counts, "hammer"):
+		_cancel_pending_tool_mode()
+		return
+	_clear_undo_snapshot()
+	undo_snapshot = capture_board_snapshot()
+	consume_booster("hammer")
 	while not target_stack.is_empty():
 		target_stack.pop()
 	hammer_mode_active = false
 	glove_mode_active = false
 	_update_undo_button_state()
 	resolve_board_after_action()
+
+func _active_tool_booster_type() -> String:
+	if hammer_mode_active:
+		return "hammer"
+	if glove_mode_active:
+		return "glove"
+	return ""
+
+func _cancel_pending_tool_mode() -> void:
+	if not hammer_mode_active and not glove_mode_active:
+		return
+	hammer_mode_active = false
+	glove_mode_active = false
+	clear_selection()
 
 func try_use_booster(booster_type: String) -> void:
 	if BoardTutorialServiceScript.blocks_tools(_tutorial_step):
@@ -4225,25 +4271,30 @@ func try_use_booster(booster_type: String) -> void:
 			% [get_booster_display_name(booster_type), get_booster_unlock_level(booster_type)]
 		)
 		return
+	if BoosterFlowServiceScript.booster_action_kind(booster_type) == "tool":
+		var hud_click := BoosterFlowServiceScript.tool_hud_click(
+			_active_tool_booster_type(), booster_type
+		)
+		if hud_click == "cancel":
+			_cancel_pending_tool_mode()
+			return
+		if hud_click == "switch":
+			_cancel_pending_tool_mode()
 	if not BoosterFlowServiceScript.has_uses(booster_counts, booster_type):
+		_cancel_pending_tool_mode()
 		open_purchase_dialog(booster_type)
 		return
 
 	match BoosterFlowServiceScript.booster_action_kind(booster_type):
 		"mix":
-			# Mezclar no tiene undo (reparte de nuevo el tablero).
+			_cancel_pending_tool_mode()
 			consume_booster(booster_type)
 			perform_mix_action()
 		"tool":
-			# Snapshot ANTES de gastar: deshacer devuelve tablero + Booster.
-			_clear_undo_snapshot()
-			undo_snapshot = capture_board_snapshot()
-			consume_booster(booster_type)
 			if booster_type == "hammer":
 				perform_hammer_action()
 			else:
 				perform_glove_action()
-			_update_undo_button_state()
 		_:
 			return
 

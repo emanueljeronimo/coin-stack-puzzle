@@ -2,7 +2,7 @@ extends Area2D
 
 const GameRulesScript = preload("res://game_rules.gd")
 const CoinWildcardShader = preload("res://coin_wildcard.gdshader")
-const CoinNumberFont = preload("res://Fonts/Chewy-Regular.ttf")
+const CoinNumberFont = preload("res://Fonts/Lobster-Regular.ttf")
 const CoinFaceTexture = preload("res://Imagenes/ficha.png")
 const WildcardFaceTexture = preload("res://Imagenes/ficha-comodin.png")
 const CoinNumberMarkScript = preload("res://coin_number_mark.gd")
@@ -41,9 +41,9 @@ const COIN_TINT_LIGHTEN := 0.04
 const SHADOW_ALPHA := 0.09
 const HIGHLIGHT_ALPHA := 0.14
 const COIN_RADIUS := 26.0
-const NUMBER_TO_DIAMETER := 0.55
+const NUMBER_TO_DIAMETER := 0.50
 const NUMBER_OUTLINE_DARKEN := 0.50
-const NUMBER_WIDTH_SCALE := 0.76
+const NUMBER_WIDTH_SCALE := 1.0
 const NUMBER_NUDGE_X := 0.0
 ## El HTML usa 0.05 por metricas de canvas; en Godot ese valor baja de mas el digito.
 const NUMBER_NUDGE_Y := 0.0

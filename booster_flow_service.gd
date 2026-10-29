@@ -12,3 +12,17 @@ static func booster_action_kind(booster_type: String) -> String:
 			return "tool"
 		_:
 			return "unknown"
+
+## Mix se gasta al tocar el HUD. Martillo/guante solo al aplicarlos al tablero.
+static func should_spend_on_hud(booster_type: String) -> bool:
+	return booster_action_kind(booster_type) == "mix"
+
+## enter: apuntar. cancel: mismo chip otra vez. switch: el otro tool. ignore: no es tool.
+static func tool_hud_click(active_tool: String, clicked_type: String) -> String:
+	if clicked_type != "hammer" and clicked_type != "glove":
+		return "ignore"
+	if active_tool == clicked_type:
+		return "cancel"
+	if active_tool == "hammer" or active_tool == "glove":
+		return "switch"
+	return "enter"

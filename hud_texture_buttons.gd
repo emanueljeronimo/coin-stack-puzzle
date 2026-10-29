@@ -4,7 +4,9 @@ extends RefCounted
 const LongButtonTexture := preload("res://Imagenes/boton-largo.png")
 const PlayPastelButtonTexture := preload("res://Imagenes/boton-nuevo.png")
 const PlayButtonTexture := preload("res://Imagenes/boton-nuevo.png")
-const LogoFont := preload("res://Fonts/Chewy-Regular.ttf")
+const UiFontServiceScript := preload("res://ui_font_service.gd")
+const LogoFont := preload("res://Fonts/Lobster-Regular.ttf")
+const StatFont := preload("res://Fonts/Lobster-Regular.ttf")
 const GameLivesServiceScript := preload("res://game_lives_service.gd")
 const SlotOverlayBgScript := preload("res://slot_overlay_bg.gd")
 const UiThemeServiceScript := preload("res://ui_theme_service.gd")
@@ -28,8 +30,8 @@ const LIFE_HEART_ICON_SIZE_RATIO := 1.12
 const LIFE_COUNT_COLOR := Color(0.98, 0.97, 0.94)
 const LIFE_COUNT_OUTLINE := Color(0.28, 0.10, 0.14, 0.92)
 const LIFE_UNLIMITED_GLYPH := "∞"
-const LIFE_UNLIMITED_COLOR := Color(0.06, 0.06, 0.08, 1.0)
-const LIFE_UNLIMITED_OUTLINE := Color(1.0, 1.0, 1.0, 0.96)
+const LIFE_UNLIMITED_COLOR := Color(1.0, 1.0, 1.0, 1.0)
+const LIFE_UNLIMITED_OUTLINE := Color(0.28, 0.10, 0.14, 0.92)
 ## El PNG llena el recuadro: el número va al centro del corazón.
 const LIFE_COUNT_TOP_RATIO := 0.18
 const LIFE_COUNT_BOTTOM_RATIO := 0.22
@@ -54,6 +56,9 @@ const LIFE_UNLIMITED_FONT_RATIO := 0.74
 const LIFE_UNLIMITED_FONT_MAX := 78
 const CANDY_TEXT := Color(0.98, 0.98, 0.96, 1.0)
 const CANDY_FILL_FALLBACK := Color(0.20, 0.76, 0.96, 1.0)
+
+static func get_stat_font() -> Font:
+	return UiFontServiceScript.ui_font()
 
 static func get_button_size(texture: Texture2D, width: float) -> Vector2:
 	var tex_size := texture.get_size()
@@ -444,8 +449,8 @@ static func create_chip_stat_label(text: String, font_size: int) -> Label:
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	if LogoFont != null:
-		lbl.add_theme_font_override("font", LogoFont)
+	if get_stat_font() != null:
+		lbl.add_theme_font_override("font", get_stat_font())
 	lbl.add_theme_font_size_override("font_size", font_size)
 	lbl.add_theme_color_override("font_color", CHIP_STAT_COLOR)
 	lbl.add_theme_color_override("font_outline_color", CHIP_STAT_OUTLINE)
@@ -470,8 +475,8 @@ static func create_life_heart_badge(icon_texture: Texture2D) -> Dictionary:
 	count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	count.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	count.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	if LogoFont != null:
-		count.add_theme_font_override("font", LogoFont)
+	if get_stat_font() != null:
+		count.add_theme_font_override("font", get_stat_font())
 	count.add_theme_color_override("font_color", LIFE_COUNT_COLOR)
 	count.add_theme_color_override("font_outline_color", LIFE_COUNT_OUTLINE)
 	count.add_theme_constant_override("outline_size", 5)
@@ -593,8 +598,8 @@ static func create_resource_chip(icon_texture: Texture2D, with_icon_count: bool)
 		count.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		count.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		count.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		if LogoFont != null:
-			count.add_theme_font_override("font", LogoFont)
+		if get_stat_font() != null:
+			count.add_theme_font_override("font", get_stat_font())
 		count.add_theme_color_override("font_color", LIFE_COUNT_COLOR)
 		count.add_theme_color_override("font_outline_color", LIFE_COUNT_OUTLINE)
 		count.add_theme_constant_override("outline_size", 6)
@@ -605,8 +610,8 @@ static func create_resource_chip(icon_texture: Texture2D, with_icon_count: bool)
 	value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	value.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	value.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	if LogoFont != null:
-		value.add_theme_font_override("font", LogoFont)
+	if get_stat_font() != null:
+		value.add_theme_font_override("font", get_stat_font())
 	value.add_theme_color_override("font_color", BTN_TEXT_COLOR)
 	value.add_theme_color_override("font_outline_color", BTN_TEXT_OUTLINE)
 	value.add_theme_constant_override("outline_size", 4)
@@ -792,8 +797,8 @@ static func create_button_label(text: String, font_size: int) -> Label:
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	if LogoFont != null:
-		lbl.add_theme_font_override("font", LogoFont)
+	if get_stat_font() != null:
+		lbl.add_theme_font_override("font", get_stat_font())
 	lbl.add_theme_font_size_override("font_size", font_size)
 	lbl.add_theme_color_override("font_color", BTN_TEXT_COLOR)
 	lbl.add_theme_color_override("font_outline_color", BTN_TEXT_OUTLINE)

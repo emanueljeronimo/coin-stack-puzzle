@@ -96,7 +96,7 @@ static func format_chip_text(
 	max_lives: int = MAX_LIVES
 ) -> String:
 	if lives >= max_lives:
-		return "full"
+		return "Full"
 	return format_countdown(remaining_sec)
 
 ## Saves viejos sin timestamp: el ciclo arrancó al guardar.

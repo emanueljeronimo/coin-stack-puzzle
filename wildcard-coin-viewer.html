@@ -4,10 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Fichas — vista previa</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Lobster&display=swap" rel="stylesheet" />
   <style>
     @font-face {
-      font-family: "Chewy";
-      src: url("Fonts/Chewy-Regular.ttf") format("truetype");
+      font-family: "Lobster";
+      src: url("Fonts/Lobster-Regular.ttf") format("truetype");
     }
 
     * { box-sizing: border-box; }
@@ -110,8 +113,7 @@
 <body>
   <h1>Comparacion de fichas</h1>
   <p>
-    El borde del numero es el color de esa ficha, mas oscuro.
-    Ajustalo con <strong>NUMBER_OUTLINE_DARKEN</strong>.
+    Numero en <strong>Lobster</strong>, tamano <strong>NUMBER_TO_DIAMETER 0.50</strong>.
   </p>
   <div class="row">
     <div class="col">
@@ -137,8 +139,8 @@
   <script>
     const SWEEP_DURATION = 0.8;
     const SWEEP_PERIOD = 3.6;
-    const NUMBER_TO_DIAMETER = 0.55;
-    const NUMBER_WIDTH_SCALE = 0.76;
+    const NUMBER_TO_DIAMETER = 0.50;
+    const NUMBER_WIDTH_SCALE = 1.0;
     const NUMBER_NUDGE_X = 0.0;
     const NUMBER_NUDGE_Y = 0.05;
     const PASTEL_SOFTEN = 0.14;
@@ -213,6 +215,9 @@
       const ctx = canvas.getContext("2d");
       const w = wildcardImg.naturalWidth;
       const h = wildcardImg.naturalHeight;
+      if (w <= 0 || h <= 0) {
+        return;
+      }
       if (canvas.width !== w || canvas.height !== h) {
         canvas.width = w;
         canvas.height = h;
@@ -254,6 +259,9 @@
       const ctx = canvas.getContext("2d");
       const w = commonImg.naturalWidth;
       const h = commonImg.naturalHeight;
+      if (w <= 0 || h <= 0) {
+        return;
+      }
       if (canvas.width !== w || canvas.height !== h) {
         canvas.width = w;
         canvas.height = h;
@@ -282,7 +290,7 @@
         h * 0.5 + side * NUMBER_NUDGE_Y
       );
       ctx.scale(NUMBER_WIDTH_SCALE, 1);
-      ctx.font = fontSize + "px Chewy, sans-serif";
+      ctx.font = fontSize + 'px "Lobster", sans-serif';
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.lineJoin = "round";
@@ -315,7 +323,12 @@
       if (ready < 2) {
         return;
       }
-      requestAnimationFrame(frame);
+      const fontsOk = document.fonts && document.fonts.ready
+        ? document.fonts.ready
+        : Promise.resolve();
+      fontsOk.then(function () {
+        requestAnimationFrame(frame);
+      });
     }
 
     mountCommons();
