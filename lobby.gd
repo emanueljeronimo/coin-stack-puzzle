@@ -9,7 +9,6 @@ const DailyLoginIconTexture = preload("res://Imagenes/icono-login-diario.png")
 const ShowcaseCoinTexture = preload("res://Imagenes/ficha-portada2.png")
 const ShowcaseCoinShader = preload("res://coin_wildcard.gdshader")
 const LevelLabelShader = preload("res://lobby_level_label.gdshader")
-const SlotOverlayBgScript = preload("res://slot_overlay_bg.gd")
 const ShopScene = preload("res://Shop.tscn")
 const LogoFont = preload("res://Fonts/Lobster-Regular.ttf")
 const GameScenePath := "res://Main.tscn"
@@ -53,13 +52,8 @@ const PLAY_LETTER_SPACING := 3
 const PLAY_EMBOLDEN := 0.55
 const PLAY_LABEL_INSET_X := 0.04
 const PLAY_LABEL_LIFT_RATIO := 0.08
-const PLAY_GOLD_HI := Color(1.00, 0.95, 0.68)
-const PLAY_GOLD_MID := Color(0.96, 0.78, 0.28)
-const PLAY_GOLD_LO := Color(0.76, 0.46, 0.12)
-const PLAY_GOLD_BORDER := Color(0.46, 0.24, 0.10, 1.0)
 const PLAY_TEXT_COLOR := Color(1.0, 1.0, 1.0, 1.0)
 const PLAY_TEXT_OUTLINE := Color(0.42, 0.22, 0.10, 0.92)
-const PLAY_GOLD_BG_META := "play_gold_bg"
 const DAILY_LOGIN_SIZE_RATIO := 1.65
 
 var background_rect: TextureRect = null
@@ -428,39 +422,7 @@ func _apply_level_label_style(ui_scale: float) -> void:
 	)
 
 func _apply_play_button_style(play_size: Vector2, scale: float) -> void:
-	if play_button == null:
-		return
-	var radius := int(minf(play_size.x, play_size.y) * 0.50)
-	var border_w := int(clampf(round(2.0 * scale), 2.0, 3.0))
-	var style: StyleBoxFlat = HudTextureButtons.make_candy_style(
-		PLAY_GOLD_MID,
-		PLAY_GOLD_BORDER,
-		radius,
-		border_w
-	)
-	style.draw_center = false
-	play_button.add_theme_stylebox_override("panel", style)
-	var bg: TextureRect = null
-	if play_button.has_meta(PLAY_GOLD_BG_META):
-		bg = play_button.get_meta(PLAY_GOLD_BG_META)
-	if bg == null:
-		bg = SlotOverlayBgScript.new()
-		bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		bg.z_index = -1
-		play_button.add_child(bg)
-		play_button.move_child(bg, 0)
-		play_button.set_meta(PLAY_GOLD_BG_META, bg)
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	bg.offset_left = float(border_w)
-	bg.offset_top = float(border_w)
-	bg.offset_right = float(-border_w)
-	bg.offset_bottom = float(-border_w)
-	bg.visible = true
-	var inner := Vector2(
-		maxf(play_size.x - float(border_w) * 2.0, 2.0),
-		maxf(play_size.y - float(border_w) * 2.0, 2.0)
-	)
-	bg.configure(maxi(radius - border_w, 4), PLAY_GOLD_HI, PLAY_GOLD_MID, PLAY_GOLD_LO, inner)
+	HudTextureButtons.apply_gold_pill_style(play_button, play_size, scale)
 
 func _apply_play_label_style(ui_scale: float) -> void:
 	if play_label == null:

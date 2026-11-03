@@ -12,10 +12,15 @@ const SlotOverlayBgScript := preload("res://slot_overlay_bg.gd")
 const UiThemeServiceScript := preload("res://ui_theme_service.gd")
 
 const PILL_GRAD_CELESTE := Color(0.72, 0.87, 0.98, 0.94)
-const PILL_GRAD_ROSA := Color(0.98, 0.76, 0.87, 0.94)
+const PILL_GRAD_ROSA := Color("fac2def0")
 const PILL_GRAD_VERDE := Color(0.74, 0.91, 0.76, 0.94)
 const PILL_BG_META := "pill_bg"
 const RAINBOW_BG_META := "rainbow_fill_bg"
+const GOLD_BG_META := "gold_fill_bg"
+const GOLD_HI := Color(1.00, 0.95, 0.68)
+const GOLD_MID := Color(0.96, 0.78, 0.28)
+const GOLD_LO := Color(0.76, 0.46, 0.12)
+const GOLD_BORDER := Color(0.46, 0.24, 0.10, 1.0)
 const RoundedClipShader = preload("res://rounded_clip.gdshader")
 
 const BTN_TEXT_COLOR := Color(0.88, 0.86, 0.83)
@@ -411,6 +416,59 @@ static func _make_style_border_only(host: Control, style_name: String) -> void:
 	flat.draw_center = false
 	host.add_theme_stylebox_override(style_name, flat)
 
+
+static func gold_border_width(scale: float = 1.0) -> int:
+	return int(clampf(round(2.0 * scale), 2.0, 3.0))
+
+static func apply_gold_pill_style(
+	host: Control,
+	host_size: Vector2,
+	scale: float = 1.0,
+	radius: int = -1,
+	fill_alpha: float = 1.0,
+	colors: Dictionary = {}
+) -> void:
+	if host == null:
+		return
+	var hi: Color = colors.get("hi", GOLD_HI)
+	var mid: Color = colors.get("mid", GOLD_MID)
+	var lo: Color = colors.get("lo", GOLD_LO)
+	var border_col: Color = colors.get("border", GOLD_BORDER)
+	var corner: int = radius
+	if corner < 0:
+		corner = int(minf(host_size.x, host_size.y) * 0.50)
+	var border_w: int = gold_border_width(scale)
+	border_col.a *= clampf(fill_alpha * 0.70 + 0.30, 0.30, 1.0)
+	var style: StyleBoxFlat = make_candy_style(mid, border_col, corner, border_w)
+	style.draw_center = false
+	host.add_theme_stylebox_override("panel", style)
+	if host.has_meta(RAINBOW_BG_META):
+		var rainbow: TextureRect = host.get_meta(RAINBOW_BG_META)
+		if rainbow != null:
+			rainbow.visible = false
+	var bg: TextureRect = null
+	if host.has_meta(GOLD_BG_META):
+		bg = host.get_meta(GOLD_BG_META)
+	if bg == null:
+		bg = SlotOverlayBgScript.new()
+		bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		bg.z_index = -1
+		host.add_child(bg)
+		host.set_meta(GOLD_BG_META, bg)
+	if bg.get_parent() == host:
+		host.move_child(bg, 0)
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.offset_left = float(border_w)
+	bg.offset_top = float(border_w)
+	bg.offset_right = float(-border_w)
+	bg.offset_bottom = float(-border_w)
+	bg.visible = true
+	bg.modulate = Color(1.0, 1.0, 1.0, clampf(fill_alpha, 0.0, 1.0))
+	var inner := Vector2(
+		maxf(host_size.x - float(border_w) * 2.0, 2.0),
+		maxf(host_size.y - float(border_w) * 2.0, 2.0)
+	)
+	bg.configure(maxi(corner - border_w, 4), hi, mid, lo, inner)
 
 static func apply_candy_button_style(btn: Control, btn_size: Vector2, scale: float = 1.0) -> void:
 	if btn == null:

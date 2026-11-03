@@ -1,20 +1,25 @@
 class_name LevelUpCartelLayoutService
 extends RefCounted
 
-const TEX_WIDTH := 1536.0
-const TEX_HEIGHT := 1024.0
-const WIDTH_RATIO := 0.96
-const MAX_WIDTH := 980.0
-const PAD_LEFT := 0.16
-const PAD_RIGHT := 0.16
-const PAD_TOP := 0.26
-const PAD_BOTTOM := 0.61
-const TITLE_FONT_SIZE := 72
-const TITLE_H := 86.0
+const WIDTH_RATIO := 0.76
+const MAX_WIDTH := 760.0
+const CARD_ASPECT := 0.58
+const PAD_LEFT := 0.08
+const PAD_RIGHT := 0.08
+const PAD_TOP := 0.12
+const PAD_BOTTOM := 0.14
+const CORNER_RATIO := 0.22
+const FILL_ALPHA := 0.82
+const FILL_HI := Color(1.00, 0.86, 0.92)
+const FILL_MID := Color(0.98, 0.58, 0.76)
+const FILL_LO := Color(0.88, 0.38, 0.58)
+const FILL_BORDER := Color(0.58, 0.22, 0.38, 1.0)
+const TITLE_FONT_SIZE := 84
+const TITLE_H := 100.0
 const TITLE_LETTER_SPACING := 4
-const LEVEL_FONT_SIZE := 62
-const LEVEL_H := 78.0
-const STAR_H := 72.0
+const LEVEL_FONT_SIZE := 76
+const LEVEL_H := 92.0
+const STAR_H := 90.0
 const STAR_ASPECT := 1.78
 const BUTTON_BORDER := Color(0.68, 0.54, 0.92, 1.0)
 const BUTTON_H := 90.0
@@ -33,15 +38,24 @@ const BODY_GAP_MIN := 28.0
 const BUTTON_SEP := 24.0
 const AD_LABEL := "x2 (ver Ad)"
 
+static func fill_colors() -> Dictionary:
+	return {
+		"hi": FILL_HI,
+		"mid": FILL_MID,
+		"lo": FILL_LO,
+		"border": FILL_BORDER,
+	}
+
 static func texture_aspect() -> float:
-	if TEX_WIDTH <= 0.0:
-		return 1.0
-	return TEX_HEIGHT / TEX_WIDTH
+	return CARD_ASPECT
 
 static func card_size(viewport_size: Vector2, ui_scale: float) -> Vector2:
 	var max_w: float = minf(viewport_size.x * WIDTH_RATIO, MAX_WIDTH * ui_scale)
 	var card_w: float = maxf(max_w, 280.0)
-	return Vector2(card_w, card_w * texture_aspect())
+	return Vector2(card_w, card_w * CARD_ASPECT)
+
+static func corner_radius(card: Vector2) -> int:
+	return int(round(minf(card.x, card.y) * CORNER_RATIO))
 
 static func content_margins(card: Vector2) -> Dictionary:
 	return {

@@ -35,7 +35,6 @@ const MainFacadeScript = preload("res://main_facade.gd")
 const BoardTutorialServiceScript = preload("res://board_tutorial_service.gd")
 const LevelUpRewardServiceScript = preload("res://level_up_reward_service.gd")
 const CelebrationBurstScript = preload("res://celebration_burst.gd")
-const LevelUpCartelTexture = preload("res://Imagenes/cartel-nivel.png")
 const LevelUpCartelLayoutServiceScript = preload("res://level_up_cartel_layout_service.gd")
 const SlotOverlayBgScript = preload("res://slot_overlay_bg.gd")
 const RainbowLabelShader = preload("res://rainbow_label.gdshader")
@@ -2631,38 +2630,27 @@ func _settings_card_colors() -> Dictionary:
 		Color(0.42, 0.28, 0.58, 0.95)
 	)
 
-## Cartel de subida de nivel: usa Imagenes/cartel-nivel.png como marco.
-func _apply_level_up_cartel_art(_ui_scale: float = 1.0) -> void:
+## Cartel de subida de nivel: pastilla rosa con el mismo recorte que Jugar ahora.
+func _apply_level_up_cartel_art(ui_scale: float = 1.0) -> void:
 	if level_up_card == null:
 		return
-	var empty := StyleBoxEmpty.new()
-	level_up_card.add_theme_stylebox_override("panel", empty)
-	if level_up_card.has_meta(HudTextureButtons.RAINBOW_BG_META):
-		var rainbow_bg: TextureRect = level_up_card.get_meta(HudTextureButtons.RAINBOW_BG_META)
-		if rainbow_bg != null:
-			rainbow_bg.visible = false
 	if level_up_card.has_meta("wavy_bg"):
 		var wavy: Control = level_up_card.get_meta("wavy_bg")
 		if wavy != null:
 			wavy.visible = false
-	var art: TextureRect = null
 	if level_up_card.has_meta("cartel_art"):
-		art = level_up_card.get_meta("cartel_art")
-	if art == null:
-		art = TextureRect.new()
-		art.texture = LevelUpCartelTexture
-		art.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		art.set_anchors_preset(Control.PRESET_FULL_RECT)
-		art.offset_left = 0.0
-		art.offset_top = 0.0
-		art.offset_right = 0.0
-		art.offset_bottom = 0.0
-		level_up_card.add_child(art)
-		level_up_card.move_child(art, 0)
-		level_up_card.set_meta("cartel_art", art)
-	art.visible = true
+		var art: TextureRect = level_up_card.get_meta("cartel_art")
+		if art != null:
+			art.visible = false
+	var radius: int = LevelUpCartelLayoutServiceScript.corner_radius(level_up_card.size)
+	HudTextureButtons.apply_gold_pill_style(
+		level_up_card,
+		level_up_card.size,
+		ui_scale,
+		radius,
+		LevelUpCartelLayoutServiceScript.FILL_ALPHA,
+		LevelUpCartelLayoutServiceScript.fill_colors()
+	)
 
 ## Carteles de Booster: borde grueso oscuro + sombra, como los chips candy.
 func _apply_candy_dialog_card(card: Panel, ui_scale: float = 1.0) -> void:
@@ -4695,18 +4683,13 @@ func _heavy_dialog_font() -> Font:
 	return variation
 
 func _style_level_up_level_label(lbl: Label, font_size: int) -> void:
-	if lbl == null:
+	_style_dialog_title_label(lbl, font_size, true, true)
+
+func _apply_level_up_button_rainbow(btn: Control, span_px: float) -> void:
+	if btn == null:
 		return
-	lbl.material = null
-	if UiFont != null:
-		lbl.add_theme_font_override("font", UiFont)
-	lbl.add_theme_font_size_override("font_size", font_size)
-	lbl.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
-	lbl.add_theme_color_override("font_outline_color", Color(0.38, 0.24, 0.58, 0.92))
-	lbl.add_theme_constant_override("outline_size", maxi(int(round(float(font_size) * 0.12)), 6))
-	lbl.add_theme_color_override("font_shadow_color", Color(0.28, 0.16, 0.42, 0.35))
-	lbl.add_theme_constant_override("shadow_offset_x", 0)
-	lbl.add_theme_constant_override("shadow_offset_y", 3)
+	var lbl: Label = btn.get_meta("label")
+	_apply_rainbow_label(lbl, span_px)
 
 func _apply_rainbow_label(lbl: Label, span_px: float) -> void:
 	if lbl == null:
@@ -4766,6 +4749,7 @@ func _make_level_up_star_icon(texture: Texture2D) -> TextureRect:
 	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	icon.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	return icon
 
 func _layout_level_up_star_icon(icon: TextureRect, icon_size: Vector2) -> void:
@@ -5297,7 +5281,6 @@ func layout_level_up_dialog_controls() -> void:
 			title_font.spacing_glyph = int(round(float(LevelUpCartelLayoutServiceScript.TITLE_LETTER_SPACING) * scale))
 		level_up_title_label.visible = true
 		level_up_title_label.custom_minimum_size.y = LevelUpCartelLayoutServiceScript.TITLE_H * scale
-		_apply_rainbow_label(level_up_title_label, card_size.x - float(margins.left) - float(margins.right))
 	if level_up_level_row != null:
 		level_up_level_row.custom_minimum_size.y = LevelUpCartelLayoutServiceScript.LEVEL_H * scale
 		level_up_level_row.add_theme_constant_override("separation", int(10.0 * scale))
@@ -5321,6 +5304,8 @@ func layout_level_up_dialog_controls() -> void:
 	if level_up_continue_button != null:
 		level_up_continue_button.visible = not show_reward
 	var inner_w: float = maxf(card_size.x - float(margins.left) - float(margins.right), 80.0)
+	_apply_rainbow_label(level_up_title_label, inner_w)
+	_apply_rainbow_label(level_up_subtitle_label, inner_w * 0.55)
 	var button_ratio: float = LevelUpCartelLayoutServiceScript.BUTTON_H / DIALOG_BTN_HEIGHT
 	var claim_w: float = LevelUpCartelLayoutServiceScript.reward_button_width(inner_w)
 	var ad_w: float = LevelUpCartelLayoutServiceScript.ad_button_width(inner_w)
@@ -5341,6 +5326,8 @@ func layout_level_up_dialog_controls() -> void:
 			scale,
 			LevelUpCartelLayoutServiceScript.AD_FONT_SIZE
 		)
+		_apply_level_up_button_rainbow(level_up_claim_button, claim_w)
+		_apply_level_up_button_rainbow(level_up_ad_button, ad_w)
 	else:
 		if level_up_continue_button != null:
 			level_up_continue_button.set_meta("compact", false)
@@ -5351,6 +5338,7 @@ func layout_level_up_dialog_controls() -> void:
 			scale,
 			LevelUpCartelLayoutServiceScript.CONTINUE_FONT_SIZE
 		)
+		_apply_level_up_button_rainbow(level_up_continue_button, ad_w)
 
 func show_level_up_panel(level: int) -> void:
 	if level_up_overlay == null:
