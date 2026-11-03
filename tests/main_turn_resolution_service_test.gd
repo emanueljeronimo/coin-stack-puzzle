@@ -53,4 +53,19 @@ func _test_alert_flags() -> void:
 	if MainTurnResolutionServiceScript.should_unlock_board(true, false):
 		_fail("keep_locked_with_level_alert")
 		return
+	if not MainTurnResolutionServiceScript.should_hold_booster_unlock([6], false):
+		_fail("hold_booster_when_level_queued")
+		return
+	if not MainTurnResolutionServiceScript.should_hold_booster_unlock([], true):
+		_fail("hold_booster_when_level_visible")
+		return
+	if MainTurnResolutionServiceScript.should_hold_booster_unlock([], false):
+		_fail("booster_ok_when_no_level")
+		return
+	if not MainTurnResolutionServiceScript.should_preempt_booster_for_level_alerts([7]):
+		_fail("preempt_booster_for_wildcard_level")
+		return
+	if MainTurnResolutionServiceScript.should_preempt_booster_for_level_alerts([]):
+		_fail("no_preempt_without_level")
+		return
 	_ok("alert_flags")

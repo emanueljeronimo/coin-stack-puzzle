@@ -19,3 +19,11 @@ static func booster_alert_open(booster_unlock_overlay: CanvasItem) -> bool:
 
 static func should_unlock_board(level_alert_open_flag: bool, booster_alert_open_flag: bool) -> bool:
 	return not level_alert_open_flag and not booster_alert_open_flag
+
+## El cartel de nivel gana siempre, aunque la subida venga de comodín / Mezclar
+## y a la vez se desbloquee un Booster.
+static func should_hold_booster_unlock(pending_level_alerts: Array, level_overlay_visible: bool) -> bool:
+	return level_overlay_visible or not pending_level_alerts.is_empty()
+
+static func should_preempt_booster_for_level_alerts(pending_level_alerts: Array) -> bool:
+	return not pending_level_alerts.is_empty()

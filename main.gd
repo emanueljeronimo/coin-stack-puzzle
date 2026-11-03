@@ -441,6 +441,7 @@ var booster_unlock_title_label: Label = null
 var booster_unlock_subtitle_label: Label = null
 var booster_unlock_continue_button: Control = null
 var _pending_booster_unlock_queue: Array[String] = []
+var _visible_booster_unlock_type: String = ""
 var _main_facade: MainFacade = null
 
 func _ready() -> void:
@@ -591,7 +592,7 @@ func fill_board_initial_random() -> void:
 	)
 	var pool: Array = []
 	var fill_max: int = GameTurnEngineScript.early_roll_value_max(
-		GameEngineScript.cycle_play_level(checkpoint_level, cycle_checkpoint_origin),
+		checkpoint_level,
 		0,
 		get_roll_min_value(),
 		get_roll_max_value()
@@ -1444,9 +1445,8 @@ func perform_roll() -> bool:
 		return false
 
 	var max_roll_value = maxi(roll_value_floor, max_value - 1)
-	var play_level := GameEngineScript.cycle_play_level(checkpoint_level, cycle_checkpoint_origin)
 	var deal_max: int = GameTurnEngineScript.early_roll_value_max(
-		play_level,
+		checkpoint_level,
 		board_deal_count,
 		roll_value_floor,
 		max_roll_value
@@ -1465,10 +1465,11 @@ func perform_roll() -> bool:
 		)
 		values_to_roll.shuffle()
 		roll_count = GameTurnEngineScript.compute_level_roll_count(
-			play_level,
+			checkpoint_level,
 			values_to_roll.size(),
 			total_free_slots,
-			true
+			true,
+			roll_value_floor
 		)
 		values_to_roll = GameTurnEngineScript.pad_roll_values(
 			values_to_roll,
@@ -1543,6 +1544,9 @@ func resolve_board_after_action(expected_revision: int = -1, skip_fusions: bool 
 		save_game()
 	if MainTurnResolutionServiceScript.should_unlock_board(level_alert_open, booster_alert_open):
 		check_blocked_state()
+	if MainTurnResolutionServiceScript.should_preempt_booster_for_level_alerts(_pending_level_up_alerts):
+		if level_up_overlay == null or not level_up_overlay.visible:
+			_show_next_level_up_alert()
 	_update_undo_button_state()
 
 func request_resolve_board_after_action(expected_revision: int = -1) -> void:
@@ -1948,7 +1952,7 @@ func _apply_cycle_reset_meta(milestone_level: int, cycle_state: Dictionary) -> v
 	cycle_rules_revision = GameEngineScript.CYCLE_RULES_REVISION
 
 ## Reinicia el tablero al conseguir la ficha hito (15, 25, 35…).
-## 5 ranuras; tiradas 11-14 / 21-24 / 31-34. El hito entra en la tirada al crear el siguiente.
+## 5 ranuras; tiradas 11-14 / 21-24 / 31-34 (sin easing de tutorial). El hito entra al crear el siguiente.
 func reset_board_for_cycle_milestone(milestone_level: int) -> void:
 	var cycle_state := GameBoardEngineScript.build_cycle_reset_state(milestone_level, {
 		"board_cycle_levels": BOARD_CYCLE_LEVELS,
@@ -2291,8 +2295,10 @@ func _show_next_level_up_alert() -> void:
 		# Tras el último cartel de nivel, mostrar Boosters pendientes si hay.
 		try_show_booster_unlock_panel()
 		return
-	if booster_unlock_overlay != null and booster_unlock_overlay.visible:
-		return
+	# Comodín / Mezclar pueden desbloquear un Booster en el mismo resolve:
+	# el cartel de nivel tiene que salir primero.
+	if MainTurnResolutionServiceScript.should_preempt_booster_for_level_alerts(_pending_level_up_alerts):
+		_preempt_booster_unlock_for_level_alert()
 	# Si ya hay un cartel visible, solo re-layout (no consumir otro de la cola).
 	if level_up_overlay != null and level_up_overlay.visible:
 		layout_level_up_dialog_controls()
@@ -2305,6 +2311,15 @@ func _show_next_level_up_alert() -> void:
 		settings_ui.close()
 	var alert_level: int = int(_pending_level_up_alerts.pop_front())
 	show_level_up_panel(alert_level)
+
+func _preempt_booster_unlock_for_level_alert() -> void:
+	if booster_unlock_overlay == null or not booster_unlock_overlay.visible:
+		return
+	if not _visible_booster_unlock_type.is_empty():
+		if not _pending_booster_unlock_queue.has(_visible_booster_unlock_type):
+			_pending_booster_unlock_queue.push_front(_visible_booster_unlock_type)
+		_visible_booster_unlock_type = ""
+	booster_unlock_overlay.visible = false
 
 func _snapshot_highest_coin() -> int:
 	if checkpoint_snapshot.is_empty():
@@ -5521,9 +5536,11 @@ func try_show_booster_unlock_panel() -> void:
 		return
 	if booster_unlock_overlay.visible:
 		return
-	if level_up_overlay != null and level_up_overlay.visible:
-		return
-	if not _pending_level_up_alerts.is_empty():
+	var level_visible := level_up_overlay != null and level_up_overlay.visible
+	if MainTurnResolutionServiceScript.should_hold_booster_unlock(
+		_pending_level_up_alerts,
+		level_visible
+	):
 		return
 	if _pending_cycle_reset_milestone > 0 or _cycle_reset_transition_playing:
 		return
@@ -5541,6 +5558,7 @@ func show_booster_unlock_panel(booster_type: String) -> void:
 	clear_selection()
 	hammer_mode_active = false
 	glove_mode_active = false
+	_visible_booster_unlock_type = booster_type
 	var booster_name := get_booster_display_name(booster_type)
 	if booster_unlock_title_label != null:
 		booster_unlock_title_label.text = "Desbloqueado: Booster %s" % booster_name
@@ -5553,6 +5571,7 @@ func show_booster_unlock_panel(booster_type: String) -> void:
 func hide_booster_unlock_panel() -> void:
 	if booster_unlock_overlay != null:
 		booster_unlock_overlay.visible = false
+	_visible_booster_unlock_type = ""
 	board_locked = false
 
 func _on_booster_unlock_continue_pressed() -> void:

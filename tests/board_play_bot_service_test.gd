@@ -35,8 +35,8 @@ func _test_prestige_35_opening_is_narrow() -> void:
 	if Bot.play_level(state) != 1:
 		_fail("play_level_1", str(Bot.play_level(state)))
 		return
-	if Bot.deal_max_value(state) != 32:
-		_fail("opening_deal_31_32", str(Bot.deal_max_value(state)))
+	if Bot.deal_max_value(state) != 34:
+		_fail("opening_deal_31_34", str(Bot.deal_max_value(state)))
 		return
 	if int(state.get("next_free_slot_unlock_level", 0)) != 42:
 		_fail("next_slot_42", str(state.get("next_free_slot_unlock_level", 0)))

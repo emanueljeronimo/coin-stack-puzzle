@@ -43,7 +43,7 @@ static func deal_max_value(state: Dictionary) -> int:
 	var floor_v: int = int(state.get("roll_value_floor", 1))
 	var max_roll: int = maxi(floor_v, int(state.get("max_value", 5)) - 1)
 	return GameTurnEngineScript.early_roll_value_max(
-		play_level(state),
+		int(state.get("checkpoint_level", 1)),
 		int(state.get("board_deal_count", 0)),
 		floor_v,
 		max_roll
@@ -161,10 +161,11 @@ static func _deal(state: Dictionary, rng: RandomNumberGenerator) -> bool:
 	)
 	values.shuffle()
 	var count: int = GameTurnEngineScript.compute_level_roll_count(
-		play_level(state),
+		int(state.get("checkpoint_level", 1)),
 		values.size(),
 		free,
-		true
+		true,
+		floor_v
 	)
 	if count <= 0:
 		return false

@@ -25,8 +25,12 @@ const EARLY_GROUP_LEVELS := 0
 const EARLY_GROUP_CHUNK := 4
 
 ## 2x al inicio, 1.5x al desbloquear Mezclar, 1x cerca del prestige.
+## Solo ciclo 1 (piso 1). Tras prestige el mazo es piso..hito-1, sin easing de tutorial.
 const DEAL_DOUBLE_UNTIL_LEVEL := 8
 const DEAL_ONE_HALF_UNTIL_LEVEL := 12
+
+static func uses_intro_deal_easing(roll_floor: int) -> bool:
+	return roll_floor <= 1
 
 static func deal_multiplier(checkpoint_level: int) -> float:
 	if checkpoint_level <= 0:
@@ -56,14 +60,16 @@ static func early_roll_target(checkpoint_level: int) -> int:
 static func should_group_early_rolls(checkpoint_level: int) -> bool:
 	return EARLY_GROUP_LEVELS > 0 and checkpoint_level >= 1 and checkpoint_level <= EARLY_GROUP_LEVELS
 
-## Primera tirada piso..piso+1, segunda piso+2. Despues el tope sigue al mazo real.
-## El piso post-prestige (31) tiene que capear 31-32, no el absoluto 1-2.
+## Ciclo 1: primera tirada 1-2, segunda 1-3. Despues el tope sigue al mazo real.
+## Tras prestige no se recorta: 15→11-14, 25→21-24, 35→31-34.
 static func early_roll_value_max(
 	checkpoint_level: int,
 	deal_index: int,
 	roll_floor: int,
 	max_roll: int
 ) -> int:
+	if not uses_intro_deal_easing(roll_floor):
+		return max_roll
 	if early_roll_target(checkpoint_level) <= 0:
 		return max_roll
 	var cap := max_roll
@@ -80,9 +86,12 @@ static func compute_level_roll_count(
 	checkpoint_level: int,
 	pool_size: int,
 	total_free_slots: int,
-	keep_one_free_if_possible: bool = true
+	keep_one_free_if_possible: bool = true,
+	roll_floor: int = 1
 ) -> int:
 	var base: int = compute_roll_count(pool_size, total_free_slots, keep_one_free_if_possible)
+	if not uses_intro_deal_easing(roll_floor):
+		return base
 	var early: int = early_roll_target(checkpoint_level)
 	var wanted: int = maxi(base, early)
 	wanted = int(round(float(wanted) * deal_multiplier(checkpoint_level)))
