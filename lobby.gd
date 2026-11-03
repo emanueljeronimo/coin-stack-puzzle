@@ -9,9 +9,9 @@ const DailyLoginIconTexture = preload("res://Imagenes/icono-login-diario.png")
 const ShowcaseCoinTexture = preload("res://Imagenes/ficha-portada2.png")
 const ShowcaseCoinShader = preload("res://coin_wildcard.gdshader")
 const LevelLabelShader = preload("res://lobby_level_label.gdshader")
+const SlotOverlayBgScript = preload("res://slot_overlay_bg.gd")
 const ShopScene = preload("res://Shop.tscn")
 const LogoFont = preload("res://Fonts/Lobster-Regular.ttf")
-const LevelFont = preload("res://Fonts/FredokaOne-Regular.ttf")
 const GameScenePath := "res://Main.tscn"
 const DailyLoginServiceScript = preload("res://daily_login_service.gd")
 
@@ -42,10 +42,24 @@ const HUD_PILL_RADIUS := 34
 const LOBBY_CHIP_HEIGHT_RATIO := 0.76
 const LOBBY_STAT_ICON_RATIO := 0.56
 
-const PLAY_WIDTH_RATIO := 0.46
+const PLAY_WIDTH_RATIO := 0.40
+const PLAY_HEIGHT := 120.0
 const PLAY_BOTTOM_MARGIN := 80.0
 const PLAY_Y_DROP := 0.0
 const PLAY_VISIBLE_HEIGHT := 1.0
+const PLAY_LABEL_TEXT := "Jugar ahora"
+const PLAY_FONT_SIZE := 80
+const PLAY_LETTER_SPACING := 3
+const PLAY_EMBOLDEN := 0.55
+const PLAY_LABEL_INSET_X := 0.04
+const PLAY_LABEL_LIFT_RATIO := 0.08
+const PLAY_GOLD_HI := Color(1.00, 0.95, 0.68)
+const PLAY_GOLD_MID := Color(0.96, 0.78, 0.28)
+const PLAY_GOLD_LO := Color(0.76, 0.46, 0.12)
+const PLAY_GOLD_BORDER := Color(0.46, 0.24, 0.10, 1.0)
+const PLAY_TEXT_COLOR := Color(1.0, 1.0, 1.0, 1.0)
+const PLAY_TEXT_OUTLINE := Color(0.42, 0.22, 0.10, 0.92)
+const PLAY_GOLD_BG_META := "play_gold_bg"
 const DAILY_LOGIN_SIZE_RATIO := 1.65
 
 var background_rect: TextureRect = null
@@ -77,7 +91,10 @@ var daily_login_button_icon: TextureRect = null
 var level_label: Label = null
 var _level_font_variation: FontVariation = null
 var showcase_coin: Sprite2D = null
-var play_button: TextureButton = null
+var play_button_shadow: Panel = null
+var play_button: Control = null
+var play_label: Label = null
+var _play_font_variation: FontVariation = null
 var settings_layer: CanvasLayer = null
 var settings_ui: SettingsOverlay = null
 var shop_layer: CanvasLayer = null
@@ -191,10 +208,6 @@ func build_ui() -> void:
 	level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	level_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	level_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	if LevelFont != null:
-		level_label.add_theme_font_override("font", LevelFont)
-	elif LogoFont != null:
-		level_label.add_theme_font_override("font", LogoFont)
 	_apply_level_label_style(1.0)
 	hud_root.add_child(level_label)
 
@@ -212,10 +225,24 @@ func build_ui() -> void:
 	build_profile_editor()
 	build_daily_login_dialog()
 
-	play_button = HudTextureButtons.create_play()
-	play_button.pressed.connect(_on_play_pressed)
-	GameState.hook_button_sound(play_button)
+	play_button_shadow = create_shadow_panel(HUD_PILL_RADIUS)
+	play_button_shadow.z_index = 19
+	play_button = Panel.new()
+	play_button.mouse_filter = Control.MOUSE_FILTER_STOP
+	play_button.clip_contents = false
+	play_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	play_button.z_index = 20
+	play_label = Label.new()
+	play_label.text = PLAY_LABEL_TEXT
+	play_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	play_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	play_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	play_label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	play_button.add_child(play_label)
+	_bind_chip_click(play_button, _on_play_pressed)
+	_wire_play_press_scale()
+	_apply_play_label_style(1.0)
+	hud_root.add_child(play_button_shadow)
 	hud_root.add_child(play_button)
 
 func _build_profile_chip() -> Dictionary:
@@ -349,37 +376,121 @@ func _showcase_coin_scale(ui_scale: float) -> float:
 	var target: float = SHOWCASE_COIN_LOCAL_DIAMETER * PEDESTAL_COIN_SCALE * ui_scale
 	return target / tex_side
 
+func _make_display_font_variation() -> FontVariation:
+	var variation := FontVariation.new()
+	var ui_font: Font = UiFontService.ui_font()
+	if ui_font is FontVariation:
+		var src := ui_font as FontVariation
+		variation.base_font = src.base_font
+		variation.fallbacks = src.fallbacks
+	elif LogoFont != null:
+		variation.base_font = LogoFont
+	elif ui_font != null:
+		variation.base_font = ui_font
+	return variation
+
+func _apply_display_label_style(
+	lbl: Label,
+	variation: FontVariation,
+	font_size: float,
+	letter_spacing: float,
+	ui_scale: float,
+	fill_shader: Shader
+) -> void:
+	if lbl == null or variation == null:
+		return
+	var s: float = maxf(ui_scale, 0.5)
+	var size_ratio: float = font_size / float(LEVEL_FONT_SIZE)
+	lbl.add_theme_font_override("font", variation)
+	variation.spacing_glyph = int(round(letter_spacing * s))
+	lbl.add_theme_font_size_override("font_size", int(font_size * s))
+	lbl.add_theme_color_override("font_color", LEVEL_FILL)
+	lbl.add_theme_color_override("font_outline_color", LEVEL_OUTLINE)
+	lbl.add_theme_constant_override("outline_size", int(round(10.0 * size_ratio * s)))
+	lbl.add_theme_color_override("font_shadow_color", LEVEL_SHADOW)
+	lbl.add_theme_constant_override("shadow_offset_x", int(round(2.0 * size_ratio * s)))
+	lbl.add_theme_constant_override("shadow_offset_y", int(round(7.0 * size_ratio * s)))
+	lbl.add_theme_constant_override("shadow_outline_size", int(round(5.0 * size_ratio * s)))
+	_apply_display_label_shader(lbl, fill_shader)
+
 func _apply_level_label_style(ui_scale: float) -> void:
 	if level_label == null:
 		return
-	var s: float = maxf(ui_scale, 0.5)
 	if _level_font_variation == null:
-		_level_font_variation = FontVariation.new()
-		if LevelFont != null:
-			_level_font_variation.base_font = LevelFont
-		elif LogoFont != null:
-			_level_font_variation.base_font = LogoFont
-		level_label.add_theme_font_override("font", _level_font_variation)
-	_level_font_variation.spacing_glyph = int(round(float(LEVEL_LETTER_SPACING) * s))
-	level_label.add_theme_font_size_override("font_size", int(float(LEVEL_FONT_SIZE) * s))
-	level_label.add_theme_color_override("font_color", LEVEL_FILL)
-	level_label.add_theme_color_override("font_outline_color", LEVEL_OUTLINE)
-	level_label.add_theme_constant_override("outline_size", int(round(10.0 * s)))
-	level_label.add_theme_color_override("font_shadow_color", LEVEL_SHADOW)
-	level_label.add_theme_constant_override("shadow_offset_x", int(round(2.0 * s)))
-	level_label.add_theme_constant_override("shadow_offset_y", int(round(7.0 * s)))
-	level_label.add_theme_constant_override("shadow_outline_size", int(round(5.0 * s)))
-	_apply_level_label_shader()
+		_level_font_variation = _make_display_font_variation()
+	_apply_display_label_style(
+		level_label,
+		_level_font_variation,
+		float(LEVEL_FONT_SIZE),
+		float(LEVEL_LETTER_SPACING),
+		ui_scale,
+		LevelLabelShader
+	)
 
-func _apply_level_label_shader() -> void:
-	if level_label == null:
+func _apply_play_button_style(play_size: Vector2, scale: float) -> void:
+	if play_button == null:
 		return
-	var mat: ShaderMaterial = level_label.material as ShaderMaterial
-	if mat == null or mat.shader != LevelLabelShader:
+	var radius := int(minf(play_size.x, play_size.y) * 0.50)
+	var border_w := int(clampf(round(2.0 * scale), 2.0, 3.0))
+	var style: StyleBoxFlat = HudTextureButtons.make_candy_style(
+		PLAY_GOLD_MID,
+		PLAY_GOLD_BORDER,
+		radius,
+		border_w
+	)
+	style.draw_center = false
+	play_button.add_theme_stylebox_override("panel", style)
+	var bg: TextureRect = null
+	if play_button.has_meta(PLAY_GOLD_BG_META):
+		bg = play_button.get_meta(PLAY_GOLD_BG_META)
+	if bg == null:
+		bg = SlotOverlayBgScript.new()
+		bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		bg.z_index = -1
+		play_button.add_child(bg)
+		play_button.move_child(bg, 0)
+		play_button.set_meta(PLAY_GOLD_BG_META, bg)
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.offset_left = float(border_w)
+	bg.offset_top = float(border_w)
+	bg.offset_right = float(-border_w)
+	bg.offset_bottom = float(-border_w)
+	bg.visible = true
+	var inner := Vector2(
+		maxf(play_size.x - float(border_w) * 2.0, 2.0),
+		maxf(play_size.y - float(border_w) * 2.0, 2.0)
+	)
+	bg.configure(maxi(radius - border_w, 4), PLAY_GOLD_HI, PLAY_GOLD_MID, PLAY_GOLD_LO, inner)
+
+func _apply_play_label_style(ui_scale: float) -> void:
+	if play_label == null:
+		return
+	if _play_font_variation == null:
+		_play_font_variation = _make_display_font_variation()
+	_play_font_variation.variation_embolden = PLAY_EMBOLDEN
+	var s: float = maxf(ui_scale, 0.5)
+	play_label.material = null
+	play_label.add_theme_font_override("font", _play_font_variation)
+	_play_font_variation.spacing_glyph = int(round(float(PLAY_LETTER_SPACING) * s))
+	play_label.add_theme_font_size_override("font_size", int(float(PLAY_FONT_SIZE) * s))
+	play_label.add_theme_color_override("font_color", PLAY_TEXT_COLOR)
+	play_label.add_theme_color_override("font_outline_color", PLAY_TEXT_OUTLINE)
+	var size_ratio: float = float(PLAY_FONT_SIZE) / float(LEVEL_FONT_SIZE)
+	play_label.add_theme_constant_override("outline_size", int(round(8.0 * s)))
+	play_label.add_theme_color_override("font_shadow_color", LEVEL_SHADOW)
+	play_label.add_theme_constant_override("shadow_offset_x", int(round(2.0 * size_ratio * s)))
+	play_label.add_theme_constant_override("shadow_offset_y", int(round(7.0 * size_ratio * s)))
+	play_label.add_theme_constant_override("shadow_outline_size", int(round(5.0 * size_ratio * s)))
+
+func _apply_display_label_shader(lbl: Label, fill_shader: Shader) -> void:
+	if lbl == null or fill_shader == null:
+		return
+	var mat: ShaderMaterial = lbl.material as ShaderMaterial
+	if mat == null or mat.shader != fill_shader:
 		mat = ShaderMaterial.new()
-		mat.shader = LevelLabelShader
-		level_label.material = mat
-	mat.set_shader_parameter("span_px", maxf(level_label.size.x, 1.0))
+		mat.shader = fill_shader
+		lbl.material = mat
+	mat.set_shader_parameter("span_px", maxf(lbl.size.x, 1.0))
 
 func layout_hud_pill_pair(shadow: Panel, panel: Control, pos: Vector2, size: Vector2, scale: float) -> void:
 	if panel != null:
@@ -492,11 +603,29 @@ func _get_cover_draw_rect() -> Rect2:
 	var offset := (viewport_size - drawn_size) * 0.5
 	return Rect2(offset, drawn_size)
 
-func _get_play_button_size(cover_width: float) -> Vector2:
-	return HudTextureButtons.get_button_size(
-		HudTextureButtons.PlayButtonTexture,
-		cover_width * PLAY_WIDTH_RATIO
+func _get_play_button_size(cover_width: float, ui_scale: float) -> Vector2:
+	return Vector2(cover_width * PLAY_WIDTH_RATIO, PLAY_HEIGHT * ui_scale)
+
+func _wire_play_press_scale() -> void:
+	if play_button == null:
+		return
+	play_button.gui_input.connect(func(event: InputEvent) -> void:
+		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+			play_button.scale = Vector2(0.96, 0.96) if event.pressed else Vector2.ONE
 	)
+	play_button.mouse_exited.connect(func() -> void:
+		play_button.scale = Vector2.ONE
+	)
+
+func _layout_play_label(play_size: Vector2) -> void:
+	if play_label == null:
+		return
+	var pad_x: float = play_size.x * PLAY_LABEL_INSET_X
+	var lift: float = play_size.y * PLAY_LABEL_LIFT_RATIO
+	play_label.offset_left = pad_x
+	play_label.offset_right = -pad_x
+	play_label.offset_top = -lift
+	play_label.offset_bottom = -lift
 
 func layout_ui() -> void:
 	var viewport_size := get_viewport_rect().size
@@ -592,13 +721,19 @@ func layout_ui() -> void:
 	var play_pos := Vector2.ZERO
 	var play_size := Vector2.ZERO
 	if play_button != null:
-		play_size = _get_play_button_size(cover.size.x)
+		play_size = _get_play_button_size(cover.size.x, scale)
 		play_pos.x = cover.position.x + (cover.size.x - play_size.x) * 0.5
 		var cover_bottom := minf(cover.position.y + cover.size.y, viewport_size.y)
 		play_pos.y = cover_bottom - play_size.y - (PLAY_BOTTOM_MARGIN * scale) + (PLAY_Y_DROP * scale)
 		var max_y := viewport_size.y - play_size.y * PLAY_VISIBLE_HEIGHT
 		play_pos.y = minf(play_pos.y, max_y)
-		HudTextureButtons.layout_button(play_button, play_pos, play_size)
+		var play_radius := int(play_size.y * 0.5)
+		layout_hud_pill_pair(play_button_shadow, play_button, play_pos, play_size, scale)
+		HudTextureButtons.apply_shadow_corner_radius(play_button_shadow, play_radius)
+		_apply_play_button_style(play_size, scale)
+		play_button.pivot_offset = play_size * 0.5
+		_layout_play_label(play_size)
+		_apply_play_label_style(scale)
 
 	# Tienda abajo a la izquierda, alineada con Jugar.
 	var shop_size := corner_size
