@@ -8,7 +8,7 @@ uniform float sweep_width : hint_range(0.04, 0.4) = 0.15;
 uniform float sweep_strength : hint_range(0.05, 0.8) = 0.28;
 uniform float pastel_mix : hint_range(0.0, 1.0) = 0.0;
 uniform vec3 pastel_tint : source_color = vec3(0.96, 0.86, 0.94);
-uniform float use_luma_mask : hint_range(0.0, 1.0) = 1.0;
+uniform float use_luma_mask : hint_range(0.0, 1.0) = 0.0;
 
 void fragment() {
 	vec4 tex = texture(TEXTURE, UV);

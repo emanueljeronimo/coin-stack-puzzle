@@ -265,11 +265,14 @@ func _ensure_wildcard_material() -> void:
 	if sprite == null:
 		return
 	var mat := sprite.material as ShaderMaterial
-	if mat != null and mat.shader == CoinWildcardShader:
-		return
-	mat = ShaderMaterial.new()
-	mat.shader = CoinWildcardShader
-	sprite.material = mat
+	if mat == null or mat.shader != CoinWildcardShader:
+		mat = ShaderMaterial.new()
+		mat.shader = CoinWildcardShader
+		sprite.material = mat
+	mat.set_shader_parameter("use_luma_mask", 0.0)
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	if shadow_sprite:
+		shadow_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 
 func _clear_wildcard_material() -> void:
 	if sprite == null:
@@ -277,3 +280,6 @@ func _clear_wildcard_material() -> void:
 	var mat := sprite.material as ShaderMaterial
 	if mat != null and mat.shader == CoinWildcardShader:
 		sprite.material = null
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	if shadow_sprite:
+		shadow_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
