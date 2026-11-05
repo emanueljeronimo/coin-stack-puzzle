@@ -994,6 +994,7 @@ func _restore_board_from_snapshot(snap: Dictionary) -> void:
 	_sync_slot_overlay_controls()
 	_grant_missing_cycle_floor_stacks()
 	_migrate_legacy_cycle_roll_range()
+	check_level_up()
 	if _pending_cycle_reset_milestone > 0:
 		board_locked = true
 		_pending_level_up_alerts.clear()
@@ -1176,9 +1177,9 @@ func handle_glove_click(mouse_pos: Vector2) -> void:
 		if clicked_stack.is_empty():
 			print(MainMoveInteractionServiceScript.glove_prompt_empty_origin())
 			return
+		GameState.play_coin_select_sound()
 		selected_stack = clicked_stack
 		selected_stack.set_selected(true)
-		GameState.play_coin_sound(int(selected_stack.top_block_size()))
 		queue_redraw()
 		print(MainMoveInteractionServiceScript.glove_prompt_pick_destination())
 		return
@@ -1189,11 +1190,13 @@ func handle_glove_click(mouse_pos: Vector2) -> void:
 		_cancel_pending_tool_mode()
 		return
 	_clear_undo_snapshot()
+	var glove_n: int = mini(selected_stack.top_block_size(), clicked_stack.free_slots())
+	if glove_n > 0:
+		GameState.play_coin_place_sound(glove_n)
 	undo_snapshot = capture_board_snapshot()
 	var moved = selected_stack.move_top_block_to(clicked_stack, true)
 	if moved > 0:
 		consume_booster("glove")
-		GameState.play_coin_sound(int(moved))
 		_update_undo_button_state()
 		glove_mode_active = false
 		board_locked = true
@@ -1224,18 +1227,22 @@ func handle_click(mouse_pos: Vector2) -> void:
 	if selected_stack == null:
 		if clicked_stack.is_empty():
 			return
+		GameState.play_coin_select_sound()
 		selected_stack = clicked_stack
 		selected_stack.set_selected(true)
-		GameState.play_coin_sound(int(selected_stack.top_block_size()))
 		queue_redraw()
 		return
 	if selected_stack == clicked_stack:
 		clear_selection()
 		return
+	var move_n: int = 0
+	if clicked_stack.can_receive_value(selected_stack.top_value()):
+		move_n = mini(selected_stack.top_block_size(), clicked_stack.free_slots())
+	if move_n > 0:
+		GameState.play_coin_place_sound(move_n)
 	var pre_move_snapshot := capture_board_snapshot()
 	var moved = selected_stack.move_top_block_to(clicked_stack)
 	if moved > 0:
-		GameState.play_coin_sound(int(moved))
 		undo_snapshot = pre_move_snapshot
 		_update_undo_button_state()
 		board_locked = true
@@ -1442,6 +1449,7 @@ func perform_roll() -> bool:
 		save_game()
 		check_blocked_state()
 		return false
+	GameState.play_button_sound()
 
 	var max_roll_value = maxi(roll_value_floor, max_value - 1)
 	var deal_max: int = GameTurnEngineScript.early_roll_value_max(
@@ -1630,6 +1638,7 @@ func resolve_fusions() -> void:
 		var new_value = stack.remove_all_and_fuse()
 		if new_value < 0:
 			continue
+		GameState.play_fusion_sound()
 		var fusion_output := GameRulesScript.FUSION_OUTPUT_COUNT
 		for _i in range(fusion_output):
 			if not stack.push(new_value, false):
@@ -1717,8 +1726,26 @@ func total_count_of_value(value: int) -> int:
 	return total
 
 func check_level_up() -> void:
+	var highest := highest_coin_value_on_board()
+	var clamped: int = GameBoardEngineScript.clamped_play_max_value(
+		roll_value_floor,
+		max_value,
+		highest,
+		CHECKPOINT_BASE_VALUE
+	)
+	if clamped < max_value:
+		max_value = clamped
+		refresh_fusion_target_bonus_unlock()
+		_sync_slot_overlay_controls()
 	var has_next := total_count_of_value(max_value + 1) > 0
-	var next_state := GameBoardEngineScript.catch_up_max_value(current_level, max_value, has_next)
+	var should_bump := GameBoardEngineScript.should_catch_up_max_value(
+		has_next,
+		roll_value_floor,
+		max_value,
+		highest,
+		CHECKPOINT_BASE_VALUE
+	)
+	var next_state := GameBoardEngineScript.catch_up_max_value(current_level, max_value, should_bump)
 	if not bool(next_state.get("changed", false)):
 		return
 	current_level = int(next_state.get("current_level", current_level))
@@ -2421,6 +2448,7 @@ func restore_checkpoint() -> void:
 	update_progress_bar(false)
 	_grant_missing_cycle_floor_stacks()
 	_migrate_legacy_cycle_roll_range()
+	check_level_up()
 	if _pending_cycle_reset_milestone <= 0 and get_reached_cycle_coin_milestone() > 0:
 		update_checkpoint_level()
 	_rewind_false_checkpoint_half_unlock()
@@ -2504,11 +2532,18 @@ func _draw() -> void:
 		soft_shadow.corner_radius_bottom_right = int(corner + grow)
 		draw_style_box(soft_shadow, shadow_rect)
 
+	_draw_board_style.draw_center = true
+	_draw_board_style.set_border_width_all(0)
 	_draw_board_style.bg_color = BOARD_BG_COLOR
 	_draw_board_style.corner_radius_top_left = corner
 	_draw_board_style.corner_radius_top_right = corner
 	_draw_board_style.corner_radius_bottom_right = corner
 	_draw_board_style.corner_radius_bottom_left = corner
+	draw_style_box(_draw_board_style, board_rect)
+	_draw_board_style.draw_center = false
+	_draw_board_style.bg_color = Color(0, 0, 0, 0)
+	_draw_board_style.border_color = HUD_HAIRLINE
+	_draw_board_style.set_border_width_all(HUD_HAIRLINE_W)
 	draw_style_box(_draw_board_style, board_rect)
 
 	var gloss_rect = Rect2(
@@ -5364,6 +5399,7 @@ func layout_level_up_dialog_controls() -> void:
 func show_level_up_panel(level: int) -> void:
 	if level_up_overlay == null:
 		return
+	GameState.play_level_up_sound()
 	hide_no_moves_panel()
 	board_locked = true
 	clear_selection()

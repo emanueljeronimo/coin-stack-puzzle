@@ -5,6 +5,7 @@ signal restart_level_confirmed
 
 const REF_WIDTH := 1080.0
 const LogoFont = preload("res://Fonts/Lobster-Regular.ttf")
+const BoardMusicServiceScript = preload("res://board_music_service.gd")
 const CLOSE_RED := Color(0.90, 0.22, 0.24, 1.0)
 const CLOSE_RED_BORDER := Color(0.55, 0.10, 0.12, 1.0)
 const SELECT_GREEN := Color(0.32, 0.86, 0.28, 1.0)
@@ -28,6 +29,7 @@ var _toggle_rows: Array[HBoxContainer] = []
 var _toggle_labels: Array[Label] = []
 var _toggle_btns: Array[Button] = []
 var _toggle_setters: Array[Callable] = []
+var _music_btn: Button = null
 var _footer_row: HBoxContainer = null
 var _restart_btn: Button = null
 var _close_menu_btn: Button = null
@@ -130,6 +132,9 @@ func layout_for_viewport(viewport_size: Vector2) -> void:
 	for i in range(_toggle_btns.size()):
 		_toggle_btns[i].custom_minimum_size = toggle_btn
 		_toggle_btns[i].add_theme_font_size_override("font_size", int(26 * scale))
+	if _music_btn != null:
+		_music_btn.custom_minimum_size = toggle_btn
+		_music_btn.add_theme_font_size_override("font_size", int(26 * scale))
 	for row in _toggle_rows:
 		row.custom_minimum_size = Vector2(0, toggle_h)
 	var toggles_block_h := toggle_h * 3.0 + float(sep) * 2.0 + float(well_pad) * 2.0
@@ -269,7 +274,7 @@ func _build_ui() -> void:
 	toggles_box.add_theme_constant_override("separation", 10)
 	toggles_margin.add_child(toggles_box)
 
-	_add_toggle_row(toggles_box, "Música", _get_music_enabled, _set_music_enabled)
+	_add_music_row(toggles_box)
 	_add_toggle_row(toggles_box, "Sonidos", _get_sounds_enabled, _set_sounds_enabled)
 	_add_toggle_row(toggles_box, "Vibración", _get_vibration_enabled, _set_vibration_enabled)
 
@@ -507,6 +512,7 @@ func _apply_theme_colors() -> void:
 
 	for i in range(_toggle_btns.size()):
 		_apply_toggle_style(_toggle_btns[i], _toggle_btns[i].button_pressed)
+	_apply_music_style()
 	_refresh_theme_selection()
 	_apply_rainbow_ui_fills()
 
@@ -526,6 +532,32 @@ func _apply_rainbow_ui_fills() -> void:
 	for btn in _toggle_btns:
 		if btn != null:
 			HudTextureButtons.apply_optional_rainbow_fill(btn, 14, btn.size, 3)
+	if _music_btn != null:
+		HudTextureButtons.apply_optional_rainbow_fill(_music_btn, 14, _music_btn.size, 3)
+
+func _add_music_row(parent: VBoxContainer) -> void:
+	var row := HBoxContainer.new()
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_theme_constant_override("separation", 16)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	parent.add_child(row)
+	_toggle_rows.append(row)
+
+	var lbl := _make_outlined_label("Música", 30)
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(lbl)
+	_toggle_labels.append(lbl)
+
+	_music_btn = Button.new()
+	_music_btn.focus_mode = Control.FOCUS_NONE
+	_music_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	_music_btn.pressed.connect(_on_music_pressed)
+	GameState.hook_button_sound(_music_btn)
+	if LogoFont != null:
+		_music_btn.add_theme_font_override("font", LogoFont)
+	row.add_child(_music_btn)
+	_apply_music_style()
 
 func _add_toggle_row(
 	parent: VBoxContainer,
@@ -561,17 +593,11 @@ func _add_toggle_row(
 	btn.button_pressed = bool(getter.call())
 	_apply_toggle_style(btn, btn.button_pressed)
 
-func _get_music_enabled() -> bool:
-	return GameState.music_enabled
-
 func _get_sounds_enabled() -> bool:
 	return GameState.sounds_enabled
 
 func _get_vibration_enabled() -> bool:
 	return GameState.vibration_enabled
-
-func _set_music_enabled(enabled: bool) -> void:
-	GameState.set_music_enabled(enabled)
 
 func _set_sounds_enabled(enabled: bool) -> void:
 	GameState.set_sounds_enabled(enabled)
@@ -588,12 +614,41 @@ func _on_toggle_pressed(index: int) -> void:
 	if index < _toggle_setters.size():
 		_toggle_setters[index].call(enabled)
 
-func _refresh_toggle_states() -> void:
-	if _toggle_btns.size() < 3:
+func _on_music_pressed() -> void:
+	GameState.cycle_music_track()
+	_apply_music_style()
+
+func _apply_music_style() -> void:
+	if _music_btn == null:
 		return
-	_sync_toggle_btn(0, GameState.music_enabled)
-	_sync_toggle_btn(1, GameState.sounds_enabled)
-	_sync_toggle_btn(2, GameState.vibration_enabled)
+	var enabled: bool = GameState.music_enabled
+	_music_btn.text = BoardMusicServiceScript.button_label(GameState.music_track_id)
+	var p: Dictionary = GameState.get_ui_palette()
+	var text_marble := Color(0.88, 0.86, 0.83)
+	if enabled:
+		_apply_button_style(
+			_music_btn,
+			p.get("settings_btn_on", Color(0.58, 0.80, 0.48, 0.98)),
+			p.get("settings_btn_border", Color(0.75, 0.88, 0.58, 1.0)),
+			14,
+			text_marble
+		)
+	else:
+		_apply_button_style(
+			_music_btn,
+			p.get("settings_btn_off", Color(0.40, 0.50, 0.40, 0.95)),
+			p.get("settings_card_border", Color(0.52, 0.60, 0.48, 0.9)).darkened(0.2),
+			14,
+			text_marble
+		)
+	HudTextureButtons.apply_optional_rainbow_fill(_music_btn, 14, _music_btn.size, 3)
+
+func _refresh_toggle_states() -> void:
+	if _toggle_btns.size() < 2:
+		return
+	_apply_music_style()
+	_sync_toggle_btn(0, GameState.sounds_enabled)
+	_sync_toggle_btn(1, GameState.vibration_enabled)
 
 func _sync_toggle_btn(index: int, on: bool) -> void:
 	_toggle_btns[index].button_pressed = on

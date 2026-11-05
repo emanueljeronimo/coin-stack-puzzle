@@ -184,6 +184,20 @@ func _test_unlock_levels() -> void:
 	if bool(has_16.get("changed", true)):
 		_fail("desync_keeps_real_16", str(has_16))
 		return
+	var formed_16 := GameRulesScript.heal_cramped_prestige_opening({
+		"roll_value_floor": 11,
+		"max_value": 16,
+		"highest_board_coin": 16,
+		"milestone_level": 15,
+		"active_stacks": 5,
+		"cycle_reset_stacks": 5,
+		"cycle_checkpoint_origin": 20,
+		"checkpoint_level": 22,
+		"next_free_slot_unlock_level": 24,
+	})
+	if bool(formed_16.get("changed", true)):
+		_fail("cramped_keeps_real_16", str(formed_16))
+		return
 	var cramped := GameRulesScript.heal_cramped_prestige_opening({
 		"roll_value_floor": 31,
 		"max_value": 40,

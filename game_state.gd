@@ -6,6 +6,7 @@ signal lives_changed
 
 const GameLivesServiceScript = preload("res://game_lives_service.gd")
 const UiSfxServiceScript = preload("res://ui_sfx_service.gd")
+const BoardMusicServiceScript = preload("res://board_music_service.gd")
 
 ## Recursos del jugador compartidos entre Lobby y partida.
 const INITIAL_LIVES := 5
@@ -13,7 +14,6 @@ const INITIAL_DIAMONDS := 3000
 
 const SETTINGS_PATH := "user://settings.cfg"
 const DEFAULT_BACKGROUND_THEME_ID := "fondo-naranja"
-const BOARD_MUSIC_PATH := "res://musica/musica tablero.mp3"
 
 const BACKGROUND_THEMES: Array = [
 	{"id": "fondo-amarillo", "path": "res://Imagenes/fondo-amarillo.png"},
@@ -264,6 +264,7 @@ var player_level: int = 1
 var username: String = ""
 var checkpoint_snapshot: Dictionary = {}
 var background_theme_id: String = DEFAULT_BACKGROUND_THEME_ID
+var music_track_id: String = BoardMusicServiceScript.DEFAULT_TRACK
 var music_enabled: bool = true
 var sounds_enabled: bool = true
 var vibration_enabled: bool = true
@@ -271,15 +272,22 @@ var vibration_enabled: bool = true
 var _background_textures: Dictionary = {}
 var _board_music_player: AudioStreamPlayer = null
 var _board_music_active: bool = false
+var _board_music_path: String = ""
 var _button_sfx_player: AudioStreamPlayer = null
+var _coin_select_sfx_player: AudioStreamPlayer = null
 var _coin_sfx_player: AudioStreamPlayer = null
+var _fusion_sfx_player: AudioStreamPlayer = null
+var _level_up_sfx_player: AudioStreamPlayer = null
 var _life_hud_tick: float = 0.0
 
 func _ready() -> void:
 	load_settings()
 	_ensure_board_music_player()
 	_ensure_button_sfx_player()
+	_ensure_coin_select_sfx_player()
 	_ensure_coin_sfx_player()
+	_ensure_fusion_sfx_player()
+	_ensure_level_up_sfx_player()
 
 func _process(delta: float) -> void:
 	var now: int = _now_unix()
@@ -403,6 +411,9 @@ func load_settings() -> void:
 	if get_background_theme_path(background_theme_id).is_empty():
 		background_theme_id = DEFAULT_BACKGROUND_THEME_ID
 	music_enabled = bool(cfg.get_value("audio", "music_enabled", true))
+	var saved_track := str(cfg.get_value("audio", "music_track", ""))
+	music_track_id = BoardMusicServiceScript.resolve_track(saved_track, music_enabled)
+	music_enabled = BoardMusicServiceScript.is_enabled(music_track_id)
 	sounds_enabled = bool(cfg.get_value("audio", "sounds_enabled", true))
 	vibration_enabled = bool(cfg.get_value("audio", "vibration_enabled", true))
 
@@ -411,6 +422,7 @@ func save_settings() -> void:
 	cfg.load(SETTINGS_PATH)
 	cfg.set_value("display", "background_theme_id", background_theme_id)
 	cfg.set_value("audio", "music_enabled", music_enabled)
+	cfg.set_value("audio", "music_track", music_track_id)
 	cfg.set_value("audio", "sounds_enabled", sounds_enabled)
 	cfg.set_value("audio", "vibration_enabled", vibration_enabled)
 	cfg.save(SETTINGS_PATH)
@@ -456,12 +468,27 @@ func set_background_theme(theme_id: String) -> void:
 	background_theme_changed.emit(theme_id)
 
 func set_music_enabled(enabled: bool) -> void:
-	if music_enabled == enabled:
+	if enabled:
+		if music_enabled:
+			return
+		set_music_track(BoardMusicServiceScript.TRACK_1)
 		return
+	set_music_track(BoardMusicServiceScript.TRACK_OFF)
+
+func set_music_track(track_id: String) -> void:
+	var next_id := BoardMusicServiceScript.normalize(track_id)
+	if music_track_id == next_id and music_enabled == BoardMusicServiceScript.is_enabled(next_id):
+		return
+	music_track_id = next_id
+	var enabled := BoardMusicServiceScript.is_enabled(next_id)
 	music_enabled = enabled
 	save_settings()
 	music_enabled_changed.emit(enabled)
+	_sync_board_music_stream()
 	_apply_board_music_playback()
+
+func cycle_music_track() -> void:
+	set_music_track(BoardMusicServiceScript.next_track(music_track_id))
 
 func set_sounds_enabled(enabled: bool) -> void:
 	sounds_enabled = enabled
@@ -500,33 +527,105 @@ func _ensure_button_sfx_player() -> void:
 	_button_sfx_player.stream = stream
 	add_child(_button_sfx_player)
 
+func play_coin_select_sound() -> void:
+	_ensure_coin_select_sfx_player()
+	if not UiSfxServiceScript.should_play_button(sounds_enabled, _coin_select_sfx_player != null):
+		return
+	_coin_select_sfx_player.play()
+
 func play_coin_sound(coin_count: int = 1) -> void:
+	play_coin_place_sound(coin_count)
+
+func play_coin_place_sound(coin_count: int = 1) -> void:
 	_ensure_coin_sfx_player()
 	if not UiSfxServiceScript.should_play_button(sounds_enabled, _coin_sfx_player != null):
 		return
-	_coin_sfx_player.pitch_scale = UiSfxServiceScript.coin_sfx_pitch(coin_count)
+	var flicks: int = UiSfxServiceScript.card_flick_count(coin_count)
+	for i in range(flicks):
+		var delay: float = UiSfxServiceScript.card_flick_delay(i)
+		if delay <= 0.001:
+			_coin_sfx_player.play()
+		else:
+			var timer := get_tree().create_timer(delay)
+			timer.timeout.connect(_play_card_flick)
+
+func _play_card_flick() -> void:
+	if not sounds_enabled or _coin_sfx_player == null:
+		return
 	_coin_sfx_player.play()
 
+func play_fusion_sound() -> void:
+	_ensure_fusion_sfx_player()
+	if not UiSfxServiceScript.should_play_button(sounds_enabled, _fusion_sfx_player != null):
+		return
+	_fusion_sfx_player.play()
+
+func play_level_up_sound() -> void:
+	_ensure_level_up_sfx_player()
+	if not UiSfxServiceScript.should_play_button(sounds_enabled, _level_up_sfx_player != null):
+		return
+	_level_up_sfx_player.play()
+
+func _ensure_coin_select_sfx_player() -> void:
+	_coin_select_sfx_player = _make_sfx_player(
+		_coin_select_sfx_player,
+		"CoinSelectSfxPlayer",
+		UiSfxServiceScript.COIN_SELECT_SFX_PATH,
+		4
+	)
+
 func _ensure_coin_sfx_player() -> void:
-	if _coin_sfx_player != null:
-		return
+	_coin_sfx_player = _make_sfx_player(
+		_coin_sfx_player,
+		"CoinSfxPlayer",
+		UiSfxServiceScript.COIN_PLACE_SFX_PATH,
+		10
+	)
+
+func _ensure_fusion_sfx_player() -> void:
+	_fusion_sfx_player = _make_sfx_player(
+		_fusion_sfx_player,
+		"FusionSfxPlayer",
+		UiSfxServiceScript.FUSION_SFX_PATH,
+		3
+	)
+
+func _ensure_level_up_sfx_player() -> void:
+	_level_up_sfx_player = _make_sfx_player(
+		_level_up_sfx_player,
+		"LevelUpSfxPlayer",
+		UiSfxServiceScript.LEVEL_UP_SFX_PATH,
+		1
+	)
+
+func _make_sfx_player(
+	current: AudioStreamPlayer,
+	player_name: String,
+	path: String,
+	polyphony: int
+) -> AudioStreamPlayer:
+	if current != null:
+		return current
 	if DisplayServer.get_name() == "headless":
-		return
-	var stream := load(UiSfxServiceScript.COIN_SFX_PATH) as AudioStream
+		return null
+	var stream := load(path) as AudioStream
 	if stream == null:
-		push_warning("No se pudo cargar el sonido de ficha: %s" % UiSfxServiceScript.COIN_SFX_PATH)
-		return
+		push_warning("No se pudo cargar el sonido: %s" % path)
+		return null
 	stream = stream.duplicate()
 	UiSfxServiceScript.apply_oneshot_stream(stream)
-	_coin_sfx_player = AudioStreamPlayer.new()
-	_coin_sfx_player.name = "CoinSfxPlayer"
-	_coin_sfx_player.stream = stream
-	add_child(_coin_sfx_player)
+	var player := AudioStreamPlayer.new()
+	player.name = player_name
+	player.stream = stream
+	player.max_polyphony = polyphony
+	add_child(player)
+	return player
 
 ## Reproduce la música del tablero en loop mientras hay partida activa.
 func start_board_music() -> void:
 	_board_music_active = true
 	_ensure_board_music_player()
+	_sync_board_music_stream()
 	_apply_board_music_playback()
 
 ## Detiene la música del tablero al salir de la partida.
@@ -543,17 +642,30 @@ func _ensure_board_music_player() -> void:
 		return
 	if DisplayServer.get_name() == "headless":
 		return
-	var stream := load(BOARD_MUSIC_PATH) as AudioStream
+	_board_music_player = AudioStreamPlayer.new()
+	_board_music_player.name = "BoardMusicPlayer"
+	add_child(_board_music_player)
+	_sync_board_music_stream()
+
+func _sync_board_music_stream() -> void:
+	if _board_music_player == null:
+		return
+	var path := BoardMusicServiceScript.path_for(music_track_id)
+	if path.is_empty():
+		return
+	if _board_music_path == path and _board_music_player.stream != null:
+		return
+	var stream := load(path) as AudioStream
 	if stream == null:
-		push_warning("No se pudo cargar la música del tablero: %s" % BOARD_MUSIC_PATH)
+		push_warning("No se pudo cargar la musica del tablero: %s" % path)
 		return
 	stream = stream.duplicate()
 	if stream is AudioStreamMP3:
 		(stream as AudioStreamMP3).loop = true
-	_board_music_player = AudioStreamPlayer.new()
-	_board_music_player.name = "BoardMusicPlayer"
+	_board_music_player.stop()
+	_board_music_player.stream_paused = false
 	_board_music_player.stream = stream
-	add_child(_board_music_player)
+	_board_music_path = path
 
 func _apply_board_music_playback() -> void:
 	if _board_music_player == null:

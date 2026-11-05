@@ -273,7 +273,8 @@ static func heal_prestige_start_desync(state: Dictionary) -> Dictionary:
 
 ## 5 ranuras con mazo 31-40 (u 11-20, etc.): el prestige viejo no reabría el ciclo.
 ## Rehace el tablero de apertura y deja nivel/origen. No toca diamantes ni boosters.
-const CRAMPED_CYCLE_VALUE_SPAN := 5
+## Span 8+: decena completa. Un 16 (span 5) es progreso real, no este bug.
+const CRAMPED_CYCLE_VALUE_SPAN := 8
 
 static func heal_cramped_prestige_opening(state: Dictionary) -> Dictionary:
 	var floor_v := int(state.get("roll_value_floor", 1))
@@ -293,6 +294,10 @@ static func heal_cramped_prestige_opening(state: Dictionary) -> Dictionary:
 	if milestone <= 0 or floor_v <= 1:
 		return result
 	if active_stacks > cycle_reset_stacks + 1:
+		return result
+	# Crear 16/17 es progreso real. El bug viejo era un mazo de decena completa
+	# (31-40, 11-20) en 5 ranuras, no el 16 recien fusionado.
+	if maxi(highest, max_value) <= milestone + 1:
 		return result
 	var span := maxi(highest, max_value) - floor_v
 	if span < CRAMPED_CYCLE_VALUE_SPAN:

@@ -1,6 +1,7 @@
 extends Area2D
 
 const GameRulesScript = preload("res://game_rules.gd")
+const CoinPaletteServiceScript = preload("res://coin_palette_service.gd")
 const CoinWildcardShader = preload("res://coin_wildcard.gdshader")
 const CoinNumberFont = preload("res://Fonts/Lobster-Regular.ttf")
 const CoinFaceTexture = preload("res://Imagenes/ficha.png")
@@ -16,23 +17,23 @@ var number_visible: bool = true
 @onready var label: Label = $Label
 @onready var collision_shape: CollisionShape2D = $CollisionShape2D
 
-## Paleta pastel con matices redistribuidos para mejor distinción.
+## 15 colores. El 16 vuelve al 1, el 17 al 2, etc. Sin duplicar rosa/verde/azul.
 const VALUE_COLORS := [
-	Color(0.95, 0.45, 0.55), # 1  blush
-	Color(0.25, 0.75, 0.40), # 2  verde
-	Color(0.55, 0.35, 0.85), # 3  violeta
-	Color(0.90, 0.65, 0.50), # 4  durazno (bajado)
-	Color(0.25, 0.85, 0.80), # 5  aqua
-	Color(0.75, 0.30, 0.75), # 6  rosa violeta
-	Color(0.65, 0.85, 0.25), # 7  lima
-	Color(0.30, 0.55, 0.90), # 8  azul
-	Color(0.95, 0.85, 0.35), # 9  amarillo trigo
-	Color(0.55, 0.70, 0.55), # 10 salvia
-	Color(0.90, 0.50, 0.15), # 11 naranja
-	Color(0.75, 0.70, 0.95), # 12 lavanda
-	Color(0.22, 0.62, 0.70), # 13 teal
-	Color(0.98, 0.50, 0.72), # 14 rosa
-	Color(0.92, 0.92, 0.95), # 15 gris claro 
+	Color(0.90, 0.30, 0.32), # 1  rojo
+	Color(0.22, 0.74, 0.34), # 2  verde
+	Color(0.50, 0.28, 0.88), # 3  violeta
+	Color(0.94, 0.70, 0.52), # 4  durazno
+	Color(0.18, 0.88, 0.86), # 5  aqua
+	Color(0.80, 0.22, 0.62), # 6  fucsia
+	Color(0.62, 0.88, 0.22), # 7  lima
+	Color(0.22, 0.48, 0.94), # 8  azul
+	Color(0.96, 0.84, 0.22), # 9  amarillo
+	Color(0.58, 0.52, 0.28), # 10 khaki
+	Color(0.94, 0.48, 0.12), # 11 naranja
+	Color(0.70, 0.62, 0.96), # 12 lavanda
+	Color(0.12, 0.58, 0.64), # 13 teal
+	Color(0.96, 0.42, 0.78), # 14 rosa
+	Color(0.88, 0.88, 0.90), # 15 gris
 ]
 
 const PASTEL_SOFTEN := 0.14
@@ -180,7 +181,7 @@ func _play_transform_punch() -> void:
 func get_color_for_value(v: int) -> Color:
 	if v <= 0:
 		return Color.WHITE
-	var idx := (v - 1) % VALUE_COLORS.size()
+	var idx := CoinPaletteServiceScript.palette_index(v, VALUE_COLORS.size())
 	return VALUE_COLORS[idx].lerp(Color.WHITE, PASTEL_SOFTEN)
 
 func get_sprite_tint(base: Color) -> Color:

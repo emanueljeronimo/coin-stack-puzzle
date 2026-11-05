@@ -47,6 +47,27 @@ func _test_level_up_detection() -> void:
 	if bool(no_catch.get("changed", true)):
 		_fail("catch_up_no_change", str(no_catch))
 		return
+	if GameBoardEngineScript.should_catch_up_max_value(false, 1, 5, 5):
+		_fail("cycle1_needs_next_coin")
+		return
+	if not GameBoardEngineScript.should_catch_up_max_value(false, 11, 15, 15):
+		_fail("prestige_opens_15_in_deals")
+		return
+	if GameBoardEngineScript.should_catch_up_max_value(false, 11, 16, 16):
+		_fail("playing_16_does_not_deal_16")
+		return
+	if GameBoardEngineScript.prestige_play_max_value(11, 16) != 16:
+		_fail("play_max_stays_16", str(GameBoardEngineScript.prestige_play_max_value(11, 16)))
+		return
+	if GameBoardEngineScript.clamped_play_max_value(11, 17, 16) != 16:
+		_fail("clamp_overshot_17", str(GameBoardEngineScript.clamped_play_max_value(11, 17, 16)))
+		return
+	if GameBoardEngineScript.should_catch_up_max_value(false, 11, 15, 14):
+		_fail("prestige_opening_stays_14")
+		return
+	if not GameBoardEngineScript.should_catch_up_max_value(true, 11, 15, 16):
+		_fail("prestige_16_still_advances")
+		return
 	_ok("level_up")
 
 func _test_checkpoint_decision() -> void:

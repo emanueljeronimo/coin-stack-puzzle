@@ -53,7 +53,8 @@ const PLAY_EMBOLDEN := 0.55
 const PLAY_LABEL_INSET_X := 0.04
 const PLAY_LABEL_LIFT_RATIO := 0.08
 const PLAY_TEXT_COLOR := Color(1.0, 1.0, 1.0, 1.0)
-const PLAY_TEXT_OUTLINE := Color(0.42, 0.22, 0.10, 0.92)
+const PLAY_TEXT_OUTLINE := Color(0.0, 0.0, 0.0, 1.0)
+const PLAY_OUTLINE_SIZE := 3.0
 const DAILY_LOGIN_SIZE_RATIO := 1.65
 ## El PNG de la tienda llena mas el canvas que el calendario; se escala para igualar.
 const SHOP_ICON_VISUAL_SCALE := 0.88
@@ -440,7 +441,7 @@ func _apply_play_label_style(ui_scale: float) -> void:
 	play_label.add_theme_color_override("font_color", PLAY_TEXT_COLOR)
 	play_label.add_theme_color_override("font_outline_color", PLAY_TEXT_OUTLINE)
 	var size_ratio: float = float(PLAY_FONT_SIZE) / float(LEVEL_FONT_SIZE)
-	play_label.add_theme_constant_override("outline_size", int(round(8.0 * s)))
+	play_label.add_theme_constant_override("outline_size", int(round(PLAY_OUTLINE_SIZE * s)))
 	play_label.add_theme_color_override("font_shadow_color", LEVEL_SHADOW)
 	play_label.add_theme_constant_override("shadow_offset_x", int(round(2.0 * size_ratio * s)))
 	play_label.add_theme_constant_override("shadow_offset_y", int(round(7.0 * size_ratio * s)))

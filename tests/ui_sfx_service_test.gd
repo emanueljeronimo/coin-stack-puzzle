@@ -13,7 +13,8 @@ func _run() -> void:
 	_test_button_path()
 	_test_should_play_button()
 	_test_oneshot_null_is_safe()
-	_test_coin_sfx_pitch()
+	_test_card_flicks_get_longer()
+	_test_solitaire_paths()
 	print("=== RESULT: %d passed, %d failed ===" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -47,24 +48,38 @@ func _test_oneshot_null_is_safe() -> void:
 	UiSfxServiceScript.apply_oneshot_stream(null)
 	_ok("oneshot_null_is_safe")
 
-func _test_coin_sfx_pitch() -> void:
-	if not str(UiSfxServiceScript.COIN_SFX_PATH).ends_with("sonido-ficha-2.mp3"):
-		_fail("coin_path", UiSfxServiceScript.COIN_SFX_PATH)
+func _test_card_flicks_get_longer() -> void:
+	if UiSfxServiceScript.card_flick_count(1) != 1:
+		_fail("one_card", str(UiSfxServiceScript.card_flick_count(1)))
 		return
-	if not is_equal_approx(UiSfxServiceScript.coin_sfx_pitch(1), 1.0):
-		_fail("one_coin_normal", str(UiSfxServiceScript.coin_sfx_pitch(1)))
+	if UiSfxServiceScript.card_flick_count(5) != 5:
+		_fail("five_cards", str(UiSfxServiceScript.card_flick_count(5)))
 		return
-	if UiSfxServiceScript.coin_sfx_pitch(5) >= UiSfxServiceScript.coin_sfx_pitch(1):
-		_fail("more_coins_lower_pitch", str(UiSfxServiceScript.coin_sfx_pitch(5)))
+	if UiSfxServiceScript.card_flick_count(0) != 1:
+		_fail("zero_counts_as_one", str(UiSfxServiceScript.card_flick_count(0)))
 		return
-	if UiSfxServiceScript.coin_sfx_pitch(10) > UiSfxServiceScript.coin_sfx_pitch(5):
-		_fail("ten_not_higher_than_five", str(UiSfxServiceScript.coin_sfx_pitch(10)))
+	if UiSfxServiceScript.card_flick_count(20) != UiSfxServiceScript.CARD_FLICK_MAX:
+		_fail("cap", str(UiSfxServiceScript.card_flick_count(20)))
 		return
-	if UiSfxServiceScript.coin_sfx_pitch(10) < UiSfxServiceScript.COIN_PITCH_MIN - 0.001:
-		_fail("pitch_floor", str(UiSfxServiceScript.coin_sfx_pitch(10)))
+	if UiSfxServiceScript.card_flick_delay(3) <= UiSfxServiceScript.card_flick_delay(1):
+		_fail("later_flick_is_later")
 		return
-	if UiSfxServiceScript.coin_sfx_pitch(0) != 1.0:
-		_fail("zero_counts_as_one", str(UiSfxServiceScript.coin_sfx_pitch(0)))
-		return
-	_ok("coin_sfx_pitch")
+	_ok("card_flicks_get_longer")
 
+func _test_solitaire_paths() -> void:
+	if not str(UiSfxServiceScript.COIN_SELECT_SFX_PATH).ends_with("sonido-giro.wav"):
+		_fail("select_path", UiSfxServiceScript.COIN_SELECT_SFX_PATH)
+		return
+	if not str(UiSfxServiceScript.COIN_PLACE_SFX_PATH).ends_with("sonido-colocar.wav"):
+		_fail("place_path", UiSfxServiceScript.COIN_PLACE_SFX_PATH)
+		return
+	if UiSfxServiceScript.COIN_SELECT_SFX_PATH == UiSfxServiceScript.COIN_PLACE_SFX_PATH:
+		_fail("select_and_place_are_same")
+		return
+	if not str(UiSfxServiceScript.FUSION_SFX_PATH).ends_with("sonido-clin.wav"):
+		_fail("clin_path", UiSfxServiceScript.FUSION_SFX_PATH)
+		return
+	if not str(UiSfxServiceScript.LEVEL_UP_SFX_PATH).ends_with("subir-nivel.mp3"):
+		_fail("level_path", UiSfxServiceScript.LEVEL_UP_SFX_PATH)
+		return
+	_ok("solitaire_paths")

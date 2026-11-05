@@ -18,6 +18,44 @@ static func apply_level_up(current_level: int, max_value: int) -> Dictionary:
 		"max_value": max_value + 1,
 	}
 
+## Tras prestige, el mazo incluye el objetivo de apertura (15) cuando ya existe,
+## pero no la ficha que estas jugando (16). 15 en tablero → max 16. 16 en tablero → max 16.
+static func prestige_play_max_value(
+	roll_floor: int,
+	highest: int,
+	checkpoint_base_value: int = 5
+) -> int:
+	if roll_floor <= 1:
+		return 0
+	var opening: int = roll_floor + checkpoint_base_value - 1
+	if highest >= opening:
+		return maxi(opening + 1, highest)
+	return opening
+
+static func clamped_play_max_value(
+	roll_floor: int,
+	max_value: int,
+	highest: int,
+	checkpoint_base_value: int = 5
+) -> int:
+	var play: int = prestige_play_max_value(roll_floor, highest, checkpoint_base_value)
+	if play <= 0 or max_value <= play:
+		return max_value
+	return play
+
+## Ciclo 1: el mazo sube al crear max+1. Tras prestige, crear el 15 abre esa ficha
+## en las tiradas; crear el 16 no (sigue siendo el objetivo actual).
+static func should_catch_up_max_value(
+	has_next_value: bool,
+	roll_floor: int,
+	max_value: int,
+	highest: int,
+	checkpoint_base_value: int = 5
+) -> bool:
+	if has_next_value:
+		return true
+	return prestige_play_max_value(roll_floor, highest, checkpoint_base_value) > max_value
+
 ## El objetivo avanza de a 1 solo si ya existe la ficha siguiente (max+1).
 ## Ochos residuales con max=5 no cuentan como nivel 8/9 en el mismo turno.
 static func catch_up_max_value(current_level: int, max_value: int, has_next_value: bool) -> Dictionary:
