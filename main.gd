@@ -100,17 +100,17 @@ const BOARD_SLOT_BORDER_SELECTED := Color(0.42, 0.72, 0.98, 0.95)
 const BOARD_SLOT_SELECTED_FILL := Color(0.62, 0.86, 1.0, 0.22)
 const BOARD_SLOT_BORDER_WIDTH := 3
 const BOARD_SLOT_INSET := 3.0
-## Chips superiores (home, vidas, diamantes, settings).
+## Chips superiores: mismas proporciones que el lobby (12% / 19% del ancho).
 const HUD_SIZE_MULTIPLIER = 1.0
-const HUD_CHIP_HEIGHT = 50.0
-const HUD_CORNER_SIZE = 70.0
-const HUD_CHIP_STAT_W = 136.0
+const HUD_CHIP_HEIGHT = 99.0
+const HUD_CORNER_SIZE = 130.0
+const HUD_CHIP_STAT_W = 205.0
 ## Pastillas de vidas/diamantes: cápsula baja, más larga que alta.
 const HUD_RESOURCE_PILL_H_RATIO := 0.62
 const HUD_LIFE_ICON_H_RATIO := 1.38
 const HUD_MONEY_ICON_H_RATIO := 1.26
 const HUD_MONEY_ICON_W_RATIO := 1.06
-const HUD_BOARD_STAT_FONT_SIZE = 30
+const HUD_BOARD_STAT_FONT_SIZE = 48
 const HUD_BOARD_LONG_ICON_RATIO = 0.56
 const HUD_CHIP_GAP = 26.0
 const HUD_CHIP_TO_PROGRESS_GAP = 26.0
@@ -1543,9 +1543,7 @@ func resolve_board_after_action(expected_revision: int = -1, skip_fusions: bool 
 		save_game()
 	if MainTurnResolutionServiceScript.should_unlock_board(level_alert_open, booster_alert_open):
 		check_blocked_state()
-	if MainTurnResolutionServiceScript.should_preempt_booster_for_level_alerts(_pending_level_up_alerts):
-		if level_up_overlay == null or not level_up_overlay.visible:
-			_show_next_level_up_alert()
+	_queue_level_up_alert_display()
 	_update_undo_button_state()
 
 func request_resolve_board_after_action(expected_revision: int = -1) -> void:
@@ -2263,6 +2261,7 @@ func update_checkpoint_level() -> bool:
 			_pending_level_up_alerts.append(alert_lvl)
 	if _pending_cycle_reset_milestone > 0 and _pending_level_up_alerts.is_empty():
 		_pending_level_up_alerts.append(checkpoint_level)
+	_queue_level_up_alert_display()
 	sync_booster_unlocks(previous)
 	# Tras un reset de ciclo no hay desbloqueo retroactivo de ranuras.
 	if not did_cycle_reset:
@@ -2274,7 +2273,6 @@ func update_checkpoint_level() -> bool:
 	GameState.player_level = checkpoint_level
 	GameState.checkpoint_snapshot = checkpoint_snapshot.duplicate(true)
 	print("Checkpoint alcanzado: nivel ", checkpoint_level, " (tablero guardado)")
-	_show_next_level_up_alert()
 	save_game()
 	return true
 
@@ -2286,30 +2284,38 @@ func _sync_level_up_alerts_after_restore() -> void:
 		_last_acked_checkpoint_level,
 		checkpoint_level
 	)
-	if not _pending_level_up_alerts.is_empty():
-		call_deferred("_show_next_level_up_alert")
+	_queue_level_up_alert_display()
+
+func _queue_level_up_alert_display() -> void:
+	var overlay_visible := level_up_overlay != null and level_up_overlay.visible
+	if not MainTurnResolutionServiceScript.should_show_pending_level_alert(
+		_pending_level_up_alerts,
+		overlay_visible
+	):
+		return
+	call_deferred("_show_next_level_up_alert")
 
 func _show_next_level_up_alert() -> void:
+	if level_up_overlay != null and level_up_overlay.visible:
+		layout_level_up_dialog_controls()
+		return
 	if _pending_level_up_alerts.is_empty():
 		# Tras el último cartel de nivel, mostrar Boosters pendientes si hay.
 		try_show_booster_unlock_panel()
 		return
 	# Comodín / Mezclar pueden desbloquear un Booster en el mismo resolve:
 	# el cartel de nivel tiene que salir primero.
-	if MainTurnResolutionServiceScript.should_preempt_booster_for_level_alerts(_pending_level_up_alerts):
-		_preempt_booster_unlock_for_level_alert()
-	# Si ya hay un cartel visible, solo re-layout (no consumir otro de la cola).
-	if level_up_overlay != null and level_up_overlay.visible:
-		layout_level_up_dialog_controls()
-		return
+	_preempt_booster_unlock_for_level_alert()
 	if level_up_overlay == null:
 		return
 	if shop_ui != null and shop_ui.is_open():
 		shop_ui.close()
 	if settings_ui != null and settings_ui.is_open():
 		settings_ui.close()
-	var alert_level: int = int(_pending_level_up_alerts.pop_front())
+	var alert_level: int = int(_pending_level_up_alerts[0])
 	show_level_up_panel(alert_level)
+	if level_up_overlay != null and level_up_overlay.visible:
+		_pending_level_up_alerts.pop_front()
 
 func _preempt_booster_unlock_for_level_alert() -> void:
 	if booster_unlock_overlay == null or not booster_unlock_overlay.visible:
@@ -3544,6 +3550,9 @@ func _bind_hud_chip_click(chip: Control, callback: Callable) -> void:
 		return
 	chip.gui_input.connect(func(event: InputEvent) -> void:
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			var viewport := chip.get_viewport()
+			if viewport != null:
+				viewport.set_input_as_handled()
 			GameState.play_button_sound()
 			callback.call()
 	)
@@ -3879,21 +3888,19 @@ func layout_mock_ui() -> void:
 	var viewport_size = get_viewport_rect().size
 	var board_rect = get_board_rect()
 	var scale = get_layout_scale()
-	var chip_y: float = maxf(12.0 * scale, board_rect.position.y - 132.0 * scale)
-	var topbar := HudTopbarLayoutServiceScript.topbar_base_metrics(
-		scale,
+	var topbar := HudTopbarLayoutServiceScript.lobby_matched_metrics(
+		viewport_size.x,
 		HUD_EDGE_MARGIN,
-		HUD_CHIP_STAT_W,
-		HUD_CHIP_HEIGHT,
 		HUD_CHIP_GAP
 	)
-	var edge_margin: float = float(topbar.get("edge_margin", HUD_EDGE_MARGIN * scale))
-	var stat_w: float = float(topbar.get("stat_w", HUD_CHIP_STAT_W * scale))
-	var chip_h: float = float(topbar.get("chip_h", HUD_CHIP_HEIGHT * scale))
-	# Home/tienda/ajustes: círculos del mismo alto que las pastillas de vidas/diamantes.
-	var corner_w: float = chip_h
-	var inner_gap: float = 10.0 * scale
-	var col_gap: float = float(topbar.get("col_gap", HUD_CHIP_GAP * scale))
+	var hud_scale: float = float(topbar.get("scale", viewport_size.x / 1080.0))
+	var edge_margin: float = float(topbar.get("edge_margin", HUD_EDGE_MARGIN * hud_scale))
+	var stat_w: float = float(topbar.get("stat_w", HUD_CHIP_STAT_W * hud_scale))
+	var chip_h: float = float(topbar.get("chip_h", HUD_CHIP_HEIGHT * hud_scale))
+	# Home/tienda/ajustes: mismo ancho de chip de esquina que el lobby.
+	var corner_w: float = float(topbar.get("corner_w", HUD_CORNER_SIZE * hud_scale))
+	var inner_gap: float = 10.0 * hud_scale
+	var col_gap: float = float(topbar.get("col_gap", HUD_CHIP_GAP * hud_scale))
 	var life_hang: float = HudTextureButtons.resource_chip_hang(
 		chip_h, HUD_RESOURCE_PILL_H_RATIO, HUD_LIFE_ICON_H_RATIO
 	)
@@ -3915,7 +3922,7 @@ func layout_mock_ui() -> void:
 		var shrink: float = clampf(viewport_size.x / required, 0.72, 1.0)
 		stat_w *= shrink
 		chip_h *= shrink
-		corner_w = chip_h
+		corner_w *= shrink
 		inner_gap *= shrink
 		col_gap *= shrink
 		life_hang = HudTextureButtons.resource_chip_hang(
@@ -3936,17 +3943,25 @@ func layout_mock_ui() -> void:
 		right_w = corner_w
 	var corner_size := Vector2(corner_w, chip_h)
 	var stat_size := Vector2(stat_w, chip_h)
-	var pill_radius := int(chip_h * 0.5)
+	var progress_h_est: float = 54.0 * scale
+	var chip_y: float = HudTopbarLayoutServiceScript.chip_row_y(
+		12.0 * hud_scale,
+		board_rect.position.y,
+		chip_h,
+		progress_h_est,
+		HUD_CHIP_TO_PROGRESS_GAP * hud_scale,
+		12.0 * scale
+	)
 
 	# Tres columnas: home+shop | vidas+diamantes | settings.
 	var left_x: float = edge_margin
-	layout_hud_pill_pair(null, home_chip, Vector2(left_x, chip_y), corner_size, scale)
+	layout_hud_pill_pair(null, home_chip, Vector2(left_x, chip_y), corner_size, hud_scale)
 
 	var shop_x: float = left_x + corner_w + inner_gap
-	layout_hud_pill_pair(null, shop_chip, Vector2(shop_x, chip_y), corner_size, scale)
+	layout_hud_pill_pair(null, shop_chip, Vector2(shop_x, chip_y), corner_size, hud_scale)
 
 	var settings_x: float = viewport_size.x - edge_margin - right_w
-	layout_hud_pill_pair(null, settings_chip, Vector2(settings_x, chip_y), corner_size, scale)
+	layout_hud_pill_pair(null, settings_chip, Vector2(settings_x, chip_y), corner_size, hud_scale)
 
 	var center_x: float = (viewport_size.x - center_w) * 0.5
 	var min_center: float = left_x + left_w + col_gap
@@ -3958,8 +3973,8 @@ func layout_mock_ui() -> void:
 		life_chip_parts,
 		Vector2(center_x + life_hang, chip_y),
 		stat_size,
-		HudTextureButtons.LIFE_COUNT_FONT_RATIO,
-		HudTextureButtons.LIFE_COUNT_FONT_MAX,
+		0.40,
+		48,
 		HUD_RESOURCE_PILL_H_RATIO,
 		HUD_LIFE_ICON_H_RATIO
 	)
@@ -3968,8 +3983,8 @@ func layout_mock_ui() -> void:
 			diamonds_chip_parts,
 			Vector2(center_x + life_w + pair_gap + money_hang, chip_y),
 			stat_size,
-			HudTextureButtons.LIFE_COUNT_FONT_RATIO,
-			HudTextureButtons.LIFE_COUNT_FONT_MAX,
+			0.38,
+			42,
 			HUD_RESOURCE_PILL_H_RATIO,
 			HUD_MONEY_ICON_H_RATIO,
 			HUD_MONEY_ICON_W_RATIO
@@ -3977,7 +3992,7 @@ func layout_mock_ui() -> void:
 
 	var progress_w = viewport_size.x * 0.78
 	var progress_h = 54 * scale
-	var progress_y = min(chip_y + chip_h + HUD_CHIP_TO_PROGRESS_GAP * scale, board_rect.position.y - progress_h - 12 * scale)
+	var progress_y = min(chip_y + chip_h + HUD_CHIP_TO_PROGRESS_GAP * hud_scale, board_rect.position.y - progress_h - 12 * scale)
 	var progress_x: float = roundf((viewport_size.x - progress_w) * 0.5)
 	var progress_y_px: float = roundf(progress_y)
 	progress_container.position = Vector2(progress_x, progress_y_px)

@@ -27,3 +27,8 @@ static func should_hold_booster_unlock(pending_level_alerts: Array, level_overla
 
 static func should_preempt_booster_for_level_alerts(pending_level_alerts: Array) -> bool:
 	return not pending_level_alerts.is_empty()
+
+## Mezclar dispara el resolve en el mismo click del HUD: el cartel tiene que
+## salir en el frame siguiente, con la cola todavía llena.
+static func should_show_pending_level_alert(pending_level_alerts: Array, overlay_visible: bool) -> bool:
+	return not pending_level_alerts.is_empty() and not overlay_visible

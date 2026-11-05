@@ -68,4 +68,13 @@ func _test_alert_flags() -> void:
 	if MainTurnResolutionServiceScript.should_preempt_booster_for_level_alerts([]):
 		_fail("no_preempt_without_level")
 		return
+	if not MainTurnResolutionServiceScript.should_show_pending_level_alert([9], false):
+		_fail("mix_level_alert_should_show")
+		return
+	if MainTurnResolutionServiceScript.should_show_pending_level_alert([9], true):
+		_fail("mix_level_alert_already_visible")
+		return
+	if MainTurnResolutionServiceScript.should_show_pending_level_alert([], false):
+		_fail("mix_level_alert_empty")
+		return
 	_ok("alert_flags")

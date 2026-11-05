@@ -60,6 +60,7 @@ TEST_SCRIPTS=(
   "res://tests/temp_slot_purchase_service_test.gd"
   "res://tests/adjacent_slot_purchase_service_test.gd"
   "res://tests/hud_action_row_layout_service_test.gd"
+  "res://tests/hud_topbar_layout_service_test.gd"
   "res://tests/integration_undo_wildcard_checkpoint_test.gd"
   "res://tests/mix_homogeneous_test.gd"
   "res://tests/integration_gameplay_progression_test.gd"

@@ -31,7 +31,7 @@ const VALUE_COLORS := [
 	Color(0.90, 0.50, 0.15), # 11 naranja
 	Color(0.75, 0.70, 0.95), # 12 lavanda
 	Color(0.22, 0.62, 0.70), # 13 teal
-	Color(0.95, 0.75, 0.85), # 14 rosa claro
+	Color(0.98, 0.50, 0.72), # 14 rosa
 	Color(0.92, 0.92, 0.95), # 15 gris claro 
 ]
 

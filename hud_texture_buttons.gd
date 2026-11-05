@@ -763,7 +763,7 @@ static func layout_resource_chip(
 	if pill != null:
 		pill.position = pill_local
 		pill.size = pill_draw
-		apply_candy_button_style(pill, pill_draw, ui_scale)
+		apply_gold_pill_style(pill, pill_draw, ui_scale)
 
 	if icon_wrap != null:
 		icon_wrap.clip_contents = false
