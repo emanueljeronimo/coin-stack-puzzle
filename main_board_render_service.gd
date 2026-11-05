@@ -20,3 +20,9 @@ static func slot_visual_state(slot_index: int, temp_slot_index: int, temp_slot_b
 
 static func slot_border_width(border_base: int, is_selected: bool) -> int:
 	return border_base + (1 if is_selected else 0)
+
+## Apenas mas oscuro y opaco para que el trazo no se pierda contra el fondo.
+static func contrast_slot_border(color: Color) -> Color:
+	var out := color.darkened(0.12)
+	out.a = clampf(lerpf(color.a, 1.0, 0.38), 0.0, 1.0)
+	return out

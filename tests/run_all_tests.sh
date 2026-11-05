@@ -56,6 +56,7 @@ TEST_SCRIPTS=(
   "res://tests/level_up_cartel_layout_service_test.gd"
   "res://tests/boot_cover_layout_service_test.gd"
   "res://tests/scene_loader_test.gd"
+  "res://tests/loading_progress_service_test.gd"
   "res://tests/slot_overlay_builder_test.gd"
   "res://tests/temp_slot_purchase_service_test.gd"
   "res://tests/adjacent_slot_purchase_service_test.gd"

@@ -86,10 +86,10 @@ const PANEL_CONTENT_PADDING_RATIO = 0.004
 ## Posición vertical del panel (área útil sobre el banner).
 const BOARD_PANEL_TOP_RATIO = 0.17
 ## Colores del tablero — celeste suave transparente + slots rosa.
-const BOARD_BG_COLOR := Color(0.88, 0.94, 0.98, 0.28)
-const BOARD_GLOSS_COLOR := Color(0.98, 0.99, 1.0, 0.10)
+const BOARD_BG_COLOR := Color(0.88, 0.94, 0.98, 0.40)
+const BOARD_GLOSS_COLOR := Color(0.98, 0.99, 1.0, 0.14)
 const BOARD_SHADOW_BASE := Color(0.20, 0.28, 0.36)
-const BOARD_ROW_COLOR := Color(0.86, 0.92, 0.97, 0.18)
+const BOARD_ROW_COLOR := Color(0.86, 0.92, 0.97, 0.24)
 const BOARD_SLOT_ACTIVE_COLOR := Color(0.98, 0.76, 0.86, 0.38)
 const BOARD_SLOT_INACTIVE_COLOR := Color(0.98, 0.82, 0.92, 0.20)
 const BOARD_SLOT_TEMP_COLOR := Color(0.96, 0.78, 0.88, 0.26)
@@ -2600,11 +2600,17 @@ func _on_background_theme_changed(_theme_id: String) -> void:
 func _apply_theme_ui_colors() -> void:
 	var palette: Dictionary = GameState.get_ui_palette()
 	theme_slot_fill = palette.get("slot_fill", BOARD_SLOT_ACTIVE_COLOR)
-	theme_slot_border = palette.get("slot_border", BOARD_SLOT_BORDER_ACTIVE)
+	theme_slot_border = MainBoardRenderServiceScript.contrast_slot_border(
+		palette.get("slot_border", BOARD_SLOT_BORDER_ACTIVE)
+	)
 	theme_slot_fill_dim = palette.get("slot_fill_dim", BOARD_SLOT_INACTIVE_COLOR)
-	theme_slot_border_dim = palette.get("slot_border_dim", BOARD_SLOT_BORDER_INACTIVE)
+	theme_slot_border_dim = MainBoardRenderServiceScript.contrast_slot_border(
+		palette.get("slot_border_dim", BOARD_SLOT_BORDER_INACTIVE)
+	)
 	theme_slot_fill_temp = palette.get("slot_fill_temp", BOARD_SLOT_TEMP_COLOR)
-	theme_slot_border_temp = palette.get("slot_border_temp", BOARD_SLOT_BORDER_TEMP)
+	theme_slot_border_temp = MainBoardRenderServiceScript.contrast_slot_border(
+		palette.get("slot_border_temp", BOARD_SLOT_BORDER_TEMP)
+	)
 	theme_progress_track_bg = palette.get("progress_track_bg", PROGRESS_TRACK_BG)
 	theme_progress_track_border = palette.get("progress_track_border", PROGRESS_TRACK_BORDER)
 	theme_progress_knob_bg = palette.get("progress_knob_bg", PROGRESS_KNOB_BG)

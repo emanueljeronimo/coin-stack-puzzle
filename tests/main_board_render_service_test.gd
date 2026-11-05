@@ -12,6 +12,7 @@ func _run() -> void:
 	print("=== main_board_render_service test ===")
 	_test_skip_slot()
 	_test_slot_visual_state()
+	_test_contrast_slot_border()
 	print("=== RESULT: %d passed, %d failed ===" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -57,3 +58,14 @@ func _test_slot_visual_state() -> void:
 		_fail("active_style", str(state))
 		return
 	_ok("slot_visual_state")
+
+func _test_contrast_slot_border() -> void:
+	var dim := Color(0.84, 0.70, 0.82, 0.50)
+	var out: Color = MainBoardRenderServiceScript.contrast_slot_border(dim)
+	if out.a <= dim.a + 0.05:
+		_fail("border_alpha", str(out.a))
+		return
+	if out.r >= dim.r and out.g >= dim.g and out.b >= dim.b:
+		_fail("border_darker", str(out))
+		return
+	_ok("contrast_slot_border")

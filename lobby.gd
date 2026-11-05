@@ -55,6 +55,8 @@ const PLAY_LABEL_LIFT_RATIO := 0.08
 const PLAY_TEXT_COLOR := Color(1.0, 1.0, 1.0, 1.0)
 const PLAY_TEXT_OUTLINE := Color(0.42, 0.22, 0.10, 0.92)
 const DAILY_LOGIN_SIZE_RATIO := 1.65
+## El PNG de la tienda llena mas el canvas que el calendario; se escala para igualar.
+const SHOP_ICON_VISUAL_SCALE := 0.88
 
 var background_rect: TextureRect = null
 var hud_layer: CanvasLayer = null
@@ -462,6 +464,17 @@ func layout_hud_pill_pair(shadow: Panel, panel: Control, pos: Vector2, size: Vec
 		shadow.position = pos + Vector2(0, 6.0 * scale)
 		shadow.size = size
 
+func _apply_icon_visual_scale(icon: TextureRect, size: Vector2, visual_scale: float) -> void:
+	if icon == null:
+		return
+	var scale: float = clampf(visual_scale, 0.5, 1.0)
+	var pad_x: float = size.x * (1.0 - scale) * 0.5
+	var pad_y: float = size.y * (1.0 - scale) * 0.5
+	icon.offset_left = pad_x
+	icon.offset_top = pad_y
+	icon.offset_right = -pad_x
+	icon.offset_bottom = -pad_y
+
 func _build_icon_only_chip(icon_texture: Texture2D) -> Dictionary:
 	var panel := Control.new()
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -697,18 +710,16 @@ func layout_ui() -> void:
 		_layout_play_label(play_size)
 		_apply_play_label_style(scale)
 
-	# Tienda abajo a la izquierda, alineada con Jugar.
-	var shop_size := corner_size
-	var shop_x := edge_margin
-	var shop_y := play_pos.y + (play_size.y - shop_size.y) * 0.5
-	if play_button == null:
-		shop_y = viewport_size.y - shop_size.y - edge_margin * 2.0
-	layout_hud_pill_pair(null, shop_button, Vector2(shop_x, shop_y), shop_size, scale)
+	# Tienda a la izquierda, mismo cuadro y altura que el login diario.
+	var side := chip_h * DAILY_LOGIN_SIZE_RATIO
+	var side_icon_size := Vector2(side, side)
+	var side_icon_y := row_y + corner_size.y + gap * 10
+	layout_hud_pill_pair(null, shop_button, Vector2(edge_margin, side_icon_y), side_icon_size, scale)
+	_apply_icon_visual_scale(shop_button_icon, side_icon_size, SHOP_ICON_VISUAL_SCALE)
 
-	var daily_size := corner_size * DAILY_LOGIN_SIZE_RATIO
-	var daily_login_x := viewport_size.x - edge_margin - daily_size.x
-	var daily_login_y := row_y + corner_size.y + gap * 10
-	layout_hud_pill_pair(null, daily_login_button, Vector2(daily_login_x, daily_login_y), daily_size, scale)
+	var daily_login_x := viewport_size.x - edge_margin - side_icon_size.x
+	layout_hud_pill_pair(null, daily_login_button, Vector2(daily_login_x, side_icon_y), side_icon_size, scale)
+	_apply_icon_visual_scale(daily_login_button_icon, side_icon_size, 1.0)
 
 	if settings_ui != null:
 		settings_ui.layout_for_viewport(viewport_size)
