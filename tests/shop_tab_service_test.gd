@@ -29,14 +29,8 @@ func _test_titles() -> void:
 	if titles.size() != ShopTabServiceScript.TAB_COUNT:
 		_fail("title_count", str(titles.size()))
 		return
-	if titles[ShopTabServiceScript.TAB_DIAMONDS] != "Diamantes":
-		_fail("title_diamonds", titles[ShopTabServiceScript.TAB_DIAMONDS])
-		return
-	if titles[ShopTabServiceScript.TAB_RESOURCES] != "Recursos":
-		_fail("title_resources", titles[ShopTabServiceScript.TAB_RESOURCES])
-		return
-	if titles[ShopTabServiceScript.TAB_COMBOS] != "Combos":
-		_fail("title_combos", titles[ShopTabServiceScript.TAB_COMBOS])
+	if titles[ShopTabServiceScript.TAB_STORE] != "Tienda":
+		_fail("title_store", titles[ShopTabServiceScript.TAB_STORE])
 		return
 	_ok("titles")
 
@@ -44,22 +38,19 @@ func _test_clamp_index() -> void:
 	if ShopTabServiceScript.clamp_index(-2) != 0:
 		_fail("clamp_low", str(ShopTabServiceScript.clamp_index(-2)))
 		return
-	if ShopTabServiceScript.clamp_index(9) != 2:
+	if ShopTabServiceScript.clamp_index(9) != 0:
 		_fail("clamp_high", str(ShopTabServiceScript.clamp_index(9)))
 		return
-	if ShopTabServiceScript.clamp_index(1) != 1:
-		_fail("clamp_mid", str(ShopTabServiceScript.clamp_index(1)))
+	if ShopTabServiceScript.clamp_index(0) != 0:
+		_fail("clamp_mid", str(ShopTabServiceScript.clamp_index(0)))
 		return
 	_ok("clamp_index")
 
 func _test_page_visible() -> void:
 	if not ShopTabServiceScript.is_page_visible(0, 0):
-		_fail("diamonds_page")
+		_fail("store_page")
 		return
 	if ShopTabServiceScript.is_page_visible(0, 1):
-		_fail("diamonds_hides_resources")
-		return
-	if not ShopTabServiceScript.is_page_visible(2, 2):
-		_fail("combos_page")
+		_fail("store_hides_extra")
 		return
 	_ok("page_visible")

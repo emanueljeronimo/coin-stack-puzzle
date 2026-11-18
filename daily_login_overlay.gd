@@ -382,7 +382,7 @@ func _apply_grant(slot: Dictionary) -> void:
 	if kind == "booster":
 		_persist_booster_uses(str(slot.get("booster_type", "")), int(slot.get("amount", 1)))
 		return
-	if kind == "unlimited_lives" and GameState != null:
+	if kind == "unlimited_lives" and GameState != null and GameState.lives_enabled():
 		GameState.grant_unlimited_lives(int(slot.get("seconds", 0)))
 
 func _persist_booster_uses(booster_type: String, amount: int) -> void:

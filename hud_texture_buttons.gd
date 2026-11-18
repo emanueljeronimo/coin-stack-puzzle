@@ -51,6 +51,8 @@ const RESOURCE_PLUS_BORDER := Color(0.28, 0.58, 0.20, 1.0)
 const RESOURCE_PILL_HEIGHT_RATIO := 0.66
 const RESOURCE_ICON_HEIGHT_RATIO := 1.18
 const RESOURCE_ICON_WIDTH_RATIO := 1.0
+const DIAMOND_ICON_HEIGHT_RATIO := 1.42
+const DIAMOND_ICON_WIDTH_RATIO := 1.14
 const RESOURCE_ICON_HANG := 0.68
 const RESOURCE_VALUE_FONT_RATIO := 0.80
 const RESOURCE_VALUE_FONT_MIN := 22
@@ -420,6 +422,21 @@ static func _make_style_border_only(host: Control, style_name: String) -> void:
 static func gold_border_width(scale: float = 1.0) -> int:
 	return int(clampf(round(2.0 * scale), 2.0, 3.0))
 
+static func inverted_gold_pill_colors() -> Dictionary:
+	return {
+		"hi": CANDY_TEXT,
+		"mid": Color(0.94, 0.92, 0.87, 1.0),
+		"lo": Color(0.86, 0.82, 0.74, 1.0),
+		"border": GOLD_BORDER,
+	}
+
+static func style_inverted_gold_label(lbl: Label, scale: float = 1.0) -> void:
+	if lbl == null:
+		return
+	lbl.add_theme_color_override("font_color", GOLD_MID)
+	lbl.add_theme_color_override("font_outline_color", GOLD_BORDER)
+	lbl.add_theme_constant_override("outline_size", int(clampf(round(4.0 * scale), 3.0, 6.0)))
+
 static func apply_gold_pill_style(
 	host: Control,
 	host_size: Vector2,
@@ -698,6 +715,12 @@ static func create_resource_chip(icon_texture: Texture2D, with_icon_count: bool)
 		"panel": root,
 	}
 
+static func set_resource_chip_visible(parts: Dictionary, visible: bool) -> void:
+	for key in ["root", "panel", "shadow", "plus"]:
+		var node: Variant = parts.get(key, null)
+		if node is CanvasItem:
+			(node as CanvasItem).visible = visible
+
 static func resource_chip_hang(
 	row_h: float,
 	pill_height_ratio: float = RESOURCE_PILL_HEIGHT_RATIO,
@@ -734,7 +757,8 @@ static func layout_resource_chip(
 	count_font_max: int = LIFE_COUNT_FONT_MAX,
 	pill_height_ratio: float = RESOURCE_PILL_HEIGHT_RATIO,
 	icon_height_ratio: float = RESOURCE_ICON_HEIGHT_RATIO,
-	icon_width_ratio: float = RESOURCE_ICON_WIDTH_RATIO
+	icon_width_ratio: float = RESOURCE_ICON_WIDTH_RATIO,
+	invert_colors: bool = false
 ) -> void:
 	var root: Control = chip.get("root", chip.get("panel", null))
 	if root == null:
@@ -763,7 +787,10 @@ static func layout_resource_chip(
 	if pill != null:
 		pill.position = pill_local
 		pill.size = pill_draw
-		apply_gold_pill_style(pill, pill_draw, ui_scale)
+		if invert_colors:
+			apply_gold_pill_style(pill, pill_draw, ui_scale, -1, 1.0, inverted_gold_pill_colors())
+		else:
+			apply_gold_pill_style(pill, pill_draw, ui_scale)
 
 	if icon_wrap != null:
 		icon_wrap.clip_contents = false
@@ -805,7 +832,10 @@ static func layout_resource_chip(
 		value.clip_text = true
 		value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		value.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		style_candy_label(value, ui_scale)
+		if invert_colors:
+			style_inverted_gold_label(value, ui_scale)
+		else:
+			style_candy_label(value, ui_scale)
 		var desired_font := int(clampf(
 			pill_h * RESOURCE_VALUE_FONT_RATIO,
 			float(RESOURCE_VALUE_FONT_MIN),

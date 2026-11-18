@@ -20,6 +20,7 @@ func _run() -> void:
 	_test_chip_format()
 	_test_unlimited_lives()
 	_test_migrate_old_save()
+	_test_disabled_flag()
 	print("=== RESULT: %d passed, %d failed ===" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
 
@@ -132,3 +133,9 @@ func _test_migrate_old_save() -> void:
 		_fail("migrate_two_days", str(out))
 		return
 	_ok("migrate_old_save")
+
+func _test_disabled_flag() -> void:
+	if GameLivesServiceScript.is_enabled():
+		_fail("lives_should_be_disabled")
+		return
+	_ok("disabled_flag")

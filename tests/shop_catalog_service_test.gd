@@ -29,13 +29,38 @@ func _fail(name: String, detail: String = "") -> void:
 
 func _test_diamond_packs() -> void:
 	var packs: Array = ShopCatalogServiceScript.diamond_packs()
-	if packs.size() != 5:
+	if packs.size() != 6:
 		_fail("pack_count", str(packs.size()))
 		return
-	var fav := ShopCatalogServiceScript.pack_by_id("diamonds_2500")
-	if fav.is_empty() or int(fav.get("amount", 0)) != 2500 or not bool(fav.get("favorite", false)):
-		_fail("favorite_pack", str(fav))
+	var first := ShopCatalogServiceScript.pack_by_id("diamonds_1000")
+	if first.is_empty() or int(first.get("amount", 0)) != 1000 or int(first.get("price_cents", 0)) != 199:
+		_fail("pack_1000", str(first))
 		return
+	var last := ShopCatalogServiceScript.pack_by_id("diamonds_100000")
+	if last.is_empty() or int(last.get("amount", 0)) != 100000 or int(last.get("price_cents", 0)) != 9999:
+		_fail("pack_100000", str(last))
+		return
+	if int(ShopCatalogServiceScript.pack_by_id("diamonds_25000").get("price_cents", 0)) != 3299:
+		_fail("pack_25000_price")
+		return
+	if ShopCatalogServiceScript.diamond_art_path(first) != "res://Imagenes/1mil-diamantes.png":
+		_fail("art_1000", ShopCatalogServiceScript.diamond_art_path(first))
+		return
+	if ShopCatalogServiceScript.diamond_art_path(ShopCatalogServiceScript.pack_by_id("diamonds_25000")) != "res://Imagenes/25mil-diamantes.png":
+		_fail("art_25000")
+		return
+	if ShopCatalogServiceScript.diamond_art_path(last) != "res://Imagenes/100mil-diamantes.png":
+		_fail("art_100000")
+		return
+	var seen_fills: Array[Color] = []
+	for pack_n in packs:
+		var ident: Dictionary = ShopCatalogServiceScript.offer_identity(pack_n as Dictionary)
+		var fill: Color = ident.get("fill", Color.BLACK)
+		for prev in seen_fills:
+			if prev.is_equal_approx(fill):
+				_fail("diamond_identity_unique", str((pack_n as Dictionary).get("id", "")))
+				return
+		seen_fills.append(fill)
 	if not ShopCatalogServiceScript.pack_by_id("missing").is_empty():
 		_fail("unknown_pack")
 		return
@@ -45,59 +70,98 @@ func _test_formatters() -> void:
 	if ShopCatalogServiceScript.format_amount(500) != "500":
 		_fail("amount_500", ShopCatalogServiceScript.format_amount(500))
 		return
-	if ShopCatalogServiceScript.format_amount(1200) != "1.200":
-		_fail("amount_1200", ShopCatalogServiceScript.format_amount(1200))
+	if ShopCatalogServiceScript.format_amount(1000) != "1.000":
+		_fail("amount_1000", ShopCatalogServiceScript.format_amount(1000))
 		return
-	if ShopCatalogServiceScript.format_amount(15000) != "15.000":
-		_fail("amount_15000", ShopCatalogServiceScript.format_amount(15000))
+	if ShopCatalogServiceScript.format_amount(100000) != "100.000":
+		_fail("amount_100000", ShopCatalogServiceScript.format_amount(100000))
 		return
-	if ShopCatalogServiceScript.format_price_usd(99) != "$0.99":
-		_fail("price_99", ShopCatalogServiceScript.format_price_usd(99))
+	if ShopCatalogServiceScript.format_price_usd(199) != "USD 1.99":
+		_fail("price_199", ShopCatalogServiceScript.format_price_usd(199))
 		return
-	if ShopCatalogServiceScript.format_price_usd(1499) != "$14.99":
-		_fail("price_1499", ShopCatalogServiceScript.format_price_usd(1499))
+	if ShopCatalogServiceScript.format_price_usd(3199) != "USD 31.99":
+		_fail("price_3199", ShopCatalogServiceScript.format_price_usd(3199))
 		return
 	_ok("formatters")
 
 func _test_confirm_copy() -> void:
-	var copy_2500: String = ShopCatalogServiceScript.confirm_copy(2500, 399)
-	if copy_2500 != "¿Comprar 2.500 por $3.99?":
-		_fail("confirm_2500", copy_2500)
+	var copy_1000: String = ShopCatalogServiceScript.confirm_copy(1000, 199)
+	if copy_1000 != "¿Comprar 1.000 por USD 1.99?":
+		_fail("confirm_1000", copy_1000)
 		return
-	var copy_500: String = ShopCatalogServiceScript.confirm_copy(500, 99)
-	if copy_500 != "¿Comprar 500 por $0.99?":
-		_fail("confirm_500", copy_500)
+	var copy_50000: String = ShopCatalogServiceScript.confirm_copy(50000, 5999)
+	if copy_50000 != "¿Comprar 50.000 por USD 59.99?":
+		_fail("confirm_50000", copy_50000)
 		return
 	_ok("confirm_copy")
 
 func _test_combo_pack() -> void:
 	var packs: Array = ShopCatalogServiceScript.combo_packs()
-	if packs.size() != 1:
+	if packs.size() != 4:
 		_fail("combo_count", str(packs.size()))
 		return
-	var pack: Dictionary = ShopCatalogServiceScript.pack_by_id("combo_player")
-	if pack.is_empty() or not ShopCatalogServiceScript.is_combo_pack(pack):
-		_fail("combo_lookup", str(pack))
+	var beginner: Dictionary = ShopCatalogServiceScript.pack_by_id("combo_beginner")
+	if beginner.is_empty() or not ShopCatalogServiceScript.is_combo_pack(beginner):
+		_fail("combo_lookup", str(beginner))
 		return
-	if int(pack.get("diamonds", 0)) != 2500 or int(pack.get("unlimited_lives_sec", 0)) != 3600:
-		_fail("combo_contents", str(pack))
+	if int(beginner.get("diamonds", 0)) != 1000 or int(beginner.get("booster_each", 0)) != 2:
+		_fail("combo_beginner_contents", str(beginner))
 		return
-	if int(pack.get("boosters", 0)) != 3 or int(pack.get("temp_slots", 0)) != 1:
-		_fail("combo_extras", str(pack))
+	if not bool(beginner.get("requires_all_boosters", false)):
+		_fail("combo_beginner_gate")
 		return
-	if ShopCatalogServiceScript.confirm_copy_for_pack(pack) != "¿Comprar PACK JUGADOR por $3.99?":
-		_fail("combo_confirm", ShopCatalogServiceScript.confirm_copy_for_pack(pack))
+	if ShopCatalogServiceScript.all_boosters_unlocked(13):
+		_fail("boosters_locked_at_13")
 		return
-	var lines: PackedStringArray = ShopCatalogServiceScript.combo_line_texts(pack)
-	if lines.size() != 4 or lines[0] != "2.500 diamantes" or lines[1] != "1 hora de vidas ilimitadas" or lines[3] != "1 ranura temporal":
+	if not ShopCatalogServiceScript.all_boosters_unlocked(14):
+		_fail("boosters_unlocked_at_14")
+		return
+	var visible_low: Array = ShopCatalogServiceScript.visible_combo_packs(13)
+	if visible_low.size() != 3:
+		_fail("visible_before_glove", str(visible_low.size()))
+		return
+	var visible_high: Array = ShopCatalogServiceScript.visible_combo_packs(14)
+	if visible_high.size() != 4:
+		_fail("visible_after_glove", str(visible_high.size()))
+		return
+	if ShopCatalogServiceScript.can_buy_combo(beginner, 13):
+		_fail("beginner_locked")
+		return
+	if not ShopCatalogServiceScript.can_buy_combo(beginner, 14):
+		_fail("beginner_unlocked")
+		return
+	var advanced: Dictionary = ShopCatalogServiceScript.pack_by_id("combo_advanced")
+	if int(advanced.get("price_cents", 0)) != 999 or int(advanced.get("booster_each", 0)) != 1:
+		_fail("combo_advanced", str(advanced))
+		return
+	if not ShopCatalogServiceScript.can_buy_combo(advanced, 1):
+		_fail("advanced_always_visible")
+		return
+	var ultimate: Dictionary = ShopCatalogServiceScript.pack_by_id("combo_ultimate")
+	if int(ultimate.get("diamonds", 0)) != 25000 or int(ultimate.get("price_cents", 0)) != 3199:
+		_fail("combo_ultimate", str(ultimate))
+		return
+	if ShopCatalogServiceScript.art_path_for_amount(25000) != "res://Imagenes/25mil-diamantes.png":
+		_fail("combo_art_amount", ShopCatalogServiceScript.art_path_for_amount(25000))
+		return
+	var beginner_fill: Color = ShopCatalogServiceScript.offer_identity(beginner).get("fill", Color.BLACK)
+	var ultimate_fill: Color = ShopCatalogServiceScript.offer_identity(ultimate).get("fill", Color.BLACK)
+	if beginner_fill.is_equal_approx(ultimate_fill):
+		_fail("combo_identity_unique")
+		return
+	if ShopCatalogServiceScript.confirm_copy_for_pack(beginner) != "¿Comprar Beginner Bundle por USD 1.99?":
+		_fail("combo_confirm", ShopCatalogServiceScript.confirm_copy_for_pack(beginner))
+		return
+	var lines: PackedStringArray = ShopCatalogServiceScript.combo_line_texts(beginner)
+	if lines.size() != 2 or lines[0] != "1.000 diamantes" or lines[1] != "x2 de cada comodín":
 		_fail("combo_lines", str(lines))
 		return
-	var icons: PackedStringArray = ShopCatalogServiceScript.confirm_icon_keys(pack)
-	if icons.size() != 3 or icons[0] != "diamonds" or icons[1] != "lives" or icons[2] != "boosters":
+	var icons: PackedStringArray = ShopCatalogServiceScript.confirm_icon_keys(beginner)
+	if icons.size() != 4 or icons[0] != "diamonds" or icons[3] != "glove":
 		_fail("combo_confirm_icons", str(icons))
 		return
 	var diamond_icons: PackedStringArray = ShopCatalogServiceScript.confirm_icon_keys(
-		ShopCatalogServiceScript.pack_by_id("diamonds_500")
+		ShopCatalogServiceScript.pack_by_id("diamonds_1000")
 	)
 	if diamond_icons.size() != 1 or diamond_icons[0] != "diamonds":
 		_fail("diamond_confirm_icons", str(diamond_icons))
@@ -117,23 +181,23 @@ func _test_resource_boosters() -> void:
 	if not ShopCatalogServiceScript.is_resource_booster(mix):
 		_fail("resource_kind", str(mix))
 		return
-	if str(mix.get("booster_type", "")) != "mix" or int(mix.get("diamond_cost", 0)) != 200:
+	if str(mix.get("booster_type", "")) != "mix" or int(mix.get("diamond_cost", 0)) != 400:
 		_fail("resource_mix", str(mix))
 		return
 	var mix_pack: Dictionary = ShopCatalogServiceScript.pack_by_id("res_mix_pack")
-	if int(mix_pack.get("amount", 0)) != 3 or int(mix_pack.get("diamond_cost", 0)) != 500:
+	if int(mix_pack.get("amount", 0)) != 3 or int(mix_pack.get("diamond_cost", 0)) != 1000:
 		_fail("resource_mix_pack", str(mix_pack))
 		return
-	if int(ShopCatalogServiceScript.pack_by_id("res_hammer_pack").get("diamond_cost", 0)) != 500:
+	if int(ShopCatalogServiceScript.pack_by_id("res_hammer_pack").get("diamond_cost", 0)) != 1000:
 		_fail("resource_hammer_pack_cost")
 		return
-	if int(ShopCatalogServiceScript.pack_by_id("res_glove").get("diamond_cost", 0)) != 200:
+	if int(ShopCatalogServiceScript.pack_by_id("res_glove").get("diamond_cost", 0)) != 400:
 		_fail("resource_glove_cost")
 		return
-	if ShopCatalogServiceScript.confirm_copy_for_pack(mix) != "¿Comprar Mezclar por 200?":
+	if ShopCatalogServiceScript.confirm_copy_for_pack(mix) != "¿Comprar Mezclar por 400?":
 		_fail("resource_confirm", ShopCatalogServiceScript.confirm_copy_for_pack(mix))
 		return
-	if ShopCatalogServiceScript.confirm_copy_for_pack(mix_pack) != "¿Comprar 3 Mezclar por 500?":
+	if ShopCatalogServiceScript.confirm_copy_for_pack(mix_pack) != "¿Comprar 3 Mezclar por 1.000?":
 		_fail("resource_pack_confirm", ShopCatalogServiceScript.confirm_copy_for_pack(mix_pack))
 		return
 	var icons: PackedStringArray = ShopCatalogServiceScript.confirm_icon_keys(mix)
@@ -172,11 +236,11 @@ func _test_resource_boosters() -> void:
 	if not ShopCatalogServiceScript.can_buy_resource(ShopCatalogServiceScript.pack_by_id("res_glove"), 14):
 		_fail("glove_unlocked_at_14")
 		return
-	var spent: Dictionary = ShopCatalogServiceScript.spend_diamonds(250, 200)
-	if not bool(spent.get("ok", false)) or int(spent.get("player_diamonds", 0)) != 50:
+	var spent: Dictionary = ShopCatalogServiceScript.spend_diamonds(500, 400)
+	if not bool(spent.get("ok", false)) or int(spent.get("player_diamonds", 0)) != 100:
 		_fail("spend_ok", str(spent))
 		return
-	var poor: Dictionary = ShopCatalogServiceScript.spend_diamonds(100, 200)
+	var poor: Dictionary = ShopCatalogServiceScript.spend_diamonds(100, 400)
 	if bool(poor.get("ok", true)):
 		_fail("spend_poor", str(poor))
 		return

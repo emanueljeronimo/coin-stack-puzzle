@@ -289,7 +289,12 @@ func _ready() -> void:
 	_ensure_fusion_sfx_player()
 	_ensure_level_up_sfx_player()
 
+func lives_enabled() -> bool:
+	return GameLivesServiceScript.is_enabled()
+
 func _process(delta: float) -> void:
+	if not lives_enabled():
+		return
 	var now: int = _now_unix()
 	if unlimited_lives_until_unix > 0:
 		_life_hud_tick += delta
@@ -323,6 +328,8 @@ func is_unlimited_lives() -> bool:
 	return GameLivesServiceScript.is_unlimited(unlimited_lives_until_unix, _now_unix())
 
 func has_playable_life() -> bool:
+	if not lives_enabled():
+		return true
 	return is_unlimited_lives() or lives > 0
 
 func get_life_count_text() -> String:
@@ -373,6 +380,8 @@ func migrate_life_timer(save_mtime: int) -> void:
 	lives_changed.emit()
 
 func spend_life() -> bool:
+	if not lives_enabled():
+		return true
 	if is_unlimited_lives():
 		return true
 	var out := GameLivesServiceScript.on_spend(lives, next_free_life_unix, _now_unix())

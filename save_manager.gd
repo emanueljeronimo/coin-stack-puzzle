@@ -18,6 +18,7 @@ const GameEconomyServiceScript = preload("res://game_economy_service.gd")
 const ProfileRepositoryScript = preload("res://profile_repository.gd")
 const SaveFileRepositoryScript = preload("res://save_file_repository.gd")
 const MainSessionAdapterScript = preload("res://main_session_adapter.gd")
+const PlayDaysServiceScript = preload("res://play_days_service.gd")
 
 const ADJECTIVES: Array[String] = [
 	"Valiente", "Astuto", "Veloz", "Brillante", "Audaz", "Noble", "Feroz", "Sabio",
@@ -189,15 +190,24 @@ func set_avatar_border_custom_color(color: Color) -> void:
 
 
 func get_avatar_border_color() -> Color:
-	if get_avatar_border_color_id() == CUSTOM_BORDER_ID:
-		return get_avatar_border_custom_color()
-	var c: Variant = _border_color_for_id(get_avatar_border_color_id())
-	if c is Color:
-		return c
-	var fallback: Variant = _border_color_for_id(get_default_border_color_id())
-	if fallback is Color:
-		return fallback
-	return DEFAULT_CUSTOM_BORDER_COLOR
+	return ProfileRepositoryScript.wildcard_border_color()
+
+
+func get_play_days() -> int:
+	_tick_play_days()
+	return maxi(1, int(player_data.get("play_days", 1)))
+
+
+func _tick_play_days() -> void:
+	if player_data.is_empty():
+		return
+	var next: Dictionary = PlayDaysServiceScript.tick(
+		str(player_data.get("play_day", "")),
+		int(player_data.get("play_days", 0)),
+		PlayDaysServiceScript.today_key()
+	)
+	player_data["play_day"] = str(next.get("day", ""))
+	player_data["play_days"] = int(next.get("count", 1))
 
 
 func _border_color_for_id(border_id: String) -> Variant:
@@ -303,6 +313,7 @@ func merge_session_data(session: Dictionary) -> void:
 func load_game() -> bool:
 	if not has_save_file():
 		player_data = _create_default_player_data()
+		_tick_play_days()
 		_apply_to_game_state(true)
 		save_game()
 		player_data_changed.emit()
@@ -312,12 +323,14 @@ func load_game() -> bool:
 	if loaded.is_empty():
 		push_error("SaveManager: no se pudo abrir %s" % SAVE_PATH)
 		player_data = _create_default_player_data()
+		_tick_play_days()
 		_apply_to_game_state(true)
 		return false
 
 	var had_life_timer := loaded.has("next_free_life_unix")
 	var lives_loaded := int(loaded.get("lives", GameState.INITIAL_LIVES))
 	player_data = _merge_with_defaults(loaded)
+	_tick_play_days()
 	_apply_to_game_state(had_life_timer)
 	if not had_life_timer or GameState.lives != lives_loaded:
 		save_game()
@@ -373,6 +386,8 @@ func _merge_with_defaults(loaded: Dictionary) -> Dictionary:
 			"g": DEFAULT_CUSTOM_BORDER_COLOR.g,
 			"b": DEFAULT_CUSTOM_BORDER_COLOR.b,
 		}
+	merged["play_days"] = maxi(0, int(merged.get("play_days", 0)))
+	merged["play_day"] = str(merged.get("play_day", ""))
 	merged.erase("gems")
 	return merged
 

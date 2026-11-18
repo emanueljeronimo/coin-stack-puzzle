@@ -97,12 +97,12 @@ func _test_slots_and_rotation() -> void:
 	if int(ad_diamonds.get("amount", 0)) != 100 or not bool(ad_diamonds.get("requires_ad", false)):
 		_fail("ad_diamonds", str(ad_diamonds))
 		return
-	var lives: Dictionary = slots[3] as Dictionary
-	if int(lives.get("seconds", 0)) != 900:
-		_fail("lives_sec", str(lives))
+	var extra: Dictionary = slots[3] as Dictionary
+	if str(extra.get("kind", "")) != "diamonds" or int(extra.get("amount", 0)) != 80:
+		_fail("extra_diamonds", str(extra))
 		return
-	if DailyLoginServiceScript.slot_label(lives) != "15 min":
-		_fail("lives_label", DailyLoginServiceScript.slot_label(lives))
+	if DailyLoginServiceScript.slot_label(extra) != "80":
+		_fail("extra_label", DailyLoginServiceScript.slot_label(extra))
 		return
 	var a: String = DailyLoginServiceScript.booster_for_day("2026-10-05")
 	var b: String = DailyLoginServiceScript.booster_for_day("2026-10-06")

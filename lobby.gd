@@ -196,6 +196,7 @@ func build_ui() -> void:
 	hud_root.add_child(profile_button_shadow)
 	hud_root.add_child(profile_button)
 	hud_root.add_child(life_button)
+	HudTextureButtons.set_resource_chip_visible(life_chip_parts, GameState.lives_enabled())
 	hud_root.add_child(diamonds_button)
 	hud_root.add_child(settings_button)
 	hud_root.add_child(shop_button)
@@ -627,11 +628,25 @@ func layout_ui() -> void:
 	var resource_gap := HudTextureButtons.resource_chip_pair_gap(
 		chip_h,
 		gap,
-		HudTextureButtons.resource_chip_hang(chip_h, 0.62, 1.48, 1.16)
+		HudTextureButtons.resource_chip_hang(
+			chip_h,
+			0.62,
+			HudTextureButtons.DIAMOND_ICON_HEIGHT_RATIO,
+			HudTextureButtons.DIAMOND_ICON_WIDTH_RATIO
+		)
 	)
+	var lives_on := GameState.lives_enabled()
 	var life_w := HudTextureButtons.resource_chip_visual_width(chip_h, stat_size.x, 0.62, 1.38)
-	var money_w := HudTextureButtons.resource_chip_visual_width(chip_h, stat_size.x, 0.62, 1.48, 1.16)
-	var total_center_w := life_w + resource_gap + money_w
+	var money_w := HudTextureButtons.resource_chip_visual_width(
+		chip_h,
+		stat_size.x,
+		0.62,
+		HudTextureButtons.DIAMOND_ICON_HEIGHT_RATIO,
+		HudTextureButtons.DIAMOND_ICON_WIDTH_RATIO
+	)
+	var total_center_w := money_w
+	if lives_on:
+		total_center_w = life_w + resource_gap + money_w
 	var center_x := (viewport_size.x - total_center_w) * 0.5
 	var avatar_side := chip_h * 1.35
 	var min_center_x := edge_margin + avatar_side + 4.0
@@ -650,26 +665,45 @@ func layout_ui() -> void:
 	)
 
 	var life_hang := HudTextureButtons.resource_chip_hang(chip_h, 0.62, 1.38)
-	var money_hang := HudTextureButtons.resource_chip_hang(chip_h, 0.62, 1.26, 1.06)
-	HudTextureButtons.layout_resource_chip(
-		life_chip_parts,
-		Vector2(center_x + life_hang, row_y),
-		stat_size,
-		0.40,
-		48,
+	var money_hang := HudTextureButtons.resource_chip_hang(
+		chip_h,
 		0.62,
-		1.38
+		HudTextureButtons.DIAMOND_ICON_HEIGHT_RATIO,
+		HudTextureButtons.DIAMOND_ICON_WIDTH_RATIO
 	)
-	HudTextureButtons.layout_resource_chip(
-		diamonds_chip_parts,
-		Vector2(center_x + life_w + resource_gap + money_hang, row_y),
-		stat_size,
-		0.38,
-		42,
-		0.62,
-		1.26,
-		1.06
-	)
+	if lives_on:
+		HudTextureButtons.layout_resource_chip(
+			life_chip_parts,
+			Vector2(center_x + life_hang, row_y),
+			stat_size,
+			0.40,
+			48,
+			0.62,
+			1.38
+		)
+		HudTextureButtons.layout_resource_chip(
+			diamonds_chip_parts,
+			Vector2(center_x + life_w + resource_gap + money_hang, row_y),
+			stat_size,
+			0.38,
+			42,
+			0.62,
+			HudTextureButtons.DIAMOND_ICON_HEIGHT_RATIO,
+			HudTextureButtons.DIAMOND_ICON_WIDTH_RATIO,
+			true
+		)
+	else:
+		HudTextureButtons.layout_resource_chip(
+			diamonds_chip_parts,
+			Vector2(center_x + money_hang, row_y),
+			stat_size,
+			0.38,
+			42,
+			0.62,
+			HudTextureButtons.DIAMOND_ICON_HEIGHT_RATIO,
+			HudTextureButtons.DIAMOND_ICON_WIDTH_RATIO,
+			true
+		)
 
 	layout_hud_pill_pair(
 		null,

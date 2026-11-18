@@ -5,7 +5,7 @@ const GameBoosterServiceScript = preload("res://game_booster_service.gd")
 const SLOT_COUNT := 4
 const FREE_DIAMONDS := 70
 const AD_DIAMONDS := 100
-const UNLIMITED_LIVES_SEC := 15 * 60
+const AD_EXTRA_DIAMONDS := 80
 const BOOSTER_TYPES: PackedStringArray = ["mix", "hammer", "glove"]
 
 static func unlock_level() -> int:
@@ -117,9 +117,9 @@ static func slot_defs(day_key: String, player_level: int = 9999) -> Array:
 			"requires_ad": true,
 		},
 		{
-			"id": "ad_lives",
-			"kind": "unlimited_lives",
-			"seconds": UNLIMITED_LIVES_SEC,
+			"id": "ad_extra_diamonds",
+			"kind": "diamonds",
+			"amount": AD_EXTRA_DIAMONDS,
 			"button": "Ver anuncio",
 			"requires_ad": true,
 		},
@@ -131,6 +131,4 @@ static func slot_label(slot: Dictionary) -> String:
 		return str(int(slot.get("amount", 0)))
 	if kind == "booster":
 		return booster_title(str(slot.get("booster_type", "mix")))
-	if kind == "unlimited_lives":
-		return "15 min"
 	return ""

@@ -108,8 +108,8 @@ const HUD_CHIP_STAT_W = 205.0
 ## Pastillas de vidas/diamantes: cápsula baja, más larga que alta.
 const HUD_RESOURCE_PILL_H_RATIO := 0.62
 const HUD_LIFE_ICON_H_RATIO := 1.38
-const HUD_MONEY_ICON_H_RATIO := 1.26
-const HUD_MONEY_ICON_W_RATIO := 1.06
+const HUD_MONEY_ICON_H_RATIO := 1.42
+const HUD_MONEY_ICON_W_RATIO := 1.14
 const HUD_BOARD_STAT_FONT_SIZE = 48
 const HUD_BOARD_LONG_ICON_RATIO = 0.56
 const HUD_CHIP_GAP = 26.0
@@ -166,9 +166,9 @@ const AD_FOOTER_MIN_HEIGHT = 120.0
 const AD_FOOTER_MAX_HEIGHT = 200.0
 const BOOSTER_TYPES := ["hammer", "mix", "glove"]
 const BOOSTER_INITIAL_USES := 3
-const BOOSTER_COST_DIAMONDS := 200
+const BOOSTER_COST_DIAMONDS := 400
 const BOOSTER_PACK_AMOUNT := 3
-const BOOSTER_PACK_COST_DIAMONDS := 500
+const BOOSTER_PACK_COST_DIAMONDS := 1000
 ## Nivel de checkpoint para desbloquear cada Booster (ver barra de progreso).
 const BOOSTER_UNLOCK_LEVEL := {
 	"mix": 9,
@@ -3627,12 +3627,18 @@ func _on_shop_combo_purchased(pack: Dictionary) -> void:
 	update_diamonds_display()
 	lives = GameState.lives
 	update_life_display()
-	var boosters: int = int(pack.get("boosters", pack.get("wildcards", 0)))
-	if boosters > 0:
-		add_booster_use("mix", boosters, false)
+	var booster_each: int = int(pack.get("booster_each", 0))
+	if booster_each > 0:
+		for booster_type in BOOSTER_TYPES:
+			add_booster_use(str(booster_type), booster_each, false)
+	else:
+		var boosters: int = int(pack.get("boosters", pack.get("wildcards", 0)))
+		if boosters > 0:
+			add_booster_use("mix", boosters, false)
 	if int(pack.get("temp_slots", 0)) > 0:
 		if _try_open_temp_slot(0):
 			_consume_pending_temp_slot()
+	save_game()
 
 func _on_shop_booster_purchased(booster_type: String, amount: int) -> void:
 	player_diamonds = GameState.player_diamonds
@@ -3817,6 +3823,7 @@ func build_mock_ui() -> void:
 	hud_root.add_child(home_chip)
 	hud_root.add_child(shop_chip)
 	hud_root.add_child(life_chip)
+	HudTextureButtons.set_resource_chip_visible(life_chip_parts, GameState.lives_enabled())
 	hud_root.add_child(diamonds_chip)
 	hud_root.add_child(settings_chip)
 
@@ -3955,8 +3962,11 @@ func layout_mock_ui() -> void:
 		chip_h, stat_w, HUD_RESOURCE_PILL_H_RATIO, HUD_MONEY_ICON_H_RATIO, HUD_MONEY_ICON_W_RATIO
 	)
 	var pair_gap: float = HudTextureButtons.resource_chip_pair_gap(chip_h, inner_gap, money_hang)
+	var lives_on := GameState.lives_enabled()
 	var left_w: float = corner_w * 2.0 + inner_gap
-	var center_w: float = life_w + pair_gap + money_w
+	var center_w: float = money_w
+	if lives_on:
+		center_w = life_w + pair_gap + money_w
 	var right_w: float = corner_w
 	var required: float = edge_margin * 2.0 + left_w + center_w + right_w + col_gap * 2.0
 	if required > viewport_size.x and required > 0.0:
@@ -3980,7 +3990,9 @@ func layout_mock_ui() -> void:
 		)
 		pair_gap = HudTextureButtons.resource_chip_pair_gap(chip_h, inner_gap, money_hang)
 		left_w = corner_w * 2.0 + inner_gap
-		center_w = life_w + pair_gap + money_w
+		center_w = money_w
+		if lives_on:
+			center_w = life_w + pair_gap + money_w
 		right_w = corner_w
 	var corner_size := Vector2(corner_w, chip_h)
 	var stat_size := Vector2(stat_w, chip_h)
@@ -4010,25 +4022,39 @@ func layout_mock_ui() -> void:
 	center_x = clampf(center_x, min_center, maxf(min_center, max_center))
 
 	# pill_pos es el borde izquierdo del pill; el ícono cuelga hacia la izquierda.
-	HudTextureButtons.layout_resource_chip(
-		life_chip_parts,
-		Vector2(center_x + life_hang, chip_y),
-		stat_size,
-		0.40,
-		48,
-		HUD_RESOURCE_PILL_H_RATIO,
-		HUD_LIFE_ICON_H_RATIO
-	)
-	if not diamonds_chip_parts.is_empty():
+	if lives_on:
+		HudTextureButtons.layout_resource_chip(
+			life_chip_parts,
+			Vector2(center_x + life_hang, chip_y),
+			stat_size,
+			0.40,
+			48,
+			HUD_RESOURCE_PILL_H_RATIO,
+			HUD_LIFE_ICON_H_RATIO
+		)
+		if not diamonds_chip_parts.is_empty():
+			HudTextureButtons.layout_resource_chip(
+				diamonds_chip_parts,
+				Vector2(center_x + life_w + pair_gap + money_hang, chip_y),
+				stat_size,
+				0.38,
+				42,
+				HUD_RESOURCE_PILL_H_RATIO,
+				HUD_MONEY_ICON_H_RATIO,
+				HUD_MONEY_ICON_W_RATIO,
+				true
+			)
+	elif not diamonds_chip_parts.is_empty():
 		HudTextureButtons.layout_resource_chip(
 			diamonds_chip_parts,
-			Vector2(center_x + life_w + pair_gap + money_hang, chip_y),
+			Vector2(center_x + money_hang, chip_y),
 			stat_size,
 			0.38,
 			42,
 			HUD_RESOURCE_PILL_H_RATIO,
 			HUD_MONEY_ICON_H_RATIO,
-			HUD_MONEY_ICON_W_RATIO
+			HUD_MONEY_ICON_W_RATIO,
+			true
 		)
 
 	var progress_w = viewport_size.x * 0.78

@@ -3,30 +3,62 @@ extends RefCounted
 const GameBoosterServiceScript = preload("res://game_booster_service.gd")
 
 const DIAMOND_PACKS := [
-	{"id": "diamonds_500", "amount": 500, "price_cents": 99, "favorite": false},
-	{"id": "diamonds_1200", "amount": 1200, "price_cents": 199, "favorite": false},
-	{"id": "diamonds_2500", "amount": 2500, "price_cents": 399, "favorite": true},
-	{"id": "diamonds_6000", "amount": 6000, "price_cents": 799, "favorite": false},
-	{"id": "diamonds_15000", "amount": 15000, "price_cents": 1499, "favorite": false},
+	{"id": "diamonds_1000", "amount": 1000, "price_cents": 199, "favorite": false, "art": "res://Imagenes/1mil-diamantes.png", "fill": Color(0.16, 0.74, 0.86, 0.98), "border": Color(0.62, 0.96, 1.00, 1.0)},
+	{"id": "diamonds_5000", "amount": 5000, "price_cents": 799, "favorite": false, "art": "res://Imagenes/5mil-diamantes.png", "fill": Color(0.22, 0.72, 0.34, 0.98), "border": Color(0.62, 0.96, 0.58, 1.0)},
+	{"id": "diamonds_10000", "amount": 10000, "price_cents": 1499, "favorite": false, "art": "res://Imagenes/10mil-diamantes.png", "fill": Color(0.16, 0.40, 0.92, 0.98), "border": Color(0.62, 0.78, 1.00, 1.0)},
+	{"id": "diamonds_25000", "amount": 25000, "price_cents": 3299, "favorite": false, "art": "res://Imagenes/25mil-diamantes.png", "fill": Color(0.54, 0.26, 0.90, 0.98), "border": Color(0.86, 0.70, 1.00, 1.0)},
+	{"id": "diamonds_50000", "amount": 50000, "price_cents": 5999, "favorite": false, "art": "res://Imagenes/50mil-diamantes.png", "fill": Color(0.88, 0.28, 0.62, 0.98), "border": Color(1.00, 0.70, 0.88, 1.0)},
+	{"id": "diamonds_100000", "amount": 100000, "price_cents": 9999, "favorite": false, "art": "res://Imagenes/100mil-diamantes.png", "fill": Color(0.88, 0.20, 0.26, 0.98), "border": Color(1.00, 0.62, 0.58, 1.0)},
 ]
 
 const COMBO_PACKS := [
 	{
-		"id": "combo_player",
+		"id": "combo_beginner",
 		"kind": "combo",
-		"title": "PACK JUGADOR",
-		"price_cents": 399,
-		"diamonds": 2500,
-		"unlimited_lives_sec": 3600,
-		"boosters": 3,
-		"temp_slots": 1,
+		"title": "Beginner Bundle",
+		"price_cents": 199,
+		"diamonds": 1000,
+		"booster_each": 2,
+		"requires_all_boosters": true,
+		"fill": Color(0.10, 0.66, 0.50, 0.98),
+		"border": Color(0.48, 0.96, 0.78, 1.0),
+	},
+	{
+		"id": "combo_advanced",
+		"kind": "combo",
+		"title": "Advanced Bundle",
+		"price_cents": 999,
+		"diamonds": 5000,
+		"booster_each": 1,
+		"fill": Color(0.10, 0.52, 0.78, 0.98),
+		"border": Color(0.52, 0.86, 1.00, 1.0),
+	},
+	{
+		"id": "combo_expert",
+		"kind": "combo",
+		"title": "Expert Bundle",
+		"price_cents": 1999,
+		"diamonds": 10000,
+		"booster_each": 3,
+		"fill": Color(0.50, 0.20, 0.68, 0.98),
+		"border": Color(0.90, 0.64, 1.00, 1.0),
+	},
+	{
+		"id": "combo_ultimate",
+		"kind": "combo",
+		"title": "Ultimate Bundle",
+		"price_cents": 3199,
+		"diamonds": 25000,
+		"booster_each": 4,
+		"fill": Color(1.00, 0.46, 0.78, 0.98),
+		"border": Color(1.00, 0.82, 0.92, 1.0),
 	},
 ]
 
 const BOOSTER_UNIT_AMOUNT := 1
-const BOOSTER_UNIT_COST := 200
+const BOOSTER_UNIT_COST := 400
 const BOOSTER_PACK_AMOUNT := 3
-const BOOSTER_PACK_COST := 500
+const BOOSTER_PACK_COST := 1000
 
 const RESOURCE_BOOSTERS := [
 	{
@@ -82,8 +114,56 @@ const RESOURCE_BOOSTERS := [
 static func diamond_packs() -> Array:
 	return DIAMOND_PACKS.duplicate(true)
 
+static func diamond_art_path(pack: Dictionary) -> String:
+	var path: String = str(pack.get("art", ""))
+	if path.is_empty():
+		return "res://Imagenes/icono-diamante.png"
+	return path
+
+static func art_path_for_amount(amount: int) -> String:
+	for pack in DIAMOND_PACKS:
+		if int(pack.get("amount", 0)) == amount:
+			return diamond_art_path(pack as Dictionary)
+	return "res://Imagenes/icono-diamante.png"
+
+static func offer_identity(pack: Dictionary) -> Dictionary:
+	var fill: Color = Color(0.22, 0.48, 0.78, 0.98)
+	var border: Color = Color(0.70, 0.84, 1.00, 1.0)
+	if pack.get("fill") is Color:
+		fill = pack.get("fill") as Color
+	if pack.get("border") is Color:
+		border = pack.get("border") as Color
+	return {
+		"fill": fill,
+		"border": border,
+	}
+
 static func combo_packs() -> Array:
 	return COMBO_PACKS.duplicate(true)
+
+static func all_boosters_unlocked(player_level: int) -> bool:
+	for booster_type in GameBoosterServiceScript.TYPES:
+		if not GameBoosterServiceScript.is_unlocked(str(booster_type), player_level):
+			return false
+	return true
+
+static func visible_combo_packs(player_level: int) -> Array:
+	var out: Array = []
+	for pack in COMBO_PACKS:
+		if not (pack is Dictionary):
+			continue
+		var row: Dictionary = (pack as Dictionary).duplicate(true)
+		if bool(row.get("requires_all_boosters", false)) and not all_boosters_unlocked(player_level):
+			continue
+		out.append(row)
+	return out
+
+static func can_buy_combo(pack: Dictionary, player_level: int) -> bool:
+	if not is_combo_pack(pack):
+		return false
+	if bool(pack.get("requires_all_boosters", false)):
+		return all_boosters_unlocked(player_level)
+	return true
 
 static func resource_booster_packs() -> Array:
 	return RESOURCE_BOOSTERS.duplicate(true)
@@ -141,7 +221,7 @@ static func format_price_usd(price_cents: int) -> String:
 	var cents: int = maxi(0, price_cents)
 	var dollars: int = int(cents / 100)
 	var rest: int = cents % 100
-	return "$%d.%02d" % [dollars, rest]
+	return "USD %d.%02d" % [dollars, rest]
 
 static func confirm_copy(amount: int, price_cents: int) -> String:
 	return "¿Comprar %s por %s?" % [format_amount(amount), format_price_usd(price_cents)]
@@ -166,25 +246,14 @@ static func confirm_copy_for_pack(pack: Dictionary) -> String:
 static func combo_line_texts(pack: Dictionary) -> PackedStringArray:
 	var lines := PackedStringArray()
 	var diamonds: int = int(pack.get("diamonds", 0))
-	var unlimited_sec: int = int(pack.get("unlimited_lives_sec", 0))
+	var booster_each: int = int(pack.get("booster_each", 0))
 	var boosters: int = int(pack.get("boosters", pack.get("wildcards", 0)))
-	var temp_slots: int = int(pack.get("temp_slots", 0))
 	if diamonds > 0:
 		lines.append("%s diamantes" % format_amount(diamonds))
-	if unlimited_sec >= 3600:
-		var hours: int = int(unlimited_sec / 3600)
-		if hours == 1:
-			lines.append("1 hora de vidas ilimitadas")
-		else:
-			lines.append("%d horas de vidas ilimitadas" % hours)
-	elif unlimited_sec > 0:
-		lines.append("vidas ilimitadas")
-	if boosters > 0:
+	if booster_each > 0:
+		lines.append("x%d de cada comodín" % booster_each)
+	elif boosters > 0:
 		lines.append("%d Boosters" % boosters)
-	if temp_slots == 1:
-		lines.append("1 ranura temporal")
-	elif temp_slots > 1:
-		lines.append("%d ranuras temporales" % temp_slots)
 	return lines
 
 static func confirm_icon_keys(pack: Dictionary) -> PackedStringArray:
@@ -192,9 +261,11 @@ static func confirm_icon_keys(pack: Dictionary) -> PackedStringArray:
 	if is_combo_pack(pack):
 		if int(pack.get("diamonds", 0)) > 0:
 			keys.append("diamonds")
-		if int(pack.get("unlimited_lives_sec", 0)) > 0 or int(pack.get("lives", 0)) > 0:
-			keys.append("lives")
-		if int(pack.get("boosters", pack.get("wildcards", 0))) > 0:
+		if int(pack.get("booster_each", 0)) > 0:
+			keys.append("mix")
+			keys.append("hammer")
+			keys.append("glove")
+		elif int(pack.get("boosters", pack.get("wildcards", 0))) > 0:
 			keys.append("boosters")
 		return keys
 	if is_resource_booster(pack):

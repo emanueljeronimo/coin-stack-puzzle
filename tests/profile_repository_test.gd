@@ -41,6 +41,10 @@ func _test_lookup_defaults() -> void:
 	if not (ProfileRepositoryScript.border_color_for_id(ProfileRepositoryScript.default_border_color_id()) is Color):
 		_fail("default_border_color")
 		return
+	var gold: Color = ProfileRepositoryScript.wildcard_border_color()
+	if gold.r < 0.85 or gold.g < 0.60 or gold.b > 0.45:
+		_fail("wildcard_border_gold", str(gold))
+		return
 	_ok("lookup_defaults")
 
 func _test_default_player_data() -> void:
@@ -53,5 +57,8 @@ func _test_default_player_data() -> void:
 		return
 	if data.has("gems"):
 		_fail("no_gems", str(data))
+		return
+	if not data.has("play_days"):
+		_fail("play_days_key", str(data))
 		return
 	_ok("default_player_data")

@@ -24,6 +24,9 @@ const BORDER_COLOR_OPTIONS: Array = [
 	{"id": "rosa_violeta", "color": Color(0.75, 0.30, 0.75), "label": "Rosa violeta"},
 ]
 
+## Aro dorado de la ficha comodin (ficha-comodin.png). El perfil ya no elige borde.
+const WILDCARD_BORDER_COLOR := Color(0.98, 0.78, 0.22, 1.0)
+
 static func sanitize_username(value: String, max_len: int = 20) -> String:
 	var cleaned := value.strip_edges()
 	if max_len > 0 and cleaned.length() > max_len:
@@ -41,6 +44,9 @@ static func default_avatar_id() -> String:
 
 static func default_border_color_id() -> String:
 	return str(BORDER_COLOR_OPTIONS[0].get("id", "verde"))
+
+static func wildcard_border_color() -> Color:
+	return WILDCARD_BORDER_COLOR
 
 static func avatar_path_for_id(avatar_id: String) -> String:
 	for opt in AVATAR_OPTIONS:
@@ -76,4 +82,6 @@ static func default_player_data(save_version: int, username: String, default_cus
 		"max_value": 5,
 		"active_stacks": 5,
 		"player_diamonds": initial_diamonds,
+		"play_day": "",
+		"play_days": 0,
 	}

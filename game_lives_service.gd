@@ -6,6 +6,10 @@ class_name GameLivesService
 const MAX_LIVES := 5
 const REGEN_SECONDS := 30 * 60
 const UNLIMITED_HOUR_SEC := 3600
+const ENABLED := false
+
+static func is_enabled() -> bool:
+	return ENABLED
 
 static func is_unlimited(until_unix: int, now: int) -> bool:
 	return until_unix > now
