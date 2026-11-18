@@ -16,16 +16,21 @@ const GloveIconTexture = preload("res://Imagenes/icono-mano.png")
 const CartIconTexture = preload("res://Imagenes/icono-cart.png")
 const REF_WIDTH := 1080.0
 const LogoFont = preload("res://Fonts/Lobster-Regular.ttf")
+const RainbowLabelShader = preload("res://rainbow_label.gdshader")
 const CLOSE_RED := Color(0.90, 0.22, 0.24, 1.0)
 const CLOSE_RED_BORDER := Color(0.55, 0.10, 0.12, 1.0)
 const FAVORITE_GOLD := Color(0.98, 0.82, 0.28, 1.0)
-const SHOP_CARD_BG := Color(0.80, 0.52, 0.26, 0.98)
-const SHOP_CARD_BORDER := Color(0.62, 0.36, 0.14, 1.0)
-const SHOP_WELL := Color(0.70, 0.44, 0.22, 0.94)
+const SHOP_BRONZE := Color(0.80, 0.52, 0.26, 1.0)
+const SHOP_CARD_BG := Color(1.00, 1.00, 1.00, 0.24)
+const SHOP_INK := Color(0.28, 0.26, 0.27, 1.0)
+const SHOP_CARD_BORDER := SHOP_INK
+const SHOP_WELL := Color(0.00, 0.00, 0.00, 0.00)
+const SHOP_CONFIRM_BG := Color(1.00, 1.00, 1.00, 0.74)
 const SHOP_TITLE := Color(1.00, 1.00, 1.00, 1.0)
-const SHOP_TEXT := Color(0.98, 0.97, 0.94, 1.0)
-const SHOP_PRICE_BG := Color(0.36, 0.80, 0.34, 1.0)
-const SHOP_PRICE_BORDER := Color(0.20, 0.52, 0.18, 1.0)
+const SHOP_TEXT := Color(1.00, 1.00, 1.00, 1.0)
+const SHOP_OUTLINE := Color(0.12, 0.10, 0.16, 0.78)
+const SHOP_PRICE_BG := Color("#1F574A")
+const SHOP_PRICE_BORDER := Color("#163E35")
 const SHOP_CANCEL_BG := Color(0.68, 0.42, 0.20, 0.96)
 
 var overlay: ColorRect = null
@@ -60,7 +65,7 @@ var _confirm_cancel_btn: Button = null
 var _pending_pack_id: String = ""
 
 func _ready() -> void:
-	set_anchors_preset(Control.PRESET_FULL_RECT)
+	_cover_viewport()
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	visible = false
 	_build_ui()
@@ -88,15 +93,33 @@ func is_open() -> bool:
 func _on_background_theme_changed(_theme_id: String) -> void:
 	_apply_shop_identity()
 
+func _cover_viewport(viewport_size: Vector2 = Vector2.ZERO) -> void:
+	var vp: Vector2 = viewport_size
+	if vp == Vector2.ZERO:
+		var tree := get_viewport()
+		if tree != null:
+			vp = tree.get_visible_rect().size
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	grow_horizontal = Control.GROW_DIRECTION_BOTH
+	grow_vertical = Control.GROW_DIRECTION_BOTH
+	if vp != Vector2.ZERO:
+		size = vp
+		position = Vector2.ZERO
+	if overlay != null:
+		overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		if vp != Vector2.ZERO:
+			overlay.size = vp
+
 func layout_for_viewport(viewport_size: Vector2) -> void:
+	_cover_viewport(viewport_size)
 	if card == null:
 		return
 	var scale := viewport_size.x / REF_WIDTH
-	var card_w := viewport_size.x * 0.94
+	var card_w := viewport_size.x * 0.90
 	var outer_pad := int(16.0 * scale)
-	var top_pad := int(16.0 * scale)
+	var top_pad := int(24.0 * scale)
 	var bottom_pad := int(16.0 * scale)
-	var sep := int(14.0 * scale)
+	var sep := int(12.0 * scale)
 
 	if card_margin != null:
 		card_margin.add_theme_constant_override("margin_left", outer_pad)
@@ -106,20 +129,27 @@ func layout_for_viewport(viewport_size: Vector2) -> void:
 	if main_vbox != null:
 		main_vbox.add_theme_constant_override("separation", sep)
 
-	var header_h := 76.0 * scale
+	var header_h := 88.0 * scale
 	if header != null:
 		header.custom_minimum_size = Vector2(0, header_h)
 	if title_label != null:
-		title_label.add_theme_font_size_override("font_size", int(66 * scale))
-		title_label.add_theme_constant_override("outline_size", int(9 * scale))
+		title_label.set_anchors_preset(Control.PRESET_FULL_RECT)
+		title_label.offset_left = 0
+		title_label.offset_top = 0
+		title_label.offset_right = 0
+		title_label.offset_bottom = 0
+		title_label.add_theme_font_size_override("font_size", int(72 * scale))
+		title_label.add_theme_constant_override("outline_size", int(8 * scale))
+		_clear_rainbow_label(title_label)
 	if close_btn != null:
-		var close_side := 64.0 * scale
+		var close_side := 46.0 * scale
+		var close_pad := 14.0 * scale
 		close_btn.custom_minimum_size = Vector2(close_side, close_side)
-		close_btn.add_theme_font_size_override("font_size", int(44 * scale))
+		close_btn.add_theme_font_size_override("font_size", int(30 * scale))
 		close_btn.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
-		close_btn.offset_left = -close_side
+		close_btn.offset_left = -close_side - close_pad
 		close_btn.offset_top = -close_side * 0.5
-		close_btn.offset_right = 0
+		close_btn.offset_right = -close_pad
 		close_btn.offset_bottom = close_side * 0.5
 
 	var tabs_h := 0.0
@@ -127,11 +157,11 @@ func layout_for_viewport(viewport_size: Vector2) -> void:
 		tabs_row.visible = false
 		tabs_row.custom_minimum_size = Vector2(0, 0)
 
-	var well_pad := int(14.0 * scale)
+	var well_pad := int(10.0 * scale)
 	if content_margin != null:
-		content_margin.add_theme_constant_override("margin_left", well_pad)
+		content_margin.add_theme_constant_override("margin_left", 0)
 		content_margin.add_theme_constant_override("margin_top", well_pad)
-		content_margin.add_theme_constant_override("margin_right", well_pad)
+		content_margin.add_theme_constant_override("margin_right", 0)
 		content_margin.add_theme_constant_override("margin_bottom", well_pad)
 	for lbl in _placeholder_labels:
 		if lbl == null:
@@ -139,24 +169,23 @@ func layout_for_viewport(viewport_size: Vector2) -> void:
 		lbl.add_theme_font_size_override("font_size", int(44 * scale))
 		lbl.add_theme_constant_override("outline_size", int(6 * scale))
 
-	var content_h := 680.0 * scale
-	if content_well != null:
-		content_well.custom_minimum_size = Vector2(0, content_h)
-
 	var footer_h := 80.0 * scale
 	if _close_menu_btn != null:
 		_close_menu_btn.custom_minimum_size = Vector2(0, footer_h)
 		_close_menu_btn.add_theme_font_size_override("font_size", int(50 * scale))
 
-	var card_h := (
-		header_h
-		+ tabs_h
-		+ content_h
-		+ footer_h
-		+ float(sep) * 3.0
-		+ float(top_pad + bottom_pad)
+	var card_h := viewport_size.y * 0.75
+	var content_h := (
+		card_h
+		- header_h
+		- tabs_h
+		- footer_h
+		- float(sep) * 3.0
+		- float(top_pad + bottom_pad)
 	)
-	card_h = mini(card_h, viewport_size.y * 0.96)
+	content_h = maxf(content_h, 240.0 * scale)
+	if content_well != null:
+		content_well.custom_minimum_size = Vector2(0, content_h)
 	card.size = Vector2(card_w, card_h)
 	card.position = Vector2((viewport_size.x - card_w) * 0.5, (viewport_size.y - card_h) * 0.5)
 	_layout_diamond_offers(scale)
@@ -191,15 +220,16 @@ func _build_ui() -> void:
 	main_vbox.add_theme_constant_override("separation", 12)
 	card_margin.add_child(main_vbox)
 
-	header = Control.new()
+	header = Panel.new()
+	header.clip_contents = true
 	header.custom_minimum_size = Vector2(0, 58)
 	header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	main_vbox.add_child(header)
 
 	title_label = _make_outlined_label("Tienda", 58)
-	title_label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	title_label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	header.add_child(title_label)
 
 	close_btn = Button.new()
@@ -212,8 +242,11 @@ func _build_ui() -> void:
 	close_btn.offset_top = -28
 	close_btn.offset_right = 0
 	close_btn.offset_bottom = 28
-	if LogoFont != null:
-		close_btn.add_theme_font_override("font", LogoFont)
+	close_btn.clip_text = true
+	close_btn.clip_contents = true
+	var close_font := FontVariation.new()
+	close_font.variation_embolden = 0.7
+	close_btn.add_theme_font_override("font", close_font)
 	close_btn.pressed.connect(close)
 	GameState.hook_button_sound(close_btn)
 	header.add_child(close_btn)
@@ -251,6 +284,7 @@ func _build_ui() -> void:
 	main_vbox.add_child(_close_menu_btn)
 
 	_build_buy_confirm()
+	_cover_viewport()
 	_apply_shop_identity()
 	_set_active_tab(ShopTabServiceScript.TAB_STORE)
 
@@ -488,8 +522,9 @@ func _make_combo_card(pack: Dictionary) -> Dictionary:
 	title.set_anchors_preset(Control.PRESET_FULL_RECT)
 	title.offset_left = 8
 	title.offset_right = -8
+	title.offset_bottom = -4
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	title.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	left.add_child(title)
 
@@ -645,7 +680,7 @@ func _make_diamond_offer_row(pack: Dictionary) -> Dictionary:
 func _layout_diamond_offers(ui_scale: float) -> void:
 	var s: float = maxf(ui_scale, 0.5)
 	if _diamond_list != null and content_well != null:
-		var inner_w: float = maxf(content_well.size.x - 28.0 * s, 200.0 * s)
+		var inner_w: float = maxf(content_well.size.x, 200.0 * s)
 		_diamond_list.custom_minimum_size.x = inner_w
 		_diamond_list.columns = 3
 		_diamond_list.add_theme_constant_override("h_separation", int(10.0 * s))
@@ -656,15 +691,16 @@ func _layout_diamond_offers(ui_scale: float) -> void:
 		var amount_lbl: Label = row.get("amount") as Label
 		var buy: Button = row.get("buy") as Button
 		if root != null:
-			root.custom_minimum_size = Vector2(0, 268.0 * s)
+			root.custom_minimum_size = Vector2(0, 340.0 * s)
 		if icon != null:
-			icon.custom_minimum_size = Vector2(108.0 * s, 108.0 * s)
+			icon.custom_minimum_size = Vector2(136.0 * s, 136.0 * s)
 		if amount_lbl != null:
-			amount_lbl.add_theme_font_size_override("font_size", int(32.0 * s))
-			amount_lbl.add_theme_constant_override("outline_size", int(4.0 * s))
+			amount_lbl.add_theme_font_size_override("font_size", int(38.0 * s))
+			amount_lbl.add_theme_constant_override("outline_size", int(5.0 * s))
 		if buy != null:
-			buy.custom_minimum_size = Vector2(0, 52.0 * s)
-			buy.add_theme_font_size_override("font_size", int(26.0 * s))
+			buy.custom_minimum_size = Vector2(0, 76.0 * s)
+			buy.add_theme_font_size_override("font_size", int(42.0 * s))
+			buy.add_theme_constant_override("outline_size", 6)
 
 func _layout_resource_offers(ui_scale: float) -> void:
 	var s: float = maxf(ui_scale, 0.5)
@@ -717,7 +753,7 @@ func _layout_resource_offers(ui_scale: float) -> void:
 func _layout_combo_offers(ui_scale: float) -> void:
 	var s: float = maxf(ui_scale, 0.5)
 	if _combo_list != null and content_well != null:
-		var inner_w: float = maxf(content_well.size.x - 28.0 * s, 200.0 * s)
+		var inner_w: float = maxf(content_well.size.x, 200.0 * s)
 		_combo_list.custom_minimum_size.x = inner_w
 		_combo_list.add_theme_constant_override("separation", int(12.0 * s))
 	for card_row in _combo_cards:
@@ -728,17 +764,17 @@ func _layout_combo_offers(ui_scale: float) -> void:
 		var icon: TextureRect = card_row.get("icon") as TextureRect
 		var left: Control = card_row.get("left") as Control
 		if root != null:
-			root.custom_minimum_size = Vector2(0, 220.0 * s)
+			root.custom_minimum_size = Vector2(0, 292.0 * s)
 		if left != null:
-			left.custom_minimum_size = Vector2(240.0 * s, 160.0 * s)
+			left.custom_minimum_size = Vector2(286.0 * s, 196.0 * s)
 		if title != null:
-			title.add_theme_font_size_override("font_size", int(36.0 * s))
-			title.add_theme_constant_override("outline_size", int(4.0 * s))
+			title.add_theme_font_size_override("font_size", int(42.0 * s))
+			title.add_theme_constant_override("outline_size", int(5.0 * s))
 		if amount_lbl != null:
-			amount_lbl.add_theme_font_size_override("font_size", int(34.0 * s))
-			amount_lbl.add_theme_constant_override("outline_size", int(4.0 * s))
+			amount_lbl.add_theme_font_size_override("font_size", int(40.0 * s))
+			amount_lbl.add_theme_constant_override("outline_size", int(5.0 * s))
 		if icon != null:
-			icon.custom_minimum_size = Vector2(104.0 * s, 104.0 * s)
+			icon.custom_minimum_size = Vector2(128.0 * s, 128.0 * s)
 		var chips: Array = card_row.get("chips", []) as Array
 		for chip_n in chips:
 			if not (chip_n is Dictionary):
@@ -748,15 +784,16 @@ func _layout_combo_offers(ui_scale: float) -> void:
 			var chip_icon: TextureRect = chip.get("icon") as TextureRect
 			var chip_qty: Label = chip.get("qty") as Label
 			if chip_root != null:
-				chip_root.custom_minimum_size = Vector2(78.0 * s, 108.0 * s)
+				chip_root.custom_minimum_size = Vector2(94.0 * s, 130.0 * s)
 			if chip_icon != null:
-				chip_icon.custom_minimum_size = Vector2(72.0 * s, 72.0 * s)
+				chip_icon.custom_minimum_size = Vector2(88.0 * s, 88.0 * s)
 			if chip_qty != null:
-				chip_qty.add_theme_font_size_override("font_size", int(24.0 * s))
-				chip_qty.add_theme_constant_override("outline_size", int(3.0 * s))
+				chip_qty.add_theme_font_size_override("font_size", int(28.0 * s))
+				chip_qty.add_theme_constant_override("outline_size", int(4.0 * s))
 		if buy != null:
-			buy.custom_minimum_size = Vector2(168.0 * s, 46.0 * s)
-			buy.add_theme_font_size_override("font_size", int(26.0 * s))
+			buy.custom_minimum_size = Vector2(236.0 * s, 78.0 * s)
+			buy.add_theme_font_size_override("font_size", int(36.0 * s))
+			buy.add_theme_constant_override("outline_size", 5)
 
 func _style_diamond_offer_rows() -> void:
 	for row in _diamond_offer_rows:
@@ -770,7 +807,7 @@ func _style_diamond_offer_rows() -> void:
 		if root != null:
 			root.add_theme_stylebox_override(
 				"panel",
-				_flat_style(ident.get("fill", SHOP_WELL), ident.get("border", FAVORITE_GOLD), 24, 2)
+				_flat_style(ident.get("fill", SHOP_WELL), SHOP_CARD_BORDER, 24, 2)
 			)
 		if amount_lbl != null:
 			amount_lbl.add_theme_color_override("font_color", SHOP_TEXT)
@@ -824,7 +861,7 @@ func _style_combo_cards() -> void:
 		if root != null:
 			root.add_theme_stylebox_override(
 				"panel",
-				_flat_style(ident.get("fill", SHOP_WELL), ident.get("border", FAVORITE_GOLD), 26, 2)
+				_flat_style(ident.get("fill", SHOP_WELL), SHOP_CARD_BORDER, 26, 2)
 			)
 		if title != null:
 			title.add_theme_color_override("font_color", SHOP_TEXT)
@@ -1223,8 +1260,8 @@ func _make_outlined_label(text: String, font_size: int) -> Label:
 	lbl.text = text
 	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	lbl.add_theme_font_size_override("font_size", font_size)
-	lbl.add_theme_color_override("font_color", Color(0.88, 0.86, 0.83))
-	lbl.add_theme_color_override("font_outline_color", Color(0.12, 0.10, 0.18, 0.55))
+	lbl.add_theme_color_override("font_color", SHOP_TEXT)
+	lbl.add_theme_color_override("font_outline_color", SHOP_OUTLINE)
 	lbl.add_theme_constant_override("outline_size", 3)
 	if LogoFont != null:
 		lbl.add_theme_font_override("font", LogoFont)
@@ -1261,7 +1298,7 @@ func _apply_button_style(btn: Button, bg: Color, border: Color, radius: int, fon
 	if btn == null:
 		return
 	btn.add_theme_color_override("font_color", font_color)
-	btn.add_theme_color_override("font_outline_color", Color(0.08, 0.06, 0.14, 0.55))
+	btn.add_theme_color_override("font_outline_color", SHOP_OUTLINE)
 	btn.add_theme_constant_override("outline_size", 3)
 	var style := _flat_style(bg, border, radius)
 	btn.add_theme_stylebox_override("normal", style)
@@ -1269,6 +1306,23 @@ func _apply_button_style(btn: Button, bg: Color, border: Color, radius: int, fon
 	btn.add_theme_stylebox_override("pressed", style)
 	btn.add_theme_stylebox_override("focus", style)
 	btn.add_theme_stylebox_override("disabled", style)
+
+func _apply_rainbow_label(lbl: Label, span_px: float) -> void:
+	if lbl == null:
+		return
+	var mat: ShaderMaterial = lbl.material as ShaderMaterial
+	if mat == null or mat.shader != RainbowLabelShader:
+		mat = ShaderMaterial.new()
+		mat.shader = RainbowLabelShader
+		lbl.material = mat
+	mat.set_shader_parameter("span_px", maxf(span_px, 1.0))
+	mat.set_shader_parameter("rainbow_sat", 0.82)
+	mat.set_shader_parameter("rainbow_val", 0.98)
+	mat.set_shader_parameter("pastel_mix", 0.0)
+
+func _clear_rainbow_label(lbl: Label) -> void:
+	if lbl != null:
+		lbl.material = null
 
 func _hide_rainbow_fill(host: Control) -> void:
 	if host == null or not host.has_meta(HudTextureButtons.RAINBOW_BG_META):
@@ -1288,12 +1342,28 @@ func _apply_shop_identity() -> void:
 	if card != null:
 		_hide_gold_fill(card)
 		_hide_rainbow_fill(card)
-		card.add_theme_stylebox_override("panel", _flat_style(SHOP_CARD_BG, SHOP_CARD_BORDER, 34, 3))
+		card.add_theme_stylebox_override("panel", _flat_style(SHOP_CARD_BG, SHOP_CARD_BORDER, 34, 0))
 	if content_well != null:
-		content_well.add_theme_stylebox_override("panel", _flat_style(SHOP_WELL, SHOP_CARD_BORDER, 24, 2))
-	_apply_button_style(close_btn, CLOSE_RED, CLOSE_RED_BORDER, 14, Color(0.90, 0.88, 0.85))
+		content_well.add_theme_stylebox_override("panel", _flat_style(SHOP_WELL, SHOP_CARD_BORDER, 24, 0))
+	if header != null:
+		header.add_theme_stylebox_override(
+			"panel",
+			_flat_style(SHOP_PRICE_BG, SHOP_PRICE_BORDER, 18, 2)
+		)
+	if close_btn != null:
+		var close_style := _flat_style(Color(1.00, 1.00, 1.00, 1.0), SHOP_PRICE_BG, 12, 3)
+		close_btn.add_theme_color_override("font_color", SHOP_PRICE_BG)
+		close_btn.add_theme_color_override("font_outline_color", SHOP_PRICE_BG)
+		close_btn.add_theme_constant_override("outline_size", 3)
+		close_btn.add_theme_stylebox_override("normal", close_style)
+		close_btn.add_theme_stylebox_override("hover", close_style)
+		close_btn.add_theme_stylebox_override("pressed", close_style)
+		close_btn.add_theme_stylebox_override("focus", close_style)
+		close_btn.add_theme_stylebox_override("disabled", close_style)
 	if title_label != null:
+		_clear_rainbow_label(title_label)
 		title_label.add_theme_color_override("font_color", SHOP_TITLE)
+		title_label.add_theme_color_override("font_outline_color", SHOP_OUTLINE)
 	for lbl in _placeholder_labels:
 		if lbl != null:
 			lbl.add_theme_color_override("font_color", SHOP_TEXT)
@@ -1304,9 +1374,10 @@ func _apply_shop_identity() -> void:
 	if _confirm_card != null:
 		_hide_gold_fill(_confirm_card)
 		_hide_rainbow_fill(_confirm_card)
-		_confirm_card.add_theme_stylebox_override("panel", _flat_style(SHOP_CARD_BG, SHOP_CARD_BORDER, 34, 3))
+		_confirm_card.add_theme_stylebox_override("panel", _flat_style(SHOP_CONFIRM_BG, SHOP_CARD_BORDER, 34, 2))
 	if _confirm_title != null:
 		_confirm_title.add_theme_color_override("font_color", SHOP_TITLE)
+		_confirm_title.add_theme_color_override("font_outline_color", SHOP_OUTLINE)
 	_apply_button_style(_confirm_accept_btn, SHOP_PRICE_BG, SHOP_PRICE_BORDER, 22, SHOP_TEXT)
 	_apply_button_style(_confirm_cancel_btn, SHOP_CANCEL_BG, SHOP_CARD_BORDER, 22, SHOP_TEXT)
 	_hide_rainbow_fill(_close_menu_btn)

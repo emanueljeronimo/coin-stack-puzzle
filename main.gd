@@ -1,6 +1,7 @@
 extends Node2D
 
 const StackScene = preload("res://stack.tscn")
+const ShopScene = preload("res://Shop.tscn")
 const StackScript = preload("res://stack.gd")
 const GameEngineScript = preload("res://game_engine.gd")
 const GameBoardEngineScript = preload("res://game_board_engine.gd")
@@ -3609,7 +3610,7 @@ func _ensure_shop_ui() -> void:
 		shop_layer = CanvasLayer.new()
 		shop_layer.layer = 105
 		add_child(shop_layer)
-	shop_ui = ShopOverlay.new()
+	shop_ui = ShopScene.instantiate() as ShopOverlay
 	shop_layer.add_child(shop_ui)
 	if not shop_ui.diamonds_purchased.is_connected(_on_shop_diamonds_purchased):
 		shop_ui.diamonds_purchased.connect(_on_shop_diamonds_purchased)
