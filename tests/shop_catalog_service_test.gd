@@ -43,13 +43,13 @@ func _test_diamond_packs() -> void:
 	if int(ShopCatalogServiceScript.pack_by_id("diamonds_25000").get("price_cents", 0)) != 3299:
 		_fail("pack_25000_price")
 		return
-	if ShopCatalogServiceScript.diamond_art_path(first) != "res://Imagenes/1mil-diamantes.png":
+	if ShopCatalogServiceScript.diamond_art_path(first) != "res://Imagenes/oferta-1000.png":
 		_fail("art_1000", ShopCatalogServiceScript.diamond_art_path(first))
 		return
-	if ShopCatalogServiceScript.diamond_art_path(ShopCatalogServiceScript.pack_by_id("diamonds_25000")) != "res://Imagenes/25mil-diamantes.png":
+	if ShopCatalogServiceScript.diamond_art_path(ShopCatalogServiceScript.pack_by_id("diamonds_25000")) != "res://Imagenes/oferta-25000.png":
 		_fail("art_25000")
 		return
-	if ShopCatalogServiceScript.diamond_art_path(last) != "res://Imagenes/100mil-diamantes.png":
+	if ShopCatalogServiceScript.diamond_art_path(last) != "res://Imagenes/oferta-100000.png":
 		_fail("art_100000")
 		return
 	var seen_fills: Array[Color] = []
@@ -141,8 +141,14 @@ func _test_combo_pack() -> void:
 	if int(ultimate.get("diamonds", 0)) != 25000 or int(ultimate.get("price_cents", 0)) != 3199:
 		_fail("combo_ultimate", str(ultimate))
 		return
-	if ShopCatalogServiceScript.art_path_for_amount(25000) != "res://Imagenes/25mil-diamantes.png":
+	if ShopCatalogServiceScript.art_path_for_amount(25000) != "res://Imagenes/oferta-25000.png":
 		_fail("combo_art_amount", ShopCatalogServiceScript.art_path_for_amount(25000))
+		return
+	if ShopCatalogServiceScript.combo_art_path(beginner) != "res://Imagenes/beginner_bundle.png":
+		_fail("combo_beginner_art", ShopCatalogServiceScript.combo_art_path(beginner))
+		return
+	if ShopCatalogServiceScript.combo_art_path(ultimate) != "res://Imagenes/ultimate-bundle.png":
+		_fail("combo_ultimate_art", ShopCatalogServiceScript.combo_art_path(ultimate))
 		return
 	var beginner_fill: Color = ShopCatalogServiceScript.offer_identity(beginner).get("fill", Color.BLACK)
 	var ultimate_fill: Color = ShopCatalogServiceScript.offer_identity(ultimate).get("fill", Color.BLACK)

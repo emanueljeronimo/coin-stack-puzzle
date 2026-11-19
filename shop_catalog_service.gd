@@ -3,12 +3,12 @@ extends RefCounted
 const GameBoosterServiceScript = preload("res://game_booster_service.gd")
 
 const DIAMOND_PACKS := [
-	{"id": "diamonds_1000", "amount": 1000, "price_cents": 199, "favorite": false, "art": "res://Imagenes/1mil-diamantes.png", "fill": Color(0.16, 0.74, 0.86, 0.98), "border": Color(0.62, 0.96, 1.00, 1.0)},
-	{"id": "diamonds_5000", "amount": 5000, "price_cents": 799, "favorite": false, "art": "res://Imagenes/5mil-diamantes.png", "fill": Color(0.22, 0.72, 0.34, 0.98), "border": Color(0.62, 0.96, 0.58, 1.0)},
-	{"id": "diamonds_10000", "amount": 10000, "price_cents": 1499, "favorite": false, "art": "res://Imagenes/10mil-diamantes.png", "fill": Color(0.16, 0.40, 0.92, 0.98), "border": Color(0.62, 0.78, 1.00, 1.0)},
-	{"id": "diamonds_25000", "amount": 25000, "price_cents": 3299, "favorite": false, "art": "res://Imagenes/25mil-diamantes.png", "fill": Color(0.54, 0.26, 0.90, 0.98), "border": Color(0.86, 0.70, 1.00, 1.0)},
-	{"id": "diamonds_50000", "amount": 50000, "price_cents": 5999, "favorite": false, "art": "res://Imagenes/50mil-diamantes.png", "fill": Color(0.88, 0.28, 0.62, 0.98), "border": Color(1.00, 0.70, 0.88, 1.0)},
-	{"id": "diamonds_100000", "amount": 100000, "price_cents": 9999, "favorite": false, "art": "res://Imagenes/100mil-diamantes.png", "fill": Color(0.88, 0.20, 0.26, 0.98), "border": Color(1.00, 0.62, 0.58, 1.0)},
+	{"id": "diamonds_1000", "amount": 1000, "price_cents": 199, "favorite": false, "art": "res://Imagenes/oferta-1000.png", "fill": Color(0.16, 0.74, 0.86, 0.98), "border": Color(0.62, 0.96, 1.00, 1.0)},
+	{"id": "diamonds_5000", "amount": 5000, "price_cents": 799, "favorite": false, "art": "res://Imagenes/oferta-5000.png", "fill": Color(0.22, 0.72, 0.34, 0.98), "border": Color(0.62, 0.96, 0.58, 1.0)},
+	{"id": "diamonds_10000", "amount": 10000, "price_cents": 1499, "favorite": false, "art": "res://Imagenes/oferta-10000.png", "fill": Color(0.16, 0.40, 0.92, 0.98), "border": Color(0.62, 0.78, 1.00, 1.0)},
+	{"id": "diamonds_25000", "amount": 25000, "price_cents": 3299, "favorite": false, "art": "res://Imagenes/oferta-25000.png", "fill": Color(0.54, 0.26, 0.90, 0.98), "border": Color(0.86, 0.70, 1.00, 1.0)},
+	{"id": "diamonds_50000", "amount": 50000, "price_cents": 5999, "favorite": false, "art": "res://Imagenes/oferta-50000.png", "fill": Color(0.88, 0.28, 0.62, 0.98), "border": Color(1.00, 0.70, 0.88, 1.0)},
+	{"id": "diamonds_100000", "amount": 100000, "price_cents": 9999, "favorite": false, "art": "res://Imagenes/oferta-100000.png", "fill": Color(0.88, 0.20, 0.26, 0.98), "border": Color(1.00, 0.62, 0.58, 1.0)},
 ]
 
 const COMBO_PACKS := [
@@ -19,6 +19,7 @@ const COMBO_PACKS := [
 		"price_cents": 199,
 		"diamonds": 1000,
 		"booster_each": 2,
+		"art": "res://Imagenes/beginner_bundle.png",
 		"requires_all_boosters": true,
 		"fill": Color(0.10, 0.66, 0.50, 0.98),
 		"border": Color(0.48, 0.96, 0.78, 1.0),
@@ -30,6 +31,7 @@ const COMBO_PACKS := [
 		"price_cents": 999,
 		"diamonds": 5000,
 		"booster_each": 1,
+		"art": "res://Imagenes/advanced_bundle.png",
 		"fill": Color(0.10, 0.52, 0.78, 0.98),
 		"border": Color(0.52, 0.86, 1.00, 1.0),
 	},
@@ -40,6 +42,7 @@ const COMBO_PACKS := [
 		"price_cents": 1999,
 		"diamonds": 10000,
 		"booster_each": 3,
+		"art": "res://Imagenes/expert_bundle.png",
 		"fill": Color(0.50, 0.20, 0.68, 0.98),
 		"border": Color(0.90, 0.64, 1.00, 1.0),
 	},
@@ -50,6 +53,7 @@ const COMBO_PACKS := [
 		"price_cents": 3199,
 		"diamonds": 25000,
 		"booster_each": 4,
+		"art": "res://Imagenes/ultimate-bundle.png",
 		"fill": Color(1.00, 0.46, 0.78, 0.98),
 		"border": Color(1.00, 0.82, 0.92, 1.0),
 	},
@@ -119,6 +123,9 @@ static func diamond_art_path(pack: Dictionary) -> String:
 	if path.is_empty():
 		return "res://Imagenes/icono-diamante.png"
 	return path
+
+static func combo_art_path(pack: Dictionary) -> String:
+	return diamond_art_path(pack)
 
 static func art_path_for_amount(amount: int) -> String:
 	for pack in DIAMOND_PACKS:
