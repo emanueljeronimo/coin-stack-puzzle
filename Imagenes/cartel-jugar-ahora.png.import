@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bbrvmu175b15x"
-path="res://.godot/imported/cartel-nivel.png-2b743f594d0a80f50399c45b00c45530.ctex"
+uid="uid://ckh8hdvl4kmrp"
+path="res://.godot/imported/cartel-jugar-ahora.png-83e623da81aad77c09eddcd726a54220.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Imagenes/cartel-nivel.png"
-dest_files=["res://.godot/imported/cartel-nivel.png-2b743f594d0a80f50399c45b00c45530.ctex"]
+source_file="res://Imagenes/cartel-jugar-ahora.png"
+dest_files=["res://.godot/imported/cartel-jugar-ahora.png-83e623da81aad77c09eddcd726a54220.ctex"]
 
 [params]
 

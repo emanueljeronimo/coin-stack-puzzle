@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://d1rxlruy15snf"
-path="res://.godot/imported/boton-nuevo.png-230ce75b291cc2d54d80d7b8efa04cd2.ctex"
+uid="uid://co31ywaf1n8bw"
+path="res://.godot/imported/cartel-login.png-f138d54971ae3c604f5658369be062f1.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Imagenes/boton-nuevo.png"
-dest_files=["res://.godot/imported/boton-nuevo.png-230ce75b291cc2d54d80d7b8efa04cd2.ctex"]
+source_file="res://Imagenes/cartel-login.png"
+dest_files=["res://.godot/imported/cartel-login.png-f138d54971ae3c604f5658369be062f1.ctex"]
 
 [params]
 

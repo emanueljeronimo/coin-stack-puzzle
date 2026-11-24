@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://c3lf1bb6dlur8"
-path="res://.godot/imported/boton-largo.png-35e2d39895e178ccc863d00429b3fb17.ctex"
+uid="uid://qhpwlhoanske"
+path="res://.godot/imported/cartel-diamantes.png-09bb6aef959de6551f632b69c088a609.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Imagenes/boton-largo.png"
-dest_files=["res://.godot/imported/boton-largo.png-35e2d39895e178ccc863d00429b3fb17.ctex"]
+source_file="res://Imagenes/cartel-diamantes.png"
+dest_files=["res://.godot/imported/cartel-diamantes.png-09bb6aef959de6551f632b69c088a609.ctex"]
 
 [params]
 

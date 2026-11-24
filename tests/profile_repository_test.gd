@@ -45,6 +45,10 @@ func _test_lookup_defaults() -> void:
 	if gold.r < 0.85 or gold.g < 0.60 or gold.b > 0.45:
 		_fail("wildcard_border_gold", str(gold))
 		return
+	var violet: Color = ProfileRepositoryScript.avatar_border_color()
+	if violet.b < 0.80 or violet.b <= violet.r or violet.r < 0.55:
+		_fail("avatar_border_violet", str(violet))
+		return
 	_ok("lookup_defaults")
 
 func _test_default_player_data() -> void:

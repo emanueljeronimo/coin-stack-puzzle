@@ -190,7 +190,7 @@ func set_avatar_border_custom_color(color: Color) -> void:
 
 
 func get_avatar_border_color() -> Color:
-	return ProfileRepositoryScript.wildcard_border_color()
+	return ProfileRepositoryScript.avatar_border_color()
 
 
 func get_play_days() -> int:

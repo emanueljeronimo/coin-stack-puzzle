@@ -1,8 +1,8 @@
 extends Control
 
 const LobbyScenePath := "res://Lobby.tscn"
-const COVER_PATH := "res://Imagenes/portada-nueva2.png"
-const PLAY_BUTTON_PATH := "res://Imagenes/boton-nuevo.png"
+const COVER_PATH := "res://Imagenes/portada-nueva.png"
+const PLAY_BUTTON_PATH := "res://Imagenes/cartel-jugar-ahora.png"
 
 const REF_WIDTH := 1080.0
 
@@ -22,17 +22,20 @@ func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	cover_texture = _load_texture(COVER_PATH, "res://Imagenes/home-1.png")
-	play_button_texture = _load_texture(PLAY_BUTTON_PATH, "res://Imagenes/boton-nuevo.png")
+	play_button_texture = _load_texture(PLAY_BUTTON_PATH, "res://Imagenes/home-1.png")
 	build_ui()
 	if not get_viewport().size_changed.is_connected(_on_viewport_resized):
 		get_viewport().size_changed.connect(_on_viewport_resized)
 	layout_ui()
 
 func _load_texture(primary_path: String, fallback_path: String) -> Texture2D:
-	var tex: Texture2D = load(primary_path) as Texture2D
-	if tex != null:
-		return tex
-	return load(fallback_path) as Texture2D
+	if ResourceLoader.exists(primary_path):
+		var tex: Texture2D = load(primary_path) as Texture2D
+		if tex != null:
+			return tex
+	if not fallback_path.is_empty() and ResourceLoader.exists(fallback_path):
+		return load(fallback_path) as Texture2D
+	return null
 
 func _apply_portrait_orientation() -> void:
 	var os_name := OS.get_name()

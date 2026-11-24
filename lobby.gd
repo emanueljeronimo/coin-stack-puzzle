@@ -2,7 +2,8 @@ extends Control
 
 const CoverTexture = preload("res://Imagenes/home-nueva.png")
 const LifeIconTexture = preload("res://Imagenes/icono-vidas.png")
-const DiamondIconTexture = preload("res://Imagenes/icono-diamante.png")
+const PlayBannerTexture = preload("res://Imagenes/cartel-jugar-ahora.png")
+const DiamondBannerTexture = preload("res://Imagenes/cartel-diamantes.png")
 const CartIconTexture = preload("res://Imagenes/icono-cart.png")
 const SettingsIconTexture = preload("res://Imagenes/icono-settings.png")
 const DailyLoginIconTexture = preload("res://Imagenes/icono-login-diario.png")
@@ -46,18 +47,26 @@ const PLAY_HEIGHT := 120.0
 const PLAY_BOTTOM_MARGIN := 80.0
 const PLAY_Y_DROP := 0.0
 const PLAY_VISIBLE_HEIGHT := 1.0
-const PLAY_LABEL_TEXT := "Jugar ahora"
-const PLAY_FONT_SIZE := 80
-const PLAY_LETTER_SPACING := 3
-const PLAY_EMBOLDEN := 0.55
-const PLAY_LABEL_INSET_X := 0.04
-const PLAY_LABEL_LIFT_RATIO := 0.08
-const PLAY_TEXT_COLOR := Color(1.0, 1.0, 1.0, 1.0)
-const PLAY_TEXT_OUTLINE := Color(0.0, 0.0, 0.0, 1.0)
-const PLAY_OUTLINE_SIZE := 3.0
+const PLAY_LABEL_TEXT := "Jugar"
+const PLAY_FONT_SIZE := 62
+const PLAY_LETTER_SPACING := 1
+const PLAY_EMBOLDEN := 0.35
+## Centro de la capsula violeta del cartel (la flor ya no empuja el texto).
+const PLAY_LABEL_LEFT_RATIO := 0.20
+const PLAY_LABEL_RIGHT_RATIO := 0.16
+const PLAY_LABEL_TOP_RATIO := 0.08
+const PLAY_LABEL_BOTTOM_RATIO := 0.20
+const PLAY_LABEL_FILL := Color(1.0, 1.0, 1.0, 1.0)
+const PLAY_LABEL_OUTLINE := Color(0.32, 0.14, 0.52, 0.92)
+const PLAY_PILL_COLORS := {
+	"hi": Color("#c08ae8"),
+	"mid": Color("#7f52b9"),
+	"lo": Color("#542c8c"),
+	"border": LEVEL_FILL,
+}
 const DAILY_LOGIN_SIZE_RATIO := 1.65
-## El PNG de la tienda llena mas el canvas que el calendario; se escala para igualar.
-const SHOP_ICON_VISUAL_SCALE := 0.88
+## Tienda y login diario: mismo cuadro y mismo recorte visual.
+const SIDE_ICON_VISUAL_SCALE := 0.88
 
 var background_rect: TextureRect = null
 var hud_layer: CanvasLayer = null
@@ -173,7 +182,8 @@ func build_ui() -> void:
 	if life_parts.plus != null:
 		(life_parts.plus as Button).pressed.connect(_on_shop_pressed)
 		GameState.hook_button_sound(life_parts.plus as Button)
-	var diamonds_parts := HudTextureButtons.create_resource_chip(DiamondIconTexture, false)
+	var diamonds_parts := HudTextureButtons.create_resource_chip(null, false)
+	HudTextureButtons.set_resource_chip_banner(diamonds_parts, DiamondBannerTexture)
 	diamonds_chip_parts = diamonds_parts
 	diamonds_button = diamonds_parts.panel
 	diamonds_button_icon = diamonds_parts.icon
@@ -237,6 +247,7 @@ func build_ui() -> void:
 	play_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	play_label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	play_button.add_child(play_label)
+	HudTextureButtons.apply_banner_art(play_button, PlayBannerTexture)
 	_bind_chip_click(play_button, _on_play_pressed)
 	_wire_play_press_scale()
 	_apply_play_label_style(1.0)
@@ -425,8 +436,10 @@ func _apply_level_label_style(ui_scale: float) -> void:
 		LevelLabelShader
 	)
 
-func _apply_play_button_style(play_size: Vector2, scale: float) -> void:
-	HudTextureButtons.apply_gold_pill_style(play_button, play_size, scale)
+func _apply_play_button_style(_play_size: Vector2, _scale: float) -> void:
+	HudTextureButtons.apply_banner_art(play_button, PlayBannerTexture)
+	if play_button_shadow != null:
+		play_button_shadow.visible = false
 
 func _apply_play_label_style(ui_scale: float) -> void:
 	if play_label == null:
@@ -439,14 +452,22 @@ func _apply_play_label_style(ui_scale: float) -> void:
 	play_label.add_theme_font_override("font", _play_font_variation)
 	_play_font_variation.spacing_glyph = int(round(float(PLAY_LETTER_SPACING) * s))
 	play_label.add_theme_font_size_override("font_size", int(float(PLAY_FONT_SIZE) * s))
-	play_label.add_theme_color_override("font_color", PLAY_TEXT_COLOR)
-	play_label.add_theme_color_override("font_outline_color", PLAY_TEXT_OUTLINE)
-	var size_ratio: float = float(PLAY_FONT_SIZE) / float(LEVEL_FONT_SIZE)
-	play_label.add_theme_constant_override("outline_size", int(round(PLAY_OUTLINE_SIZE * s)))
-	play_label.add_theme_color_override("font_shadow_color", LEVEL_SHADOW)
-	play_label.add_theme_constant_override("shadow_offset_x", int(round(2.0 * size_ratio * s)))
-	play_label.add_theme_constant_override("shadow_offset_y", int(round(7.0 * size_ratio * s)))
-	play_label.add_theme_constant_override("shadow_outline_size", int(round(5.0 * size_ratio * s)))
+	play_label.add_theme_color_override("font_color", PLAY_LABEL_FILL)
+	play_label.add_theme_color_override("font_outline_color", PLAY_LABEL_OUTLINE)
+	play_label.add_theme_constant_override("outline_size", int(round(4.0 * s)))
+	play_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0))
+	play_label.add_theme_constant_override("shadow_offset_x", 0)
+	play_label.add_theme_constant_override("shadow_offset_y", 0)
+	play_label.add_theme_constant_override("shadow_outline_size", 0)
+
+func _apply_lobby_diamond_style() -> void:
+	if diamonds_chip_parts.is_empty():
+		return
+	var value: Label = diamonds_chip_parts.get("label") as Label
+	if value == null:
+		return
+	var ui_scale := clampf(value.size.y / 50.0, 0.75, 1.4)
+	HudTextureButtons.style_banner_value_label(value, ui_scale)
 
 func _apply_display_label_shader(lbl: Label, fill_shader: Shader) -> void:
 	if lbl == null or fill_shader == null:
@@ -580,8 +601,8 @@ func _get_cover_draw_rect() -> Rect2:
 	var offset := (viewport_size - drawn_size) * 0.5
 	return Rect2(offset, drawn_size)
 
-func _get_play_button_size(cover_width: float, ui_scale: float) -> Vector2:
-	return Vector2(cover_width * PLAY_WIDTH_RATIO, PLAY_HEIGHT * ui_scale)
+func _get_play_button_size(cover_width: float, _ui_scale: float) -> Vector2:
+	return HudTextureButtons.texture_size_for_width(PlayBannerTexture, cover_width * PLAY_WIDTH_RATIO)
 
 func _wire_play_press_scale() -> void:
 	if play_button == null:
@@ -597,12 +618,13 @@ func _wire_play_press_scale() -> void:
 func _layout_play_label(play_size: Vector2) -> void:
 	if play_label == null:
 		return
-	var pad_x: float = play_size.x * PLAY_LABEL_INSET_X
-	var lift: float = play_size.y * PLAY_LABEL_LIFT_RATIO
-	play_label.offset_left = pad_x
-	play_label.offset_right = -pad_x
-	play_label.offset_top = -lift
-	play_label.offset_bottom = -lift
+	play_label.clip_text = false
+	play_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	play_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	play_label.offset_left = play_size.x * PLAY_LABEL_LEFT_RATIO
+	play_label.offset_right = -play_size.x * PLAY_LABEL_RIGHT_RATIO
+	play_label.offset_top = play_size.y * PLAY_LABEL_TOP_RATIO
+	play_label.offset_bottom = -play_size.y * PLAY_LABEL_BOTTOM_RATIO
 
 func layout_ui() -> void:
 	var viewport_size := get_viewport_rect().size
@@ -624,26 +646,11 @@ func layout_ui() -> void:
 		gap *= shrink
 	var corner_size := Vector2(corner_w, chip_h)
 	var stat_size := Vector2(stat_w, chip_h)
-	var pill_radius := _hud_pill_radius(scale)
-	var resource_gap := HudTextureButtons.resource_chip_pair_gap(
-		chip_h,
-		gap,
-		HudTextureButtons.resource_chip_hang(
-			chip_h,
-			0.62,
-			HudTextureButtons.DIAMOND_ICON_HEIGHT_RATIO,
-			HudTextureButtons.DIAMOND_ICON_WIDTH_RATIO
-		)
-	)
+	var diamond_size := HudTextureButtons.texture_size_for_height(DiamondBannerTexture, chip_h)
+	var resource_gap := maxf(gap, chip_h * 0.08)
 	var lives_on := GameState.lives_enabled()
 	var life_w := HudTextureButtons.resource_chip_visual_width(chip_h, stat_size.x, 0.62, 1.38)
-	var money_w := HudTextureButtons.resource_chip_visual_width(
-		chip_h,
-		stat_size.x,
-		0.62,
-		HudTextureButtons.DIAMOND_ICON_HEIGHT_RATIO,
-		HudTextureButtons.DIAMOND_ICON_WIDTH_RATIO
-	)
+	var money_w := diamond_size.x
 	var total_center_w := money_w
 	if lives_on:
 		total_center_w = life_w + resource_gap + money_w
@@ -665,12 +672,7 @@ func layout_ui() -> void:
 	)
 
 	var life_hang := HudTextureButtons.resource_chip_hang(chip_h, 0.62, 1.38)
-	var money_hang := HudTextureButtons.resource_chip_hang(
-		chip_h,
-		0.62,
-		HudTextureButtons.DIAMOND_ICON_HEIGHT_RATIO,
-		HudTextureButtons.DIAMOND_ICON_WIDTH_RATIO
-	)
+	var diamond_y := row_y + (chip_h - diamond_size.y) * 0.5
 	if lives_on:
 		HudTextureButtons.layout_resource_chip(
 			life_chip_parts,
@@ -681,29 +683,18 @@ func layout_ui() -> void:
 			0.62,
 			1.38
 		)
-		HudTextureButtons.layout_resource_chip(
+		HudTextureButtons.layout_banner_resource_chip(
 			diamonds_chip_parts,
-			Vector2(center_x + life_w + resource_gap + money_hang, row_y),
-			stat_size,
-			0.38,
-			42,
-			0.62,
-			HudTextureButtons.DIAMOND_ICON_HEIGHT_RATIO,
-			HudTextureButtons.DIAMOND_ICON_WIDTH_RATIO,
-			true
+			Vector2(center_x + life_w + resource_gap, diamond_y),
+			diamond_size
 		)
 	else:
-		HudTextureButtons.layout_resource_chip(
+		HudTextureButtons.layout_banner_resource_chip(
 			diamonds_chip_parts,
-			Vector2(center_x + money_hang, row_y),
-			stat_size,
-			0.38,
-			42,
-			0.62,
-			HudTextureButtons.DIAMOND_ICON_HEIGHT_RATIO,
-			HudTextureButtons.DIAMOND_ICON_WIDTH_RATIO,
-			true
+			Vector2(center_x, diamond_y),
+			diamond_size
 		)
+	_apply_lobby_diamond_style()
 
 	layout_hud_pill_pair(
 		null,
@@ -745,16 +736,22 @@ func layout_ui() -> void:
 		_layout_play_label(play_size)
 		_apply_play_label_style(scale)
 
-	# Tienda a la izquierda, mismo cuadro y altura que el login diario.
+	# Tienda y login diario apilados a la derecha, mismo tamano.
 	var side := chip_h * DAILY_LOGIN_SIZE_RATIO
 	var side_icon_size := Vector2(side, side)
+	var side_icon_x := viewport_size.x - edge_margin - side_icon_size.x
 	var side_icon_y := row_y + corner_size.y + gap * 10
-	layout_hud_pill_pair(null, shop_button, Vector2(edge_margin, side_icon_y), side_icon_size, scale)
-	_apply_icon_visual_scale(shop_button_icon, side_icon_size, SHOP_ICON_VISUAL_SCALE)
-
-	var daily_login_x := viewport_size.x - edge_margin - side_icon_size.x
-	layout_hud_pill_pair(null, daily_login_button, Vector2(daily_login_x, side_icon_y), side_icon_size, scale)
-	_apply_icon_visual_scale(daily_login_button_icon, side_icon_size, 1.0)
+	var stack_gap := gap
+	layout_hud_pill_pair(null, shop_button, Vector2(side_icon_x, side_icon_y), side_icon_size, scale)
+	_apply_icon_visual_scale(shop_button_icon, side_icon_size, SIDE_ICON_VISUAL_SCALE)
+	layout_hud_pill_pair(
+		null,
+		daily_login_button,
+		Vector2(side_icon_x, side_icon_y + side_icon_size.y + stack_gap),
+		side_icon_size,
+		scale
+	)
+	_apply_icon_visual_scale(daily_login_button_icon, side_icon_size, SIDE_ICON_VISUAL_SCALE)
 
 	if settings_ui != null:
 		settings_ui.layout_for_viewport(viewport_size)

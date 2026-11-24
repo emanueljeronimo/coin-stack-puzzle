@@ -5,6 +5,7 @@ signal rewards_changed
 
 const DialogBuilderServiceScript = preload("res://dialog_builder_service.gd")
 const DailyLoginServiceScript = preload("res://daily_login_service.gd")
+const DailyLoginFrameLayoutServiceScript = preload("res://daily_login_frame_layout_service.gd")
 const ShopCatalogServiceScript = preload("res://shop_catalog_service.gd")
 const GameBoosterServiceScript = preload("res://game_booster_service.gd")
 const DiamondIconTexture = preload("res://Imagenes/icono-diamante.png")
@@ -12,22 +13,26 @@ const LifeIconTexture = preload("res://Imagenes/icono-vidas.png")
 const MixIconTexture = preload("res://Imagenes/icono-mezclar.png")
 const HammerIconTexture = preload("res://Imagenes/icono-martillo.png")
 const GloveIconTexture = preload("res://Imagenes/icono-mano.png")
-const REF_WIDTH := 1080.0
+const FrameTexture = preload("res://Imagenes/cartel-login.png")
 const LogoFont = preload("res://Fonts/Lobster-Regular.ttf")
-const CLOSE_RED := Color(0.90, 0.22, 0.24, 1.0)
-const CLOSE_RED_BORDER := Color(0.55, 0.10, 0.12, 1.0)
+const TITLE_FILL := Color(0.42, 0.20, 0.60, 1.0)
+const TITLE_OUTLINE := Color(1.00, 0.96, 0.92, 0.85)
+const CELL_INK := Color(0.36, 0.18, 0.54, 1.0)
+const PILL_ON := Color(0.78, 0.52, 0.98, 1.0)
+const PILL_ON_BORDER := Color(0.48, 0.22, 0.78, 1.0)
+const PILL_OFF := Color(0.74, 0.58, 0.90, 1.0)
+const PILL_OFF_BORDER := Color(0.58, 0.40, 0.78, 1.0)
+const PILL_TEXT := Color(1.00, 0.98, 0.96, 1.0)
+const PILL_OFF_TEXT := Color(0.42, 0.24, 0.58, 1.0)
 
 var overlay: ColorRect = null
 var card: Panel = null
-var card_margin: MarginContainer = null
-var main_vbox: VBoxContainer = null
-var header: Control = null
+var frame_art: TextureRect = null
 var title_label: Label = null
 var close_btn: Button = null
-var content_well: Panel = null
-var _grid: GridContainer = null
+var footer_btn: Button = null
+var footer_label: Label = null
 var _slots: Array[Dictionary] = []
-var _close_menu_btn: Button = null
 var _opened_at_msec: int = 0
 var _applying_pending: bool = false
 
@@ -64,61 +69,98 @@ func _on_background_theme_changed(_theme_id: String) -> void:
 func layout_for_viewport(viewport_size: Vector2) -> void:
 	if card == null:
 		return
-	var scale: float = clampf(minf(viewport_size.x / REF_WIDTH, viewport_size.y / 1920.0), 0.75, 1.25)
-	var card_w: float = minf(viewport_size.x * 0.90, 780.0 * scale)
-	var pad: float = 16.0 * scale
-	var sep: int = int(12.0 * scale)
-	var header_h: float = 58.0 * scale
-	var well_h: float = 520.0 * scale
-	var footer_h: float = 80.0 * scale
-	if header != null:
-		header.custom_minimum_size = Vector2(0, header_h)
+	var tex_size := Vector2(1230, 1179)
+	if FrameTexture != null:
+		tex_size = FrameTexture.get_size()
+	var card_size: Vector2 = DailyLoginFrameLayoutServiceScript.card_size(viewport_size, tex_size)
+	card.size = card_size
+	card.position = Vector2(
+		(viewport_size.x - card_size.x) * 0.5,
+		(viewport_size.y - card_size.y) * 0.5
+	)
+	if frame_art != null:
+		frame_art.position = Vector2.ZERO
+		frame_art.size = card_size
 	if title_label != null:
-		title_label.add_theme_font_size_override("font_size", int(46.0 * scale))
-		title_label.add_theme_constant_override("outline_size", int(7.0 * scale))
+		var title_rect: Rect2 = DailyLoginFrameLayoutServiceScript.mapped_rect(
+			card_size,
+			DailyLoginFrameLayoutServiceScript.TITLE_FRAC
+		)
+		title_label.position = title_rect.position
+		title_label.size = title_rect.size
+		var title_font: int = DailyLoginFrameLayoutServiceScript.title_font_size(title_rect.size.y)
+		title_label.add_theme_font_size_override("font_size", title_font)
+		title_label.add_theme_constant_override("outline_size", maxi(int(round(float(title_font) * 0.08)), 4))
 	if close_btn != null:
-		var close_side: float = 56.0 * scale
-		close_btn.custom_minimum_size = Vector2(close_side, close_side)
-		close_btn.offset_left = -close_side
-		close_btn.offset_top = -close_side * 0.5
-		close_btn.offset_right = 0
-		close_btn.offset_bottom = close_side * 0.5
-		close_btn.add_theme_font_size_override("font_size", int(36.0 * scale))
-	if content_well != null:
-		content_well.custom_minimum_size = Vector2(0, well_h)
-	if _grid != null:
-		_grid.add_theme_constant_override("h_separation", int(12.0 * scale))
-		_grid.add_theme_constant_override("v_separation", int(12.0 * scale))
-	for slot_ui in _slots:
+		var close_rect: Rect2 = DailyLoginFrameLayoutServiceScript.mapped_rect(
+			card_size,
+			DailyLoginFrameLayoutServiceScript.CLOSE_FRAC
+		)
+		close_btn.position = close_rect.position
+		close_btn.size = close_rect.size
+	if footer_btn != null:
+		var footer_rect: Rect2 = DailyLoginFrameLayoutServiceScript.mapped_rect(
+			card_size,
+			DailyLoginFrameLayoutServiceScript.FOOTER_FRAC
+		)
+		footer_btn.custom_minimum_size = Vector2.ZERO
+		footer_btn.position = footer_rect.position
+		footer_btn.size = footer_rect.size
+	if footer_label != null:
+		var text_rect: Rect2 = DailyLoginFrameLayoutServiceScript.mapped_rect(
+			card_size,
+			DailyLoginFrameLayoutServiceScript.FOOTER_TEXT_FRAC
+		)
+		footer_label.position = text_rect.position
+		footer_label.size = text_rect.size
+		var font_h: float = DailyLoginFrameLayoutServiceScript.mapped_rect(
+			card_size,
+			DailyLoginFrameLayoutServiceScript.FOOTER_FRAC
+		).size.y
+		var footer_font: int = DailyLoginFrameLayoutServiceScript.footer_font_size(font_h)
+		footer_label.add_theme_font_size_override("font_size", footer_font)
+		footer_label.add_theme_constant_override("outline_size", maxi(int(round(float(footer_font) * 0.10)), 4))
+	for i in range(_slots.size()):
+		var slot_ui: Dictionary = _slots[i]
+		var root: Control = slot_ui.get("root") as Control
+		var cell_rect: Rect2 = DailyLoginFrameLayoutServiceScript.cell_rect(card_size, i)
+		if root != null:
+			root.position = cell_rect.position
+			root.size = cell_rect.size
+		var cell_h: float = cell_rect.size.y
+		var pad: int = int(clampf(cell_h * 0.06, 6.0, 16.0))
+		var bottom_pad: int = DailyLoginFrameLayoutServiceScript.cell_bottom_pad(cell_h)
+		var margin: MarginContainer = slot_ui.get("margin") as MarginContainer
+		if margin != null:
+			margin.add_theme_constant_override("margin_left", pad)
+			margin.add_theme_constant_override("margin_top", pad)
+			margin.add_theme_constant_override("margin_right", pad)
+			margin.add_theme_constant_override("margin_bottom", bottom_pad)
+		var vbox: VBoxContainer = slot_ui.get("vbox") as VBoxContainer
+		if vbox != null:
+			vbox.alignment = BoxContainer.ALIGNMENT_END
+			vbox.add_theme_constant_override("separation", DailyLoginFrameLayoutServiceScript.cell_reward_gap(cell_h))
+		var reward_row: HBoxContainer = slot_ui.get("reward_row") as HBoxContainer
+		if reward_row != null:
+			reward_row.add_theme_constant_override("separation", int(clampf(cell_h * 0.06, 8.0, 16.0)))
 		var icon: TextureRect = slot_ui.get("icon") as TextureRect
 		var qty: Label = slot_ui.get("qty") as Label
 		var lock: Label = slot_ui.get("lock") as Label
 		var btn: Button = slot_ui.get("button") as Button
+		var icon_side: float = DailyLoginFrameLayoutServiceScript.cell_icon_side(cell_h)
 		if icon != null:
-			icon.custom_minimum_size = Vector2(72.0 * scale, 72.0 * scale)
+			icon.custom_minimum_size = Vector2(icon_side, icon_side)
+		var qty_font: int = DailyLoginFrameLayoutServiceScript.cell_qty_font_size(cell_h)
 		if qty != null:
-			qty.add_theme_font_size_override("font_size", int(32.0 * scale))
-			qty.add_theme_constant_override("outline_size", int(5.0 * scale))
+			qty.add_theme_font_size_override("font_size", qty_font)
+			qty.add_theme_constant_override("outline_size", maxi(int(round(float(qty_font) * 0.10)), 3))
 		if lock != null:
-			lock.add_theme_font_size_override("font_size", int(28.0 * scale))
+			lock.add_theme_font_size_override("font_size", maxi(int(round(float(qty_font) * 0.85)), 22))
 		if btn != null:
-			btn.custom_minimum_size = Vector2(0, 58.0 * scale)
-			btn.add_theme_font_size_override("font_size", int(26.0 * scale))
-	if _close_menu_btn != null:
-		_close_menu_btn.custom_minimum_size = Vector2(0, footer_h)
-		_close_menu_btn.add_theme_font_size_override("font_size", int(40.0 * scale))
-	if main_vbox != null:
-		main_vbox.add_theme_constant_override("separation", sep)
-	if card_margin != null:
-		var m: int = int(round(pad))
-		card_margin.add_theme_constant_override("margin_left", m)
-		card_margin.add_theme_constant_override("margin_top", m)
-		card_margin.add_theme_constant_override("margin_right", m)
-		card_margin.add_theme_constant_override("margin_bottom", m)
-	var card_h: float = pad * 2.0 + header_h + well_h + footer_h + float(sep) * 2.0
-	card_h = minf(card_h, viewport_size.y * 0.92)
-	card.size = Vector2(card_w, card_h)
-	card.position = Vector2((viewport_size.x - card_w) * 0.5, (viewport_size.y - card_h) * 0.5)
+			var btn_h: float = DailyLoginFrameLayoutServiceScript.cell_btn_height(cell_h)
+			btn.custom_minimum_size = Vector2(0, btn_h)
+			btn.add_theme_font_size_override("font_size", DailyLoginFrameLayoutServiceScript.cell_btn_font_size(btn_h))
+	_apply_theme_colors()
 
 func _build_ui() -> void:
 	overlay = ColorRect.new()
@@ -130,74 +172,67 @@ func _build_ui() -> void:
 
 	card = Panel.new()
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
+	card.clip_contents = false
+	card.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 	add_child(card)
 
-	card_margin = MarginContainer.new()
-	card_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	card.add_child(card_margin)
-
-	main_vbox = VBoxContainer.new()
-	main_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	main_vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	card_margin.add_child(main_vbox)
-
-	header = Control.new()
-	header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	main_vbox.add_child(header)
+	frame_art = TextureRect.new()
+	frame_art.texture = FrameTexture
+	frame_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	frame_art.stretch_mode = TextureRect.STRETCH_SCALE
+	frame_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(frame_art)
 
 	title_label = _make_outlined_label("Login diario", 46)
-	title_label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	header.add_child(title_label)
+	card.add_child(title_label)
 
 	close_btn = Button.new()
-	close_btn.text = "✕"
+	close_btn.text = ""
 	close_btn.focus_mode = Control.FOCUS_NONE
 	close_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	close_btn.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
-	if LogoFont != null:
-		close_btn.add_theme_font_override("font", LogoFont)
+	close_btn.flat = true
+	var empty := StyleBoxEmpty.new()
+	close_btn.add_theme_stylebox_override("normal", empty)
+	close_btn.add_theme_stylebox_override("hover", empty)
+	close_btn.add_theme_stylebox_override("pressed", empty)
+	close_btn.add_theme_stylebox_override("focus", empty)
 	close_btn.pressed.connect(close)
 	GameState.hook_button_sound(close_btn)
-	header.add_child(close_btn)
+	card.add_child(close_btn)
 
-	content_well = Panel.new()
-	content_well.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	content_well.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	main_vbox.add_child(content_well)
+	footer_btn = _make_action_button("")
+	footer_btn.flat = true
+	var footer_empty := StyleBoxEmpty.new()
+	footer_btn.add_theme_stylebox_override("normal", footer_empty)
+	footer_btn.add_theme_stylebox_override("hover", footer_empty)
+	footer_btn.add_theme_stylebox_override("pressed", footer_empty)
+	footer_btn.add_theme_stylebox_override("focus", footer_empty)
+	footer_btn.pressed.connect(close)
+	card.add_child(footer_btn)
 
-	var well_margin := MarginContainer.new()
-	well_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	well_margin.add_theme_constant_override("margin_left", 10)
-	well_margin.add_theme_constant_override("margin_top", 10)
-	well_margin.add_theme_constant_override("margin_right", 10)
-	well_margin.add_theme_constant_override("margin_bottom", 10)
-	content_well.add_child(well_margin)
-
-	_grid = GridContainer.new()
-	_grid.columns = 2
-	_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_grid.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_grid.add_theme_constant_override("h_separation", 12)
-	_grid.add_theme_constant_override("v_separation", 12)
-	well_margin.add_child(_grid)
+	footer_label = _make_outlined_label("Cerrar", 64)
+	footer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	footer_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	footer_label.clip_text = false
+	footer_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	footer_label.add_theme_color_override("font_color", PILL_TEXT)
+	footer_label.add_theme_color_override("font_outline_color", Color(0.32, 0.12, 0.52, 0.85))
+	card.add_child(footer_label)
 
 	_slots.clear()
 	for i in range(DailyLoginServiceScript.SLOT_COUNT):
 		var cell: Dictionary = _make_slot_cell(i)
-		_grid.add_child(cell.get("root") as Control)
+		card.add_child(cell.get("root") as Control)
 		_slots.append(cell)
-
-	_close_menu_btn = _make_action_button("Cerrar")
-	_close_menu_btn.pressed.connect(close)
-	main_vbox.add_child(_close_menu_btn)
 
 func _make_slot_cell(index: int) -> Dictionary:
 	var root := Panel.new()
 	root.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	root.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root.mouse_filter = Control.MOUSE_FILTER_STOP
+	root.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 
 	var margin := MarginContainer.new()
 	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -208,11 +243,18 @@ func _make_slot_cell(index: int) -> Dictionary:
 	root.add_child(margin)
 
 	var vbox := VBoxContainer.new()
-	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	vbox.alignment = BoxContainer.ALIGNMENT_END
 	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	vbox.add_theme_constant_override("separation", 8)
 	margin.add_child(vbox)
+
+	var reward_row := HBoxContainer.new()
+	reward_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	reward_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	reward_row.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	reward_row.add_theme_constant_override("separation", 10)
+	vbox.add_child(reward_row)
 
 	var icon := TextureRect.new()
 	icon.texture = DiamondIconTexture
@@ -221,17 +263,23 @@ func _make_slot_cell(index: int) -> Dictionary:
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	icon.custom_minimum_size = Vector2(72, 72)
 	icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	vbox.add_child(icon)
+	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	reward_row.add_child(icon)
 
 	var qty := _make_outlined_label("", 32)
 	qty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	qty.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	vbox.add_child(qty)
+	qty.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	qty.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	qty.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	reward_row.add_child(qty)
 
 	var lock := _make_outlined_label("🔒", 28)
 	lock.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lock.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	lock.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	lock.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	lock.visible = false
-	vbox.add_child(lock)
+	reward_row.add_child(lock)
 
 	var btn := _make_action_button("Gratis")
 	btn.pressed.connect(_on_slot_pressed.bind(index))
@@ -239,6 +287,9 @@ func _make_slot_cell(index: int) -> Dictionary:
 
 	return {
 		"root": root,
+		"margin": margin,
+		"vbox": vbox,
+		"reward_row": reward_row,
 		"icon": icon,
 		"qty": qty,
 		"lock": lock,
@@ -315,7 +366,6 @@ func _refresh_slots() -> void:
 		var qty: Label = ui.get("qty") as Label
 		var lock: Label = ui.get("lock") as Label
 		var btn: Button = ui.get("button") as Button
-		var root: Panel = ui.get("root") as Panel
 		if icon != null:
 			icon.texture = _icon_for_slot(slot)
 		if qty != null:
@@ -333,8 +383,6 @@ func _refresh_slots() -> void:
 			else:
 				btn.text = str(slot.get("button", ""))
 				btn.disabled = false
-		if root != null:
-			root.modulate = Color(1, 1, 1, 1) if status == "available" else Color(0.72, 0.72, 0.72, 0.92)
 	_apply_theme_colors()
 
 func _icon_for_slot(slot: Dictionary) -> Texture2D:
@@ -455,9 +503,12 @@ func _apply_button_style(btn: Button, bg: Color, border: Color, radius: int, fon
 	if btn == null:
 		return
 	btn.add_theme_color_override("font_color", font_color)
-	btn.add_theme_color_override("font_outline_color", Color(0.08, 0.06, 0.14, 0.9))
-	btn.add_theme_constant_override("outline_size", 5)
-	var style := _flat_style(bg, border, radius)
+	btn.add_theme_color_override("font_hover_color", font_color)
+	btn.add_theme_color_override("font_pressed_color", font_color)
+	btn.add_theme_color_override("font_disabled_color", font_color)
+	btn.add_theme_color_override("font_outline_color", Color(0.28, 0.10, 0.48, 0.85))
+	btn.add_theme_constant_override("outline_size", 4)
+	var style := _flat_style(bg, border, radius, 3)
 	btn.add_theme_stylebox_override("normal", style)
 	btn.add_theme_stylebox_override("hover", style)
 	btn.add_theme_stylebox_override("pressed", style)
@@ -465,27 +516,14 @@ func _apply_button_style(btn: Button, bg: Color, border: Color, radius: int, fon
 	btn.add_theme_stylebox_override("disabled", style)
 
 func _apply_theme_colors() -> void:
-	var p: Dictionary = GameState.get_ui_palette()
-	var card_bg: Color = p.get("settings_card_bg", Color(0.62, 0.52, 0.82, 0.98))
-	card_bg = card_bg.lightened(0.18)
-	var card_border: Color = p.get("settings_card_border", Color(0.42, 0.28, 0.58, 0.95))
-	card_border = card_border.darkened(0.35)
-	var inset: Color = p.get("settings_btn_off", Color(0.34, 0.26, 0.48, 0.95))
-	inset.a = 0.98
-	var well: Color = inset.darkened(0.12)
-	well.a = 0.98
-	var text_marble := Color(0.88, 0.86, 0.83)
-	var btn_on: Color = p.get("settings_btn_on", Color(0.58, 0.80, 0.48, 0.98))
-	var btn_border: Color = p.get("settings_btn_border", Color(0.75, 0.88, 0.58, 1.0))
-	var btn_off: Color = p.get("settings_btn_off", Color(0.34, 0.26, 0.48, 0.95))
 	if card != null:
-		card.add_theme_stylebox_override("panel", _flat_style(card_bg, card_border, 30, 4))
-	if content_well != null:
-		content_well.add_theme_stylebox_override("panel", _flat_style(well, card_border.darkened(0.15), 20, 2))
-	_apply_button_style(close_btn, CLOSE_RED, CLOSE_RED_BORDER, 14, Color(0.90, 0.88, 0.85))
+		card.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 	if title_label != null:
-		title_label.add_theme_color_override("font_color", p.get("settings_title", text_marble))
-	_apply_button_style(_close_menu_btn, btn_on, btn_border, 22, text_marble)
+		title_label.add_theme_color_override("font_color", TITLE_FILL)
+		title_label.add_theme_color_override("font_outline_color", TITLE_OUTLINE)
+	if footer_label != null:
+		footer_label.add_theme_color_override("font_color", PILL_TEXT)
+		footer_label.add_theme_color_override("font_outline_color", Color(0.32, 0.12, 0.52, 0.85))
 	var progress: Dictionary = _load_progress()
 	var claimed: int = int(progress.get("claimed", 0))
 	for i in range(_slots.size()):
@@ -494,28 +532,15 @@ func _apply_theme_colors() -> void:
 		var qty: Label = ui.get("qty") as Label
 		var btn: Button = ui.get("button") as Button
 		if root != null:
-			root.add_theme_stylebox_override(
-				"panel",
-				_flat_style(well.lightened(0.06), card_border.darkened(0.1), 18, 2)
-			)
+			root.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 		if qty != null:
-			qty.add_theme_color_override("font_color", text_marble)
+			qty.add_theme_color_override("font_color", CELL_INK)
+			qty.add_theme_color_override("font_outline_color", Color(1.0, 0.97, 0.94, 0.75))
 		var status: String = DailyLoginServiceScript.slot_status(i, claimed)
-		if status == "available":
-			_apply_button_style(btn, btn_on, btn_border, 16, text_marble)
-		else:
-			_apply_button_style(btn, btn_off, card_border.darkened(0.2), 16, text_marble)
-	_apply_rainbow_ui_fills()
-
-func _apply_rainbow_ui_fills() -> void:
-	if card != null:
-		HudTextureButtons.apply_optional_rainbow_fill(card, 30, card.size, 4)
-	if _close_menu_btn != null:
-		HudTextureButtons.apply_optional_rainbow_fill(_close_menu_btn, 22, _close_menu_btn.size, 3)
-	for ui in _slots:
-		var root: Panel = ui.get("root") as Panel
-		var btn: Button = ui.get("button") as Button
-		if root != null:
-			HudTextureButtons.apply_optional_rainbow_fill(root, 18, root.size, 2)
+		var radius := 22
 		if btn != null:
-			HudTextureButtons.apply_optional_rainbow_fill(btn, 16, btn.size, 3)
+			radius = int(clampf(btn.size.y * 0.50, 18.0, 36.0))
+		if status == "available":
+			_apply_button_style(btn, PILL_ON, PILL_ON_BORDER, radius, PILL_TEXT)
+		else:
+			_apply_button_style(btn, PILL_OFF, PILL_OFF_BORDER, radius, PILL_OFF_TEXT)

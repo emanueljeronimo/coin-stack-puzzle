@@ -1,15 +1,14 @@
 extends Control
 
-const BootCoverTexture := preload("res://Imagenes/portada-nueva2.png")
+const BootCoverTexture := preload("res://Imagenes/portada-nueva.png")
 const TransitCoverTexture := preload("res://Imagenes/home-nueva.png")
 const UiFont := preload("res://Fonts/Lobster-Regular.ttf")
 const BootCoverLayoutServiceScript := preload("res://boot_cover_layout_service.gd")
 const LoadingProgressServiceScript := preload("res://loading_progress_service.gd")
+const LoadingBarLayoutServiceScript := preload("res://loading_bar_layout_service.gd")
 const LoadingBarRainbowShader := preload("res://loading_bar_rainbow.gdshader")
 
 const REF_WIDTH := 1080.0
-const PROGRESS_TRACK_BG := Color(0.36, 0.30, 0.46, 0.94)
-const PROGRESS_TRACK_BORDER := Color(0.0, 0.0, 0.0, 1.0)
 const PROGRESS_TRACK_BORDER_W := 2
 const PROGRESS_TEXT := Color(0.44, 0.36, 0.58)
 const PROGRESS_LABEL_COLOR := Color(1.0, 1.0, 1.0, 1.0)
@@ -20,7 +19,6 @@ const TRANSIT_BAR_BOTTOM_MARGIN := 88.0
 
 const BOOT_WARMUP_PRELOADS: Array[String] = [
 	"res://Imagenes/home-nueva.png",
-	"res://Imagenes/boton-nuevo.png",
 	"res://Fonts/Lobster-Regular.ttf",
 	"res://stack.tscn",
 ]
@@ -87,29 +85,32 @@ func build_ui() -> void:
 	add_child(status_label)
 
 	progress_container = _create_panel(
-		PROGRESS_TRACK_BG,
-		PROGRESS_TRACK_BORDER,
+		LoadingBarLayoutServiceScript.TRACK_BG,
+		LoadingBarLayoutServiceScript.TRACK_BORDER,
 		24,
 		PROGRESS_TRACK_BORDER_W
 	)
-	progress_container.clip_contents = true
+	progress_container.clip_contents = false
 	add_child(progress_container)
 
 	fill_clip = Control.new()
 	fill_clip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	fill_clip.clip_contents = true
+	fill_clip.clip_contents = false
 	progress_container.add_child(fill_clip)
 
 	progress_fill = ColorRect.new()
 	progress_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var fill_mat := ShaderMaterial.new()
 	fill_mat.shader = LoadingBarRainbowShader
+	fill_mat.set_shader_parameter("color_a", LoadingBarLayoutServiceScript.VIOLET_A)
+	fill_mat.set_shader_parameter("color_b", LoadingBarLayoutServiceScript.VIOLET_B)
+	fill_mat.set_shader_parameter("color_c", LoadingBarLayoutServiceScript.VIOLET_C)
 	progress_fill.material = fill_mat
 	fill_clip.add_child(progress_fill)
 
 	shimmer_band = ColorRect.new()
 	shimmer_band.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	shimmer_band.color = Color(1.0, 1.0, 1.0, 0.28)
+	shimmer_band.visible = false
 	fill_clip.add_child(shimmer_band)
 
 
@@ -129,21 +130,25 @@ func _apply_status_label_style(ui_scale: float) -> void:
 func _create_panel(bg: Color, border: Color, radius: int, border_w: int = 2) -> Panel:
 	var panel := Panel.new()
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_theme_stylebox_override("panel", _flat_track_style(radius, border_w))
+	return panel
+
+
+func _flat_track_style(radius: int, border_w: int) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
-	style.bg_color = bg
-	style.border_color = border
+	style.bg_color = LoadingBarLayoutServiceScript.TRACK_BG
+	style.border_color = LoadingBarLayoutServiceScript.TRACK_BORDER
 	style.set_border_width_all(border_w)
 	style.set_corner_radius_all(radius)
 	style.set_content_margin_all(float(border_w))
-	panel.add_theme_stylebox_override("panel", style)
-	return panel
+	return style
 
 
 func layout_ui() -> void:
 	var viewport_size := get_viewport_rect().size
 	var scale := viewport_size.x / REF_WIDTH
-	var progress_w: float = minf(viewport_size.x * 0.82, 860.0 * scale)
-	var progress_h: float = 36.0 * scale
+	var progress_h: float = LoadingBarLayoutServiceScript.bar_height(scale)
+	var progress_w: float = LoadingBarLayoutServiceScript.transit_width(viewport_size.x)
 	var progress_x: float = (viewport_size.x - progress_w) * 0.5
 	var progress_y: float = viewport_size.y - progress_h - TRANSIT_BAR_BOTTOM_MARGIN * scale
 	if _is_boot:
@@ -156,20 +161,21 @@ func layout_ui() -> void:
 			cover,
 			BootCoverLayoutServiceScript.default_slot_size(cover.size.x)
 		)
-		progress_w = slot.size.x
-		progress_h = 32.0 * scale
-		progress_x = slot.position.x
+		progress_w = LoadingBarLayoutServiceScript.boot_width(viewport_size.x, slot.size.x)
+		progress_x = (viewport_size.x - progress_w) * 0.5
 		progress_y = slot.position.y + slot.size.y - progress_h
 		if status_label != null:
-			var label_h: float = maxf(slot.size.y - progress_h - 8.0 * scale, 56.0 * scale)
-			status_label.position = Vector2(slot.position.x, slot.position.y)
+			var gap: float = LoadingBarLayoutServiceScript.status_gap(scale)
+			var label_h: float = maxf(slot.size.y - progress_h - gap, 56.0 * scale)
+			status_label.position = Vector2(slot.position.x, slot.position.y - gap * 0.35)
 			status_label.size = Vector2(slot.size.x, label_h)
 			status_label.add_theme_font_size_override("font_size", int(64.0 * scale))
 			_apply_status_label_style(scale)
 	else:
 		if status_label != null:
 			var label_h := 80.0 * scale
-			status_label.position = Vector2(progress_x, progress_y - label_h - 12.0 * scale)
+			var gap: float = LoadingBarLayoutServiceScript.status_gap(scale)
+			status_label.position = Vector2(progress_x, progress_y - label_h - gap)
 			status_label.size = Vector2(progress_w, label_h)
 			status_label.add_theme_font_size_override("font_size", int(56.0 * scale))
 			_apply_status_label_style(scale)
@@ -181,6 +187,11 @@ func layout_ui() -> void:
 	progress_bar_height = inner_h
 	progress_container.position = Vector2(progress_x, progress_y)
 	progress_container.size = Vector2(progress_w, progress_h)
+	var radius: int = LoadingBarLayoutServiceScript.corner_radius(progress_h)
+	progress_container.add_theme_stylebox_override(
+		"panel",
+		_flat_track_style(radius, PROGRESS_TRACK_BORDER_W)
+	)
 	if fill_clip != null:
 		fill_clip.position = Vector2(border_w, border_w)
 	if progress_fill != null:
@@ -207,10 +218,6 @@ func _warmup_boot_resources() -> void:
 	for path in BOOT_WARMUP_PRELOADS:
 		if ResourceLoader.exists(path):
 			ResourceLoader.load(path)
-	_target_progress = maxf(
-		_target_progress,
-		LoadingProgressServiceScript.START_TARGET
-	)
 	_update_progress_visual()
 
 
@@ -278,8 +285,16 @@ func _update_progress_visual() -> void:
 	if fill_clip == null or progress_bar_max_width <= 0.0:
 		return
 	var pct := clampf(_display_progress, 0.0, 1.0)
-	var fill_w := progress_bar_max_width * pct
+	var fill_w: float = progress_bar_max_width * pct
+	if pct > 0.0:
+		fill_w = maxf(fill_w, progress_bar_height)
+	fill_w = minf(fill_w, progress_bar_max_width)
 	fill_clip.size = Vector2(fill_w, progress_bar_height)
+	if progress_fill != null:
+		progress_fill.size = Vector2(fill_w, progress_bar_height)
+		var fill_mat := progress_fill.material as ShaderMaterial
+		if fill_mat != null:
+			fill_mat.set_shader_parameter("bar_size", Vector2(fill_w, progress_bar_height))
 	if shimmer_band == null:
 		return
 	var band_w: float = maxf(progress_bar_height * 1.6, 36.0)

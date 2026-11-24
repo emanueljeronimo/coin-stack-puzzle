@@ -24,8 +24,10 @@ const BORDER_COLOR_OPTIONS: Array = [
 	{"id": "rosa_violeta", "color": Color(0.75, 0.30, 0.75), "label": "Rosa violeta"},
 ]
 
-## Aro dorado de la ficha comodin (ficha-comodin.png). El perfil ya no elige borde.
+## Aro dorado de la ficha comodin (ficha-comodin.png).
 const WILDCARD_BORDER_COLOR := Color(0.98, 0.78, 0.22, 1.0)
+## Aro de la foto de perfil: mismo violeta que el borde de los iconos HUD.
+const AVATAR_BORDER_COLOR := Color("#b183e9")
 
 static func sanitize_username(value: String, max_len: int = 20) -> String:
 	var cleaned := value.strip_edges()
@@ -47,6 +49,9 @@ static func default_border_color_id() -> String:
 
 static func wildcard_border_color() -> Color:
 	return WILDCARD_BORDER_COLOR
+
+static func avatar_border_color() -> Color:
+	return AVATAR_BORDER_COLOR
 
 static func avatar_path_for_id(avatar_id: String) -> String:
 	for opt in AVATAR_OPTIONS:

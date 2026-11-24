@@ -8,6 +8,7 @@ signal booster_purchased(booster_type: String, amount: int)
 const ShopTabServiceScript = preload("res://shop_tab_service.gd")
 const ShopCatalogServiceScript = preload("res://shop_catalog_service.gd")
 const GameBoosterServiceScript = preload("res://game_booster_service.gd")
+const TouchScrollServiceScript = preload("res://touch_scroll_service.gd")
 const DiamondIconTexture = preload("res://Imagenes/icono-diamante.png")
 const LifeIconTexture = preload("res://Imagenes/icono-vidas.png")
 const MixIconTexture = preload("res://Imagenes/icono-mezclar.png")
@@ -64,6 +65,11 @@ var _confirm_title: Label = null
 var _confirm_accept_btn: Button = null
 var _confirm_cancel_btn: Button = null
 var _pending_pack_id: String = ""
+var _shop_drag_pressing := false
+var _shop_drag_moved := false
+var _shop_drag_press_y := 0.0
+var _shop_drag_last_y := 0.0
+var _shop_ignore_click_until_msec := 0
 
 func _ready() -> void:
 	_cover_viewport()
@@ -82,14 +88,70 @@ func open() -> void:
 	visible = true
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	_opened_at_msec = Time.get_ticks_msec()
+	_shop_drag_pressing = false
+	_shop_drag_moved = false
 
 func close() -> void:
 	_hide_buy_confirm()
 	visible = false
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_shop_drag_pressing = false
+	_shop_drag_moved = false
 
 func is_open() -> bool:
 	return visible
+
+func _input(event: InputEvent) -> void:
+	if not visible:
+		return
+	if _confirm_root != null and _confirm_root.visible:
+		_shop_drag_pressing = false
+		return
+	if TouchScrollServiceScript.is_press(event):
+		var press_pos: Vector2 = TouchScrollServiceScript.event_position(event)
+		var scroll: ScrollContainer = _scroll_at_point(press_pos)
+		if scroll == null:
+			_shop_drag_pressing = false
+			return
+		_shop_drag_pressing = true
+		_shop_drag_moved = false
+		_shop_drag_press_y = press_pos.y
+		_shop_drag_last_y = press_pos.y
+		return
+	if TouchScrollServiceScript.is_release(event):
+		if _shop_drag_moved:
+			_shop_ignore_click_until_msec = Time.get_ticks_msec() + 250
+			get_viewport().set_input_as_handled()
+		_shop_drag_pressing = false
+		_shop_drag_moved = false
+		return
+	if not _shop_drag_pressing or not TouchScrollServiceScript.is_drag(event):
+		return
+	var scroll: ScrollContainer = _active_scroll()
+	if scroll == null:
+		return
+	var pos: Vector2 = TouchScrollServiceScript.event_position(event)
+	if not _shop_drag_moved and not TouchScrollServiceScript.should_start_drag(_shop_drag_press_y, pos.y):
+		return
+	_shop_drag_moved = true
+	var delta_y: float = TouchScrollServiceScript.drag_delta_y(event, _shop_drag_last_y)
+	scroll.scroll_vertical = TouchScrollServiceScript.next_scroll_vertical(scroll.scroll_vertical, delta_y)
+	_shop_drag_last_y = pos.y
+	get_viewport().set_input_as_handled()
+
+func _active_scroll() -> ScrollContainer:
+	for page in _pages:
+		if page != null and page.visible and page is ScrollContainer:
+			return page as ScrollContainer
+	return null
+
+func _scroll_at_point(point: Vector2) -> ScrollContainer:
+	var scroll: ScrollContainer = _active_scroll()
+	if scroll == null:
+		return null
+	if scroll.get_global_rect().has_point(point):
+		return scroll
+	return null
 
 func _on_background_theme_changed(_theme_id: String) -> void:
 	_apply_shop_identity()
@@ -293,7 +355,9 @@ func _build_store_page() -> Control:
 	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
 	scroll.mouse_filter = Control.MOUSE_FILTER_STOP
+	scroll.scroll_deadzone = int(TouchScrollServiceScript.DEADZONE)
 
 	var list := VBoxContainer.new()
 	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -334,7 +398,9 @@ func _build_resources_page() -> Control:
 	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
 	scroll.mouse_filter = Control.MOUSE_FILTER_STOP
+	scroll.scroll_deadzone = int(TouchScrollServiceScript.DEADZONE)
 
 	var list := HBoxContainer.new()
 	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -744,6 +810,8 @@ func _style_combo_cards() -> void:
 		buy.add_theme_stylebox_override("disabled", empty)
 
 func _on_buy_diamond_pack(pack_id: String) -> void:
+	if _shop_drag_moved or Time.get_ticks_msec() < _shop_ignore_click_until_msec:
+		return
 	var pack: Dictionary = ShopCatalogServiceScript.pack_by_id(pack_id)
 	if ShopCatalogServiceScript.is_resource_booster(pack):
 		if not ShopCatalogServiceScript.can_buy_resource(pack, _player_shop_level()):

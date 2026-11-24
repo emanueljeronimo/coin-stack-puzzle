@@ -43,6 +43,7 @@ const MixIconTexture = preload("res://Imagenes/icono-mezclar.png")
 const HammerIconTexture = preload("res://Imagenes/icono-martillo.png")
 const GloveIconTexture = preload("res://Imagenes/icono-mano.png")
 const DiamondIconTexture = preload("res://Imagenes/icono-diamante.png")
+const DiamondBannerTexture = preload("res://Imagenes/cartel-diamantes.png")
 const LifeIconTexture = preload("res://Imagenes/icono-vidas.png")
 const LevelUpStarsLeftTexture = preload("res://Imagenes/tres-estrellas-izq.png")
 const LevelUpStarsRightTexture = preload("res://Imagenes/tres-estrellas-der.png")
@@ -3807,7 +3808,8 @@ func build_mock_ui() -> void:
 	if life_parts.plus != null:
 		(life_parts.plus as Button).pressed.connect(_on_shop_pressed)
 		GameState.hook_button_sound(life_parts.plus as Button)
-	var diamonds_parts := HudTextureButtons.create_resource_chip(DiamondIconTexture, false)
+	var diamonds_parts := HudTextureButtons.create_resource_chip(null, false)
+	HudTextureButtons.set_resource_chip_banner(diamonds_parts, DiamondBannerTexture)
 	diamonds_chip_parts = diamonds_parts
 	diamonds_chip = diamonds_parts.panel
 	diamonds_chip_icon = diamonds_parts.icon
@@ -3953,16 +3955,12 @@ func layout_mock_ui() -> void:
 	var life_hang: float = HudTextureButtons.resource_chip_hang(
 		chip_h, HUD_RESOURCE_PILL_H_RATIO, HUD_LIFE_ICON_H_RATIO
 	)
-	var money_hang: float = HudTextureButtons.resource_chip_hang(
-		chip_h, HUD_RESOURCE_PILL_H_RATIO, HUD_MONEY_ICON_H_RATIO, HUD_MONEY_ICON_W_RATIO
-	)
+	var diamond_size: Vector2 = HudTextureButtons.texture_size_for_height(DiamondBannerTexture, chip_h)
 	var life_w: float = HudTextureButtons.resource_chip_visual_width(
 		chip_h, stat_w, HUD_RESOURCE_PILL_H_RATIO, HUD_LIFE_ICON_H_RATIO
 	)
-	var money_w: float = HudTextureButtons.resource_chip_visual_width(
-		chip_h, stat_w, HUD_RESOURCE_PILL_H_RATIO, HUD_MONEY_ICON_H_RATIO, HUD_MONEY_ICON_W_RATIO
-	)
-	var pair_gap: float = HudTextureButtons.resource_chip_pair_gap(chip_h, inner_gap, money_hang)
+	var money_w: float = diamond_size.x
+	var pair_gap: float = maxf(inner_gap, chip_h * 0.08)
 	var lives_on := GameState.lives_enabled()
 	var left_w: float = corner_w * 2.0 + inner_gap
 	var center_w: float = money_w
@@ -3980,16 +3978,12 @@ func layout_mock_ui() -> void:
 		life_hang = HudTextureButtons.resource_chip_hang(
 			chip_h, HUD_RESOURCE_PILL_H_RATIO, HUD_LIFE_ICON_H_RATIO
 		)
-		money_hang = HudTextureButtons.resource_chip_hang(
-			chip_h, HUD_RESOURCE_PILL_H_RATIO, HUD_MONEY_ICON_H_RATIO, HUD_MONEY_ICON_W_RATIO
-		)
+		diamond_size = HudTextureButtons.texture_size_for_height(DiamondBannerTexture, chip_h)
 		life_w = HudTextureButtons.resource_chip_visual_width(
 			chip_h, stat_w, HUD_RESOURCE_PILL_H_RATIO, HUD_LIFE_ICON_H_RATIO
 		)
-		money_w = HudTextureButtons.resource_chip_visual_width(
-			chip_h, stat_w, HUD_RESOURCE_PILL_H_RATIO, HUD_MONEY_ICON_H_RATIO, HUD_MONEY_ICON_W_RATIO
-		)
-		pair_gap = HudTextureButtons.resource_chip_pair_gap(chip_h, inner_gap, money_hang)
+		money_w = diamond_size.x
+		pair_gap = maxf(inner_gap, chip_h * 0.08)
 		left_w = corner_w * 2.0 + inner_gap
 		center_w = money_w
 		if lives_on:
@@ -4022,7 +4016,7 @@ func layout_mock_ui() -> void:
 	var max_center: float = settings_x - col_gap - center_w
 	center_x = clampf(center_x, min_center, maxf(min_center, max_center))
 
-	# pill_pos es el borde izquierdo del pill; el ícono cuelga hacia la izquierda.
+	var diamond_y: float = chip_y + (chip_h - diamond_size.y) * 0.5
 	if lives_on:
 		HudTextureButtons.layout_resource_chip(
 			life_chip_parts,
@@ -4034,28 +4028,16 @@ func layout_mock_ui() -> void:
 			HUD_LIFE_ICON_H_RATIO
 		)
 		if not diamonds_chip_parts.is_empty():
-			HudTextureButtons.layout_resource_chip(
+			HudTextureButtons.layout_banner_resource_chip(
 				diamonds_chip_parts,
-				Vector2(center_x + life_w + pair_gap + money_hang, chip_y),
-				stat_size,
-				0.38,
-				42,
-				HUD_RESOURCE_PILL_H_RATIO,
-				HUD_MONEY_ICON_H_RATIO,
-				HUD_MONEY_ICON_W_RATIO,
-				true
+				Vector2(center_x + life_w + pair_gap, diamond_y),
+				diamond_size
 			)
 	elif not diamonds_chip_parts.is_empty():
-		HudTextureButtons.layout_resource_chip(
+		HudTextureButtons.layout_banner_resource_chip(
 			diamonds_chip_parts,
-			Vector2(center_x + money_hang, chip_y),
-			stat_size,
-			0.38,
-			42,
-			HUD_RESOURCE_PILL_H_RATIO,
-			HUD_MONEY_ICON_H_RATIO,
-			HUD_MONEY_ICON_W_RATIO,
-			true
+			Vector2(center_x, diamond_y),
+			diamond_size
 		)
 
 	var progress_w = viewport_size.x * 0.78

@@ -1,9 +1,6 @@
 class_name HudTextureButtons
 extends RefCounted
 
-const LongButtonTexture := preload("res://Imagenes/boton-largo.png")
-const PlayPastelButtonTexture := preload("res://Imagenes/boton-nuevo.png")
-const PlayButtonTexture := preload("res://Imagenes/boton-nuevo.png")
 const UiFontServiceScript := preload("res://ui_font_service.gd")
 const LogoFont := preload("res://Fonts/Lobster-Regular.ttf")
 const StatFont := preload("res://Fonts/Lobster-Regular.ttf")
@@ -17,6 +14,9 @@ const PILL_GRAD_VERDE := Color(0.74, 0.91, 0.76, 0.94)
 const PILL_BG_META := "pill_bg"
 const RAINBOW_BG_META := "rainbow_fill_bg"
 const GOLD_BG_META := "gold_fill_bg"
+const BANNER_ART_META := "banner_art"
+const RESOURCE_BANNER_META := "resource_banner"
+const HudBannerLayoutServiceScript := preload("res://hud_banner_layout_service.gd")
 const GOLD_HI := Color(1.00, 0.95, 0.68)
 const GOLD_MID := Color(0.96, 0.78, 0.28)
 const GOLD_LO := Color(0.76, 0.46, 0.12)
@@ -437,13 +437,21 @@ static func style_inverted_gold_label(lbl: Label, scale: float = 1.0) -> void:
 	lbl.add_theme_color_override("font_outline_color", GOLD_BORDER)
 	lbl.add_theme_constant_override("outline_size", int(clampf(round(4.0 * scale), 3.0, 6.0)))
 
+static func style_banner_value_label(lbl: Label, scale: float = 1.0) -> void:
+	if lbl == null:
+		return
+	lbl.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 1.0))
+	lbl.add_theme_color_override("font_outline_color", Color(0.32, 0.14, 0.52, 0.92))
+	lbl.add_theme_constant_override("outline_size", int(clampf(round(3.0 * scale), 2.0, 5.0)))
+
 static func apply_gold_pill_style(
 	host: Control,
 	host_size: Vector2,
 	scale: float = 1.0,
 	radius: int = -1,
 	fill_alpha: float = 1.0,
-	colors: Dictionary = {}
+	colors: Dictionary = {},
+	border_width: int = -1
 ) -> void:
 	if host == null:
 		return
@@ -454,7 +462,9 @@ static func apply_gold_pill_style(
 	var corner: int = radius
 	if corner < 0:
 		corner = int(minf(host_size.x, host_size.y) * 0.50)
-	var border_w: int = gold_border_width(scale)
+	var border_w: int = border_width
+	if border_w < 0:
+		border_w = gold_border_width(scale)
 	border_col.a *= clampf(fill_alpha * 0.70 + 0.30, 0.30, 1.0)
 	var style: StyleBoxFlat = make_candy_style(mid, border_col, corner, border_w)
 	style.draw_center = false
@@ -486,6 +496,109 @@ static func apply_gold_pill_style(
 		maxf(host_size.y - float(border_w) * 2.0, 2.0)
 	)
 	bg.configure(maxi(corner - border_w, 4), hi, mid, lo, inner)
+
+static func texture_size_for_height(texture: Texture2D, height: float) -> Vector2:
+	var tex_size := Vector2.ZERO
+	if texture != null:
+		tex_size = texture.get_size()
+	return HudBannerLayoutServiceScript.size_for_height(tex_size, height)
+
+static func texture_size_for_width(texture: Texture2D, width: float) -> Vector2:
+	var tex_size := Vector2.ZERO
+	if texture != null:
+		tex_size = texture.get_size()
+	return HudBannerLayoutServiceScript.size_for_width(tex_size, width)
+
+static func apply_banner_art(host: Control, texture: Texture2D) -> void:
+	if host == null:
+		return
+	if host is Panel:
+		host.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	if host.has_meta(GOLD_BG_META):
+		var gold: TextureRect = host.get_meta(GOLD_BG_META)
+		if gold != null:
+			gold.visible = false
+	var art: TextureRect = null
+	if host.has_meta(BANNER_ART_META):
+		art = host.get_meta(BANNER_ART_META) as TextureRect
+	if art == null:
+		art = TextureRect.new()
+		art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		art.set_anchors_preset(Control.PRESET_FULL_RECT)
+		art.offset_left = 0.0
+		art.offset_top = 0.0
+		art.offset_right = 0.0
+		art.offset_bottom = 0.0
+		host.add_child(art)
+		host.move_child(art, 0)
+		host.set_meta(BANNER_ART_META, art)
+	art.texture = texture
+	art.visible = true
+
+static func set_resource_chip_banner(chip: Dictionary, texture: Texture2D) -> void:
+	chip[RESOURCE_BANNER_META] = true
+	var icon_wrap: Control = chip.get("heart", null) as Control
+	if icon_wrap != null:
+		icon_wrap.visible = false
+	var icon: TextureRect = chip.get("icon", null) as TextureRect
+	if icon != null:
+		icon.visible = false
+		icon.texture = null
+	var plus: Button = chip.get("plus", null) as Button
+	if plus != null:
+		plus.visible = false
+	var pill: Control = chip.get("pill", null) as Control
+	if pill != null:
+		pill.clip_contents = false
+		apply_banner_art(pill, texture)
+
+static func layout_banner_resource_chip(chip: Dictionary, pos: Vector2, size: Vector2) -> void:
+	var root: Control = chip.get("root", chip.get("panel", null)) as Control
+	if root == null:
+		return
+	root.position = pos
+	root.size = size
+	var shadow: Panel = chip.get("shadow", null) as Panel
+	if shadow != null:
+		shadow.visible = false
+	var icon_wrap: Control = chip.get("heart", null) as Control
+	if icon_wrap != null:
+		icon_wrap.visible = false
+	var plus: Button = chip.get("plus", null) as Button
+	if plus != null:
+		plus.visible = false
+	var pill: Control = chip.get("pill", null) as Control
+	if pill != null:
+		pill.position = Vector2.ZERO
+		pill.size = size
+		pill.clip_contents = false
+		if pill.has_meta(GOLD_BG_META):
+			var gold: TextureRect = pill.get_meta(GOLD_BG_META)
+			if gold != null:
+				gold.visible = false
+		if pill is Panel:
+			pill.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	var value: Label = chip.get("label", null) as Label
+	if value == null:
+		return
+	var label_rect: Rect2 = HudBannerLayoutServiceScript.diamond_label_rect(size)
+	value.position = label_rect.position
+	value.size = label_rect.size
+	value.clip_text = true
+	value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	value.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	var ui_scale: float = clampf(size.y / 50.0, 0.75, 1.4)
+	style_banner_value_label(value, ui_scale)
+	var desired_font := int(clampf(
+		size.y * HudBannerLayoutServiceScript.BANNER_VALUE_FONT_RATIO,
+		float(RESOURCE_VALUE_FONT_MIN),
+		float(HudBannerLayoutServiceScript.BANNER_VALUE_FONT_MAX)
+	))
+	value.set_meta("fit_max_w", label_rect.size.x)
+	value.set_meta("fit_desired", desired_font)
+	fit_resource_value_label(value)
 
 static func apply_candy_button_style(btn: Control, btn_size: Vector2, scale: float = 1.0) -> void:
 	if btn == null:
@@ -894,7 +1007,7 @@ static func create_button_label(text: String, font_size: int) -> Label:
 	return lbl
 
 static func create_long_icon_text(icon_texture: Texture2D, text: String, font_size: int = CHIP_STAT_FONT_SIZE) -> TextureButton:
-	var btn := create_base(LongButtonTexture)
+	var btn := create_base(null)
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -921,13 +1034,13 @@ static func create_long_icon_text(icon_texture: Texture2D, text: String, font_si
 	return btn
 
 static func create_play_pastel() -> TextureButton:
-	return create_base(PlayPastelButtonTexture)
+	return create_base(null)
 
 static func create_play() -> TextureButton:
-	return create_base(PlayButtonTexture)
+	return create_base(null)
 
 static func create_long_text(text: String, font_size: int) -> TextureButton:
-	var btn := create_base(LongButtonTexture)
+	var btn := create_base(null)
 	var lbl := create_button_label(text, font_size)
 	lbl.set_anchors_preset(Control.PRESET_FULL_RECT)
 	btn.add_child(lbl)
