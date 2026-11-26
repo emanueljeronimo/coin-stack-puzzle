@@ -32,8 +32,18 @@ func _test_username_sanitize() -> void:
 	_ok("username_sanitize")
 
 func _test_lookup_defaults() -> void:
-	if ProfileRepositoryScript.default_avatar_id().is_empty():
-		_fail("default_avatar_id")
+	if ProfileRepositoryScript.default_avatar_id() != "conejo":
+		_fail("default_avatar_id", ProfileRepositoryScript.default_avatar_id())
+		return
+	var options: Array = ProfileRepositoryScript.avatar_options()
+	if options.size() != 10:
+		_fail("avatar_count", str(options.size()))
+		return
+	if ProfileRepositoryScript.avatar_path_for_id("flores") != "res://Imagenes/avatars/avatar-flores.png":
+		_fail("new_avatar_flores", ProfileRepositoryScript.avatar_path_for_id("flores"))
+		return
+	if ProfileRepositoryScript.avatar_path_for_id("mariposa") != "":
+		_fail("removed_avatar_still_listed")
 		return
 	if ProfileRepositoryScript.avatar_path_for_id("inexistente") != "":
 		_fail("unknown_avatar_returns_empty")

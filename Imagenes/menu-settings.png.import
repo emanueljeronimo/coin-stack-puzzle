@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cdewfqilp1h4f"
-path="res://.godot/imported/avatar-buho.png-322882ffe0930d44bf89b633c42073db.ctex"
+uid="uid://cudp885rdfxyi"
+path="res://.godot/imported/menu-settings.png-53207047753577ef9de0a6dbc52d29e7.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Imagenes/avatars/avatar-buho.png"
-dest_files=["res://.godot/imported/avatar-buho.png-322882ffe0930d44bf89b633c42073db.ctex"]
+source_file="res://Imagenes/menu-settings.png"
+dest_files=["res://.godot/imported/menu-settings.png-53207047753577ef9de0a6dbc52d29e7.ctex"]
 
 [params]
 

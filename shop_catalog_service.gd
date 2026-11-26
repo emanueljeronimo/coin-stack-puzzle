@@ -279,7 +279,8 @@ static func confirm_icon_keys(pack: Dictionary) -> PackedStringArray:
 		keys.append(str(pack.get("booster_type", "mix")))
 		keys.append("diamonds")
 		return keys
-	keys.append("diamonds")
+	for _i in range(4):
+		keys.append("diamonds")
 	return keys
 
 static func apply_booster_uses(counts: Dictionary, booster_type: String, amount: int) -> Dictionary:

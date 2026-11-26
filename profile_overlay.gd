@@ -3,54 +3,45 @@ extends Control
 
 signal profile_saved
 
-const REF_WIDTH := 1080.0
+const ProfileFrameLayoutServiceScript = preload("res://profile_frame_layout_service.gd")
+const FrameTexture = preload("res://Imagenes/menu-perfil.png")
+const EditFrameTexture = preload("res://Imagenes/menu-perfil-2.png")
 const LogoFont = preload("res://Fonts/Lobster-Regular.ttf")
 const StarIcon = preload("res://Imagenes/ficha-comodin.png")
 const CalendarIcon = preload("res://Imagenes/icono-login-diario.png")
-const CLOSE_RED := Color(0.90, 0.22, 0.24, 1.0)
-const CLOSE_RED_BORDER := Color(0.55, 0.10, 0.12, 1.0)
 const SELECT_GREEN := Color(0.32, 0.86, 0.28, 1.0)
-const TEXT_OUTLINE := Color(0.0, 0.0, 0.0, 1.0)
-const TITLE_OUTLINE := 12
-const LABEL_OUTLINE := 8
-const BUTTON_OUTLINE := 8
+const TEXT_OUTLINE := Color(0.22, 0.10, 0.38, 0.88)
+const TITLE_FILL := Color(0.42, 0.20, 0.60, 1.0)
+const TITLE_OUTLINE := Color(1.00, 0.96, 0.92, 0.85)
+const PILL_TEXT := Color(1.00, 0.98, 0.96, 1.0)
+const PILL_OUTLINE := Color(0.62, 0.18, 0.48, 0.90)
+const NAME_FILL := Color(1.00, 0.98, 0.96, 1.0)
+const STAT_INK := Color(0.42, 0.20, 0.60, 1.0)
 const PAGE_VIEW := 0
 const PAGE_EDIT := 1
 
 var overlay: ColorRect = null
 var card: Panel = null
-var card_margin: MarginContainer = null
-var main_vbox: VBoxContainer = null
-var header: Control = null
+var frame_art: TextureRect = null
 var title_label: Label = null
 var close_btn: Button = null
-var view_box: VBoxContainer = null
-var edit_box: VBoxContainer = null
-var view_name_bar: Panel = null
-var view_name_margin: MarginContainer = null
-var view_preview_frame: Panel = null
-var view_preview_avatar: TextureRect = null
+var preview_frame: Panel = null
+var preview_avatar: TextureRect = null
 var view_name_label: Label = null
-var edit_profile_btn: Button = null
-var stats_well: Panel = null
-var stats_margin: MarginContainer = null
-var _level_value_label: Label = null
-var _days_value_label: Label = null
-var _stat_labels: Array[Label] = []
-var _stat_chips: Array[Panel] = []
-var edit_name_bar: Panel = null
-var edit_name_margin: MarginContainer = null
-var edit_preview_frame: Panel = null
-var edit_preview_avatar: TextureRect = null
 var name_label: Label = null
 var name_edit: LineEdit = null
 var edit_name_btn: Button = null
-var avatar_well: Panel = null
-var well_margin: MarginContainer = null
-var avatar_grid: GridContainer = null
-var avatar_cells: Array = []
+var edit_profile_btn: Button = null
+var edit_profile_label: Label = null
 var save_btn: Button = null
-var _pending_avatar_id: String = "mariposa"
+var save_label: Label = null
+var avatar_well: Panel = null
+var avatar_cells: Array = []
+var _stat_labels: Array[Label] = []
+var _stat_chips: Array[Panel] = []
+var _level_value_label: Label = null
+var _days_value_label: Label = null
+var _pending_avatar_id: String = "conejo"
 var _pending_username: String = ""
 var _editing_name: bool = false
 var _page: int = PAGE_VIEW
@@ -97,159 +88,158 @@ func is_open() -> bool:
 func layout_for_viewport(viewport_size: Vector2) -> void:
 	if card == null:
 		return
-	var scale := viewport_size.x / REF_WIDTH
-	var card_w := viewport_size.x * 0.76
-	var outer_pad := int(20.0 * scale)
-	var top_pad := int(24.0 * scale)
-	var bottom_pad := int(24.0 * scale)
-	var sep := int(18.0 * scale)
-	if card_margin != null:
-		card_margin.add_theme_constant_override("margin_left", outer_pad)
-		card_margin.add_theme_constant_override("margin_top", top_pad)
-		card_margin.add_theme_constant_override("margin_right", outer_pad)
-		card_margin.add_theme_constant_override("margin_bottom", bottom_pad)
-	if main_vbox != null:
-		main_vbox.add_theme_constant_override("separation", sep)
-	if view_box != null:
-		view_box.add_theme_constant_override("separation", sep)
-	if edit_box != null:
-		edit_box.add_theme_constant_override("separation", sep)
-
-	var header_h := 72.0 * scale
-	if header != null:
-		header.custom_minimum_size = Vector2(0, header_h)
-	if title_label != null:
-		title_label.add_theme_font_size_override("font_size", int(58 * scale))
-		title_label.add_theme_constant_override("outline_size", int(TITLE_OUTLINE * scale))
-	if close_btn != null:
-		var close_side := 64.0 * scale
-		close_btn.custom_minimum_size = Vector2(close_side, close_side)
-		close_btn.add_theme_font_size_override("font_size", int(36 * scale))
-		close_btn.add_theme_constant_override("outline_size", int(BUTTON_OUTLINE * scale))
-		close_btn.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
-		close_btn.offset_left = -close_side
-		close_btn.offset_top = -close_side * 0.5
-		close_btn.offset_right = 0
-		close_btn.offset_bottom = close_side * 0.5
-
-	var name_pad := int(12.0 * scale)
-	var preview_side := 128.0 * scale
-	var name_h := preview_side + float(name_pad) * 2.0
-	for margin in [view_name_margin, edit_name_margin]:
-		if margin == null:
-			continue
-		margin.add_theme_constant_override("margin_left", name_pad)
-		margin.add_theme_constant_override("margin_top", name_pad)
-		margin.add_theme_constant_override("margin_right", name_pad)
-		margin.add_theme_constant_override("margin_bottom", name_pad)
-	for bar in [view_name_bar, edit_name_bar]:
-		if bar != null:
-			bar.custom_minimum_size = Vector2(0, name_h)
-	_layout_preview_frame(view_preview_frame, view_preview_avatar, preview_side)
-	_layout_preview_frame(edit_preview_frame, edit_preview_avatar, preview_side)
-	if view_name_label != null:
-		view_name_label.add_theme_font_size_override("font_size", int(42 * scale))
-		view_name_label.add_theme_constant_override("outline_size", int(LABEL_OUTLINE * scale))
-	if name_label != null:
-		name_label.add_theme_font_size_override("font_size", int(42 * scale))
-		name_label.add_theme_constant_override("outline_size", int(LABEL_OUTLINE * scale))
-	if name_edit != null:
-		name_edit.add_theme_font_size_override("font_size", int(38 * scale))
-		name_edit.custom_minimum_size = Vector2(280.0 * scale, 64.0 * scale)
-	if edit_name_btn != null:
-		edit_name_btn.custom_minimum_size = Vector2(60.0 * scale, 60.0 * scale)
-		edit_name_btn.add_theme_font_size_override("font_size", int(32 * scale))
-		edit_name_btn.add_theme_constant_override("outline_size", int(BUTTON_OUTLINE * scale))
-
-	var action_h := 74.0 * scale
-	var action_font := int(38 * scale)
-	for btn in [edit_profile_btn, save_btn]:
-		if btn == null:
-			continue
-		btn.custom_minimum_size = Vector2(0, action_h)
-		btn.add_theme_font_size_override("font_size", action_font)
-		btn.add_theme_constant_override("outline_size", int(BUTTON_OUTLINE * scale))
-
-	var stat_h := 88.0 * scale
-	var stats_pad := int(14.0 * scale)
-	if stats_margin != null:
-		stats_margin.add_theme_constant_override("margin_left", stats_pad)
-		stats_margin.add_theme_constant_override("margin_top", stats_pad)
-		stats_margin.add_theme_constant_override("margin_right", stats_pad)
-		stats_margin.add_theme_constant_override("margin_bottom", stats_pad)
-	for lbl in _stat_labels:
-		lbl.add_theme_font_size_override("font_size", int(36 * scale))
-		lbl.add_theme_constant_override("outline_size", int(LABEL_OUTLINE * scale))
-	var chip_side := 88.0 * scale
-	var icon_side := 40.0 * scale
-	for chip in _stat_chips:
-		chip.custom_minimum_size = Vector2(chip_side * 1.35, chip_side)
-		var icon_node: Variant = chip.get_meta("icon", null)
-		if icon_node is TextureRect:
-			(icon_node as TextureRect).custom_minimum_size = Vector2(icon_side, icon_side)
-	for value_lbl in [_level_value_label, _days_value_label]:
-		if value_lbl == null:
-			continue
-		value_lbl.add_theme_font_size_override("font_size", int(36 * scale))
-		value_lbl.add_theme_constant_override("outline_size", int(LABEL_OUTLINE * scale))
-	var stats_h := stat_h * 2.0 + float(sep) + float(stats_pad) * 2.0
-	if stats_well != null:
-		stats_well.custom_minimum_size = Vector2(0, stats_h)
-
-	var well_pad := int(14.0 * scale)
-	if well_margin != null:
-		well_margin.add_theme_constant_override("margin_left", well_pad)
-		well_margin.add_theme_constant_override("margin_top", well_pad)
-		well_margin.add_theme_constant_override("margin_right", well_pad)
-		well_margin.add_theme_constant_override("margin_bottom", well_pad)
-	var gap := 14.0 * scale
-	if avatar_grid != null:
-		avatar_grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		avatar_grid.add_theme_constant_override("h_separation", int(gap))
-		avatar_grid.add_theme_constant_override("v_separation", int(gap))
-	var grid_w := card_w - float(outer_pad) * 2.0 - float(well_pad) * 2.0
-	var side := (grid_w - gap * 2.0) / 3.0
-	var extra_h := 96.0 * scale
-	var max_card := viewport_size.y * 0.92
-	var chrome := (
-		header_h
-		+ name_h
-		+ action_h
-		+ float(sep) * 3.0
-		+ float(top_pad + bottom_pad)
-		+ float(well_pad) * 2.0
-		+ extra_h
+	var editing := _page == PAGE_EDIT
+	var frame_tex: Texture2D = EditFrameTexture if editing else FrameTexture
+	var tex_size := Vector2(1325, 1187)
+	if frame_tex != null:
+		tex_size = frame_tex.get_size()
+	var card_size: Vector2 = ProfileFrameLayoutServiceScript.card_size(viewport_size, tex_size)
+	card.size = card_size
+	card.position = Vector2(
+		(viewport_size.x - card_size.x) * 0.5,
+		(viewport_size.y - card_size.y) * 0.5
 	)
-	var max_grid_h := maxf(max_card - chrome, 240.0 * scale)
-	side = minf(side, (max_grid_h - gap * 2.0) / 3.0)
-	for cell_node in avatar_cells:
-		if cell_node is Control:
-			(cell_node as Control).custom_minimum_size = Vector2(side, side)
-			(cell_node as Control).size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-			_layout_avatar_check(cell_node as Control, scale)
-	var rows := ceili(float(maxi(avatar_cells.size(), 1)) / 3.0)
-	var grid_h := side * float(rows) + gap * float(maxi(rows - 1, 0))
-	var well_h := grid_h + float(well_pad) * 2.0 + extra_h
+	if frame_art != null:
+		frame_art.texture = frame_tex
+		frame_art.position = Vector2.ZERO
+		frame_art.size = card_size
+	_place_mapped(title_label, card_size, ProfileFrameLayoutServiceScript.TITLE_FRAC)
+	if title_label != null:
+		var title_h: float = ProfileFrameLayoutServiceScript.mapped_rect(
+			card_size,
+			ProfileFrameLayoutServiceScript.TITLE_FRAC
+		).size.y
+		var title_font: int = ProfileFrameLayoutServiceScript.title_font_size(title_h)
+		title_label.add_theme_font_size_override("font_size", title_font)
+		title_label.add_theme_constant_override("outline_size", maxi(int(round(float(title_font) * 0.10)), 4))
+	_place_mapped(close_btn, card_size, ProfileFrameLayoutServiceScript.CLOSE_FRAC)
+	if editing:
+		_layout_identity(
+			card_size,
+			ProfileFrameLayoutServiceScript.EDIT_AVATAR_FRAC,
+			ProfileFrameLayoutServiceScript.EDIT_NAME_FRAC
+		)
+		_layout_action_pill(
+			save_btn,
+			save_label,
+			ProfileFrameLayoutServiceScript.mapped_rect(card_size, ProfileFrameLayoutServiceScript.EDIT_ACTION_FRAC),
+			ProfileFrameLayoutServiceScript.mapped_rect(card_size, ProfileFrameLayoutServiceScript.EDIT_ACTION_TEXT_FRAC)
+		)
+		_layout_edit_cells(card_size)
+	else:
+		_layout_identity(
+			card_size,
+			ProfileFrameLayoutServiceScript.AVATAR_FRAC,
+			ProfileFrameLayoutServiceScript.NAME_FRAC
+		)
+		_layout_action_pill(
+			edit_profile_btn,
+			edit_profile_label,
+			ProfileFrameLayoutServiceScript.mapped_rect(card_size, ProfileFrameLayoutServiceScript.ACTION_FRAC),
+			ProfileFrameLayoutServiceScript.mapped_rect(card_size, ProfileFrameLayoutServiceScript.ACTION_TEXT_FRAC)
+		)
+		_layout_stats(card_size)
+
+func _layout_identity(card_size: Vector2, avatar_frac: Rect2, name_frac: Rect2) -> void:
+	var avatar_rect: Rect2 = ProfileFrameLayoutServiceScript.mapped_rect(card_size, avatar_frac)
+	_place_rect(preview_frame, avatar_rect)
+	_layout_preview_frame(preview_frame, preview_avatar, avatar_rect.size)
+	var name_rect: Rect2 = ProfileFrameLayoutServiceScript.mapped_rect(card_size, name_frac)
+	_place_rect(view_name_label, name_rect)
+	var name_font: int = ProfileFrameLayoutServiceScript.name_font_size(name_rect.size.y)
+	if view_name_label != null:
+		view_name_label.add_theme_font_size_override("font_size", name_font)
+		view_name_label.add_theme_constant_override("outline_size", maxi(int(round(float(name_font) * 0.12)), 4))
+	var pencil_side: float = minf(name_rect.size.y * 0.82, 56.0)
+	var pencil_rect := Rect2(
+		name_rect.position.x + name_rect.size.x - pencil_side,
+		name_rect.position.y + (name_rect.size.y - pencil_side) * 0.5,
+		pencil_side,
+		pencil_side
+	)
+	var edit_name_rect := Rect2(
+		name_rect.position,
+		Vector2(maxf(name_rect.size.x - pencil_side - 8.0, 40.0), name_rect.size.y)
+	)
+	_place_rect(name_label, edit_name_rect)
+	_place_rect(name_edit, edit_name_rect)
+	_place_rect(edit_name_btn, pencil_rect)
+	if name_label != null:
+		name_label.add_theme_font_size_override("font_size", name_font)
+		name_label.add_theme_constant_override("outline_size", maxi(int(round(float(name_font) * 0.12)), 4))
+	if name_edit != null:
+		name_edit.add_theme_font_size_override("font_size", maxi(name_font - 4, 22))
+		name_edit.custom_minimum_size = Vector2.ZERO
+	if edit_name_btn != null:
+		edit_name_btn.custom_minimum_size = Vector2.ZERO
+		edit_name_btn.add_theme_font_size_override("font_size", int(clampf(pencil_side * 0.55, 22.0, 36.0)))
+
+func _layout_stats(card_size: Vector2) -> void:
+	for i in range(_stat_labels.size()):
+		var label_frac: Rect2 = ProfileFrameLayoutServiceScript.STAT_LABEL_FRACS[mini(i, 1)]
+		var chip_frac: Rect2 = ProfileFrameLayoutServiceScript.STAT_CHIP_FRACS[mini(i, 1)]
+		var label_rect: Rect2 = ProfileFrameLayoutServiceScript.mapped_rect(card_size, label_frac)
+		var chip_rect: Rect2 = ProfileFrameLayoutServiceScript.mapped_rect(card_size, chip_frac)
+		_place_rect(_stat_labels[i], label_rect)
+		var stat_font: int = ProfileFrameLayoutServiceScript.stat_font_size(label_rect.size.y)
+		_stat_labels[i].add_theme_font_size_override("font_size", stat_font)
+		_stat_labels[i].add_theme_constant_override("outline_size", maxi(int(round(float(stat_font) * 0.10)), 3))
+		if i < _stat_chips.size():
+			_place_rect(_stat_chips[i], chip_rect)
+			var icon_node: Variant = _stat_chips[i].get_meta("icon", null)
+			var icon_side: float = ProfileFrameLayoutServiceScript.chip_icon_side(chip_rect.size.y)
+			if icon_node is TextureRect:
+				(icon_node as TextureRect).custom_minimum_size = Vector2(icon_side, icon_side)
+			var value_lbl: Label = _level_value_label if i == 0 else _days_value_label
+			if value_lbl != null:
+				var chip_font: int = ProfileFrameLayoutServiceScript.chip_font_size(chip_rect.size.y)
+				value_lbl.add_theme_font_size_override("font_size", chip_font)
+				value_lbl.add_theme_constant_override("outline_size", maxi(int(round(float(chip_font) * 0.12)), 3))
+
+func _layout_edit_cells(card_size: Vector2) -> void:
 	if avatar_well != null:
-		avatar_well.custom_minimum_size = Vector2(0, well_h)
-	if stats_well != null:
-		stats_well.custom_minimum_size = Vector2(0, stats_h + extra_h)
+		avatar_well.position = Vector2.ZERO
+		avatar_well.size = card_size
+	for i in range(avatar_cells.size()):
+		var cell_node: Variant = avatar_cells[i]
+		if not (cell_node is Control):
+			continue
+		var cell := cell_node as Control
+		var cell_rect: Rect2 = ProfileFrameLayoutServiceScript.edit_cell_rect(card_size, i)
+		if cell_rect.size.x <= 0.0:
+			cell.visible = false
+			continue
+		cell.visible = true
+		cell.custom_minimum_size = Vector2.ZERO
+		_place_rect(cell, cell_rect)
+		_layout_avatar_check(cell, cell_rect.size.y / 140.0)
 
-	var view_h := name_h + action_h + stats_h + extra_h + float(sep) * 2.0
-	var edit_h := name_h + well_h + action_h + float(sep) * 2.0
-	var page_h := edit_h if _page == PAGE_EDIT else view_h
-	var content_h := header_h + page_h + float(sep) + float(top_pad + bottom_pad)
-	var card_h := mini(content_h, max_card)
-	card.size = Vector2(card_w, card_h)
-	card.position = Vector2((viewport_size.x - card_w) * 0.5, (viewport_size.y - card_h) * 0.5)
+func _place_mapped(node: Control, card_size: Vector2, frac: Rect2) -> void:
+	_place_rect(node, ProfileFrameLayoutServiceScript.mapped_rect(card_size, frac))
 
-func _layout_preview_frame(frame: Panel, avatar: TextureRect, side: float) -> void:
+func _place_rect(node: Control, rect: Rect2) -> void:
+	if node == null:
+		return
+	node.position = rect.position
+	node.size = rect.size
+
+func _layout_action_pill(btn: Button, lbl: Label, hit_rect: Rect2, text_rect: Rect2) -> void:
+	if btn != null:
+		btn.custom_minimum_size = Vector2.ZERO
+		btn.position = hit_rect.position
+		btn.size = hit_rect.size
+	if lbl != null:
+		lbl.position = text_rect.position
+		lbl.size = text_rect.size
+		var font_size: int = ProfileFrameLayoutServiceScript.action_font_size(hit_rect.size.y)
+		lbl.add_theme_font_size_override("font_size", font_size)
+		lbl.add_theme_constant_override("outline_size", maxi(int(round(float(font_size) * 0.12)), 4))
+
+func _layout_preview_frame(frame: Panel, avatar: TextureRect, size: Vector2) -> void:
 	if frame == null:
 		return
-	frame.custom_minimum_size = Vector2(side, side)
-	frame.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-	frame.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	_apply_preview_frame_style(frame, avatar, side)
+	frame.custom_minimum_size = Vector2.ZERO
+	_apply_preview_frame_style(frame, avatar, size)
 
 func _layout_avatar_check(cell: Control, scale: float) -> void:
 	var check: Variant = cell.get_meta("check", null)
@@ -264,13 +254,18 @@ func _layout_avatar_check(cell: Control, scale: float) -> void:
 	badge.offset_bottom = -inset
 	var mark: Variant = cell.get_meta("check_mark", null)
 	if mark is Label:
-		(mark as Label).add_theme_font_size_override("font_size", int(18 * scale))
+		(mark as Label).add_theme_font_size_override("font_size", int(18.0 * scale))
 	var btn: Variant = cell.get_meta("btn", null)
 	if btn is TextureButton:
-		var side := maxf(cell.custom_minimum_size.x, 1.0)
-		var pad := 5.0
+		var tex_btn := btn as TextureButton
+		var side := maxf(minf(cell.size.x, cell.size.y), 1.0)
+		var pad: float = ProfileFrameLayoutServiceScript.edit_cell_image_pad(side)
+		tex_btn.offset_left = pad
+		tex_btn.offset_top = pad
+		tex_btn.offset_right = -pad
+		tex_btn.offset_bottom = -pad
 		var inner := maxf(side - pad * 2.0, 1.0)
-		HudTextureButtons.apply_rounded_clip(btn as TextureButton, Vector2(inner, inner), inner * 0.30)
+		HudTextureButtons.apply_rounded_clip(tex_btn, Vector2(inner, inner), inner * 0.18)
 
 func _build_ui() -> void:
 	overlay = ColorRect.new()
@@ -282,222 +277,128 @@ func _build_ui() -> void:
 
 	card = Panel.new()
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
+	card.clip_contents = false
+	card.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 	add_child(card)
 
-	card_margin = MarginContainer.new()
-	card_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	card.add_child(card_margin)
-
-	main_vbox = VBoxContainer.new()
-	main_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	main_vbox.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	card_margin.add_child(main_vbox)
-
-	header = Control.new()
-	header.custom_minimum_size = Vector2(0, 58)
-	header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	main_vbox.add_child(header)
+	frame_art = TextureRect.new()
+	frame_art.texture = FrameTexture
+	frame_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	frame_art.stretch_mode = TextureRect.STRETCH_SCALE
+	frame_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(frame_art)
 
 	title_label = _make_outlined_label("Perfil", 52)
-	title_label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	header.add_child(title_label)
+	title_label.clip_text = false
+	card.add_child(title_label)
 
-	close_btn = Button.new()
-	close_btn.text = "✕"
-	close_btn.focus_mode = Control.FOCUS_NONE
-	close_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	if LogoFont != null:
-		close_btn.add_theme_font_override("font", LogoFont)
+	close_btn = _make_empty_button()
 	close_btn.pressed.connect(_on_close_pressed)
-	GameState.hook_button_sound(close_btn)
-	header.add_child(close_btn)
+	card.add_child(close_btn)
 
-	view_box = VBoxContainer.new()
-	view_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	main_vbox.add_child(view_box)
+	preview_frame = Panel.new()
+	preview_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	preview_frame.clip_contents = true
+	preview_frame.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	card.add_child(preview_frame)
 
-	var view_identity := _make_identity_bar(false)
-	view_name_bar = view_identity["bar"]
-	view_name_margin = view_identity["margin"]
-	view_preview_frame = view_identity["frame"]
-	view_preview_avatar = view_identity["avatar"]
-	view_name_label = view_identity["label"]
-	view_box.add_child(view_name_bar)
+	preview_avatar = TextureRect.new()
+	preview_avatar.set_anchors_preset(Control.PRESET_FULL_RECT)
+	preview_avatar.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	preview_avatar.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	preview_avatar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	preview_frame.add_child(preview_avatar)
 
-	edit_profile_btn = _make_action_button("Editar perfil")
+	view_name_label = _make_outlined_label("", 42)
+	view_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	view_name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	card.add_child(view_name_label)
+
+	name_label = _make_outlined_label("", 42)
+	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	name_label.mouse_filter = Control.MOUSE_FILTER_STOP
+	name_label.mouse_default_cursor_shape = Control.CURSOR_IBEAM
+	name_label.gui_input.connect(_on_name_label_gui_input)
+	card.add_child(name_label)
+
+	name_edit = LineEdit.new()
+	name_edit.max_length = 20
+	name_edit.placeholder_text = "Tu nombre"
+	name_edit.visible = false
+	name_edit.clear_button_enabled = true
+	name_edit.caret_blink = true
+	if LogoFont != null:
+		name_edit.add_theme_font_override("font", LogoFont)
+	name_edit.text_changed.connect(_on_name_edit_changed)
+	name_edit.text_submitted.connect(func(_t: String) -> void: _set_editing_name(false))
+	card.add_child(name_edit)
+
+	edit_name_btn = _make_empty_button()
+	edit_name_btn.text = "✎"
+	if LogoFont != null:
+		edit_name_btn.add_theme_font_override("font", LogoFont)
+	edit_name_btn.add_theme_color_override("font_color", PILL_TEXT)
+	edit_name_btn.add_theme_color_override("font_outline_color", TEXT_OUTLINE)
+	edit_name_btn.add_theme_constant_override("outline_size", 6)
+	edit_name_btn.pressed.connect(_on_edit_name_pressed)
+	card.add_child(edit_name_btn)
+
+	edit_profile_btn = _make_empty_button()
 	edit_profile_btn.pressed.connect(_on_edit_profile_pressed)
-	view_box.add_child(edit_profile_btn)
+	card.add_child(edit_profile_btn)
+	edit_profile_label = _make_outlined_label("Editar perfil", 40)
+	edit_profile_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	edit_profile_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	card.add_child(edit_profile_label)
 
-	stats_well = Panel.new()
-	stats_well.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	view_box.add_child(stats_well)
+	save_btn = _make_empty_button()
+	save_btn.pressed.connect(_on_save_pressed)
+	card.add_child(save_btn)
+	save_label = _make_outlined_label("Guardar", 40)
+	save_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	save_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	card.add_child(save_label)
 
-	stats_margin = MarginContainer.new()
-	stats_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	stats_well.add_child(stats_margin)
-
-	var stats_box := VBoxContainer.new()
-	stats_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	stats_box.add_theme_constant_override("separation", 14)
-	stats_margin.add_child(stats_box)
-	_add_stat_row(stats_box, "Nivel actual", StarIcon, true)
-	_add_stat_row(stats_box, "Días jugados", CalendarIcon, false)
-
-	edit_box = VBoxContainer.new()
-	edit_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	edit_box.visible = false
-	main_vbox.add_child(edit_box)
-
-	var edit_identity := _make_identity_bar(true)
-	edit_name_bar = edit_identity["bar"]
-	edit_name_margin = edit_identity["margin"]
-	edit_preview_frame = edit_identity["frame"]
-	edit_preview_avatar = edit_identity["avatar"]
-	name_label = edit_identity["label"]
-	name_edit = edit_identity["edit"]
-	edit_name_btn = edit_identity["pencil"]
-	edit_box.add_child(edit_name_bar)
+	_add_stat_row("Nivel actual", StarIcon, true)
+	_add_stat_row("Días jugados", CalendarIcon, false)
 
 	avatar_well = Panel.new()
-	avatar_well.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	avatar_well.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	edit_box.add_child(avatar_well)
-
-	well_margin = MarginContainer.new()
-	well_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	avatar_well.add_child(well_margin)
-
-	var grid_center := CenterContainer.new()
-	grid_center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	grid_center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	grid_center.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	well_margin.add_child(grid_center)
-
-	avatar_grid = GridContainer.new()
-	avatar_grid.columns = 3
-	avatar_grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	avatar_grid.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	grid_center.add_child(avatar_grid)
+	avatar_well.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	avatar_well.clip_contents = false
+	avatar_well.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	avatar_well.visible = false
+	card.add_child(avatar_well)
 
 	avatar_cells.clear()
 	for opt in SaveManager.get_avatar_options():
 		var cell := _make_avatar_cell(str(opt.get("id", "")), str(opt.get("path", "")))
-		avatar_grid.add_child(cell)
+		avatar_well.add_child(cell)
 		avatar_cells.append(cell)
-
-	save_btn = _make_action_button("Guardar")
-	save_btn.pressed.connect(_on_save_pressed)
-	edit_box.add_child(save_btn)
 
 	_apply_theme_colors()
 	_set_page(PAGE_VIEW)
 
-func _make_identity_bar(editable: bool) -> Dictionary:
-	var bar := Panel.new()
-	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var margin := MarginContainer.new()
-	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	bar.add_child(margin)
-	var row := HBoxContainer.new()
-	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override("separation", 16)
-	margin.add_child(row)
-
-	var frame := Panel.new()
-	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	frame.clip_contents = true
-	frame.custom_minimum_size = Vector2(128, 128)
-	row.add_child(frame)
-
-	var avatar := TextureRect.new()
-	avatar.set_anchors_preset(Control.PRESET_FULL_RECT)
-	avatar.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	avatar.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	avatar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	frame.add_child(avatar)
-
-	var label := _make_outlined_label("", 42)
-	label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	row.add_child(label)
-
-	var edit: LineEdit = null
-	var pencil: Button = null
-	if editable:
-		label.mouse_filter = Control.MOUSE_FILTER_STOP
-		label.mouse_default_cursor_shape = Control.CURSOR_IBEAM
-		label.gui_input.connect(_on_name_label_gui_input)
-		edit = LineEdit.new()
-		edit.max_length = 20
-		edit.placeholder_text = "Tu nombre"
-		edit.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		edit.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		edit.custom_minimum_size = Vector2(280, 64)
-		edit.visible = false
-		edit.clear_button_enabled = true
-		edit.caret_blink = true
-		if LogoFont != null:
-			edit.add_theme_font_override("font", LogoFont)
-		edit.text_changed.connect(_on_name_edit_changed)
-		edit.text_submitted.connect(func(_t: String) -> void: _set_editing_name(false))
-		row.add_child(edit)
-		pencil = Button.new()
-		pencil.text = "✎"
-		pencil.focus_mode = Control.FOCUS_NONE
-		pencil.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-		pencil.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		if LogoFont != null:
-			pencil.add_theme_font_override("font", LogoFont)
-		pencil.pressed.connect(_on_edit_name_pressed)
-		GameState.hook_button_sound(pencil)
-		row.add_child(pencil)
-
-	return {
-		"bar": bar,
-		"margin": margin,
-		"frame": frame,
-		"avatar": avatar,
-		"label": label,
-		"edit": edit,
-		"pencil": pencil,
-	}
-
-func _add_stat_row(parent: VBoxContainer, caption: String, icon: Texture2D, is_level: bool) -> void:
-	var row := HBoxContainer.new()
-	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override("separation", 16)
-	parent.add_child(row)
-
+func _add_stat_row(caption: String, icon: Texture2D, is_level: bool) -> void:
 	var lbl := _make_outlined_label(caption, 36)
-	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	row.add_child(lbl)
+	card.add_child(lbl)
 	_stat_labels.append(lbl)
 
 	var chip := Panel.new()
-	chip.custom_minimum_size = Vector2(88, 88)
-	chip.size_flags_horizontal = Control.SIZE_SHRINK_END
-	chip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	row.add_child(chip)
+	chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	chip.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	card.add_child(chip)
 	_stat_chips.append(chip)
 
-	var chip_margin := MarginContainer.new()
-	chip_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	chip_margin.add_theme_constant_override("margin_left", 6)
-	chip_margin.add_theme_constant_override("margin_right", 8)
-	chip.add_child(chip_margin)
-
 	var chip_row := HBoxContainer.new()
+	chip_row.set_anchors_preset(Control.PRESET_FULL_RECT)
 	chip_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	chip_row.add_theme_constant_override("separation", 4)
-	chip_margin.add_child(chip_row)
+	chip.add_child(chip_row)
 
 	var icon_rect := TextureRect.new()
 	icon_rect.texture = icon
@@ -522,18 +423,18 @@ func _make_avatar_cell(avatar_id: String, path: String) -> Control:
 	var cell := Panel.new()
 	cell.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	cell.clip_contents = true
-	cell.custom_minimum_size = Vector2(140, 140)
+	cell.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 	cell.set_meta("avatar_id", avatar_id)
 
 	var btn := TextureButton.new()
 	btn.set_anchors_preset(Control.PRESET_FULL_RECT)
-	btn.offset_left = 5
-	btn.offset_top = 5
-	btn.offset_right = -5
-	btn.offset_bottom = -5
+	btn.offset_left = 3
+	btn.offset_top = 3
+	btn.offset_right = -3
+	btn.offset_bottom = -3
 	btn.texture_normal = load(path) as Texture2D
 	btn.ignore_texture_size = true
-	btn.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_COVERED
+	btn.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
 	btn.focus_mode = Control.FOCUS_NONE
 	btn.mouse_filter = Control.MOUSE_FILTER_STOP
 	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
@@ -573,25 +474,29 @@ func _make_avatar_cell(avatar_id: String, path: String) -> Control:
 	return cell
 
 func _make_outlined_label(text: String, font_size: int) -> Label:
-	return UiStyleUtils.make_outlined_label(
-		text,
-		font_size,
-		LogoFont,
-		Color(0.88, 0.86, 0.83),
-		TEXT_OUTLINE,
-		LABEL_OUTLINE
-	)
-
-func _make_action_button(text: String) -> Button:
-	var btn := Button.new()
-	btn.text = text
-	btn.focus_mode = Control.FOCUS_NONE
-	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	var lbl := Label.new()
+	lbl.text = text
+	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	lbl.add_theme_font_size_override("font_size", font_size)
+	lbl.add_theme_color_override("font_color", PILL_TEXT)
+	lbl.add_theme_color_override("font_outline_color", TEXT_OUTLINE)
+	lbl.add_theme_constant_override("outline_size", 5)
 	if LogoFont != null:
-		btn.add_theme_font_override("font", LogoFont)
-	btn.add_theme_color_override("font_outline_color", TEXT_OUTLINE)
-	btn.add_theme_constant_override("outline_size", BUTTON_OUTLINE)
+		lbl.add_theme_font_override("font", LogoFont)
+	return lbl
+
+func _make_empty_button() -> Button:
+	var btn := Button.new()
+	btn.text = ""
+	btn.flat = true
+	btn.focus_mode = Control.FOCUS_NONE
+	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	var empty := StyleBoxEmpty.new()
+	btn.add_theme_stylebox_override("normal", empty)
+	btn.add_theme_stylebox_override("hover", empty)
+	btn.add_theme_stylebox_override("pressed", empty)
+	btn.add_theme_stylebox_override("focus", empty)
+	btn.add_theme_stylebox_override("disabled", empty)
 	GameState.hook_button_sound(btn)
 	return btn
 
@@ -601,87 +506,67 @@ func _flat_style(bg: Color, border: Color, radius: int, border_w: int = 3) -> St
 	style.corner_detail = 12
 	return style
 
-func _apply_button_style(btn: Button, bg: Color, border: Color, radius: int, font_color: Color) -> void:
-	UiStyleUtils.apply_button_style(
-		btn,
-		bg,
-		border,
-		radius,
-		font_color,
-		TEXT_OUTLINE,
-		BUTTON_OUTLINE
-	)
-
 func _apply_theme_colors() -> void:
-	var p: Dictionary = GameState.get_ui_palette()
-	var card_bg: Color = p.get("settings_card_bg", Color(0.62, 0.52, 0.82, 0.98))
-	card_bg = card_bg.lightened(0.18)
-	var card_border: Color = p.get("settings_card_border", Color(0.42, 0.28, 0.58, 0.95))
-	card_border = card_border.darkened(0.35)
-	var inset: Color = p.get("settings_btn_off", Color(0.34, 0.26, 0.48, 0.95))
-	inset.a = 0.98
-	var well: Color = inset.darkened(0.12)
-	well.a = 0.98
-	var text_marble := Color(0.88, 0.86, 0.83)
-	var title_col: Color = p.get("settings_title", text_marble)
-	var label_col: Color = p.get("settings_label", text_marble)
 	if card != null:
-		card.add_theme_stylebox_override("panel", _flat_style(card_bg, card_border, 30, 4))
-	for bar in [view_name_bar, edit_name_bar]:
-		if bar != null:
-			bar.add_theme_stylebox_override("panel", _flat_style(inset, card_border.darkened(0.1), 18, 2))
-	if avatar_well != null:
-		avatar_well.add_theme_stylebox_override("panel", _flat_style(well, card_border.darkened(0.15), 24, 2))
-	if stats_well != null:
-		stats_well.add_theme_stylebox_override("panel", _flat_style(well, card_border.darkened(0.15), 24, 2))
+		card.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 	if title_label != null:
-		title_label.add_theme_color_override("font_color", title_col)
-		title_label.add_theme_color_override("font_outline_color", TEXT_OUTLINE)
+		title_label.add_theme_color_override("font_color", TITLE_FILL)
+		title_label.add_theme_color_override("font_outline_color", TITLE_OUTLINE)
 	for lbl in [view_name_label, name_label]:
 		if lbl != null:
-			lbl.add_theme_color_override("font_color", title_col)
+			lbl.add_theme_color_override("font_color", NAME_FILL)
 			lbl.add_theme_color_override("font_outline_color", TEXT_OUTLINE)
+	for lbl in [edit_profile_label, save_label]:
+		if lbl != null:
+			lbl.add_theme_color_override("font_color", PILL_TEXT)
+			lbl.add_theme_color_override("font_outline_color", PILL_OUTLINE)
 	for lbl in _stat_labels:
-		lbl.add_theme_color_override("font_color", label_col)
-		lbl.add_theme_color_override("font_outline_color", TEXT_OUTLINE)
+		lbl.add_theme_color_override("font_color", STAT_INK)
+		lbl.add_theme_color_override("font_outline_color", TITLE_OUTLINE)
 	for value_lbl in [_level_value_label, _days_value_label]:
 		if value_lbl != null:
-			value_lbl.add_theme_color_override("font_color", title_col)
-			value_lbl.add_theme_color_override("font_outline_color", TEXT_OUTLINE)
+			value_lbl.add_theme_color_override("font_color", STAT_INK)
+			value_lbl.add_theme_color_override("font_outline_color", TITLE_OUTLINE)
 	for chip in _stat_chips:
-		chip.add_theme_stylebox_override("panel", _flat_style(inset.lightened(0.08), card_border, 16, 2))
-	_apply_button_style(close_btn, CLOSE_RED, CLOSE_RED_BORDER, 14, text_marble)
-	if edit_name_btn != null:
-		_apply_button_style(edit_name_btn, Color(0.96, 0.96, 0.98), Color(0.55, 0.55, 0.62), 12, Color(0.2, 0.2, 0.28))
-	var btn_on: Color = p.get("settings_btn_on", Color(0.58, 0.80, 0.48, 0.98))
-	var btn_border: Color = p.get("settings_btn_border", Color(0.75, 0.88, 0.58, 1.0))
-	_apply_button_style(edit_profile_btn, btn_on, btn_border, 26, text_marble)
-	_apply_button_style(save_btn, btn_on, btn_border, 26, text_marble)
+		chip.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	if avatar_well != null:
+		avatar_well.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 	if name_edit != null:
-		var edit_style := _flat_style(Color(0.12, 0.10, 0.18, 0.55), Color(0.85, 0.85, 0.92, 0.4), 10, 1)
+		var edit_style := _flat_style(Color(0.42, 0.24, 0.62, 0.18), Color(0.85, 0.78, 0.95, 0.0), 12, 0)
 		name_edit.add_theme_stylebox_override("normal", edit_style)
 		name_edit.add_theme_stylebox_override("focus", edit_style)
-		name_edit.add_theme_color_override("font_color", text_marble)
-		name_edit.add_theme_color_override("font_placeholder_color", Color(0.78, 0.76, 0.74, 0.55))
+		name_edit.add_theme_color_override("font_color", NAME_FILL)
+		name_edit.add_theme_color_override("font_placeholder_color", Color(0.92, 0.88, 0.96, 0.55))
+	if edit_name_btn != null:
+		edit_name_btn.add_theme_color_override("font_color", PILL_TEXT)
+		edit_name_btn.add_theme_color_override("font_outline_color", TEXT_OUTLINE)
 	_refresh_preview_avatars()
-	_apply_rainbow_ui_fills()
-
-func _apply_rainbow_ui_fills() -> void:
-	if card != null:
-		HudTextureButtons.apply_optional_rainbow_fill(card, 30, card.size, 4)
-	if edit_profile_btn != null:
-		HudTextureButtons.apply_optional_rainbow_fill(edit_profile_btn, 26, edit_profile_btn.size, 3)
-	if save_btn != null:
-		HudTextureButtons.apply_optional_rainbow_fill(save_btn, 26, save_btn.size, 3)
 
 func _set_page(page: int) -> void:
 	_page = page
-	if view_box != null:
-		view_box.visible = page == PAGE_VIEW
-	if edit_box != null:
-		edit_box.visible = page == PAGE_EDIT
-	if title_label != null:
-		title_label.text = "Editar perfil" if page == PAGE_EDIT else "Perfil"
+	var editing := page == PAGE_EDIT
+	if view_name_label != null:
+		view_name_label.visible = not editing
+	if name_label != null:
+		name_label.visible = editing and not _editing_name
+	if name_edit != null:
+		name_edit.visible = editing and _editing_name
+	if edit_name_btn != null:
+		edit_name_btn.visible = editing
+	if edit_profile_btn != null:
+		edit_profile_btn.visible = not editing
+	if edit_profile_label != null:
+		edit_profile_label.visible = not editing
+	if save_btn != null:
+		save_btn.visible = editing
+	if save_label != null:
+		save_label.visible = editing
+	for lbl in _stat_labels:
+		lbl.visible = not editing
+	for chip in _stat_chips:
+		chip.visible = not editing
+	if avatar_well != null:
+		avatar_well.visible = editing
 	if page != PAGE_EDIT:
 		_set_editing_name(false)
 	if visible:
@@ -718,11 +603,11 @@ func _sync_name_widgets() -> void:
 		view_name_label.text = _pending_username
 	if name_label != null:
 		name_label.text = _pending_username
-		name_label.visible = not _editing_name
+		name_label.visible = _page == PAGE_EDIT and not _editing_name
 	if name_edit != null:
 		if name_edit.text != _pending_username:
 			name_edit.text = _pending_username
-		name_edit.visible = _editing_name
+		name_edit.visible = _page == PAGE_EDIT and _editing_name
 		if _editing_name:
 			name_edit.call_deferred("grab_focus")
 			name_edit.caret_column = name_edit.text.length()
@@ -762,22 +647,29 @@ func _on_name_label_gui_input(event: InputEvent) -> void:
 func _on_name_edit_changed(new_text: String) -> void:
 	_pending_username = new_text
 
-func _apply_preview_frame_style(frame: Panel, avatar: TextureRect, side: float) -> void:
+func _apply_preview_frame_style(frame: Panel, avatar: TextureRect, size: Vector2) -> void:
 	if frame == null:
 		return
-	var border_w := int(clampf(side * 0.06, 4.0, 8.0))
-	var radius := int(side * 0.38)
+	var border_w: int = ProfileFrameLayoutServiceScript.preview_border_width(size)
+	var radius: int = int(ProfileFrameLayoutServiceScript.avatar_clip_radius(size))
 	var border_col := SaveManager.get_avatar_border_color()
-	frame.add_theme_stylebox_override("panel", _flat_style(border_col, border_col, radius, border_w))
+	frame.add_theme_stylebox_override(
+		"panel",
+		_flat_style(Color(0, 0, 0, 0), border_col, radius, border_w)
+	)
 	if avatar == null:
 		return
-	avatar.offset_left = float(border_w)
-	avatar.offset_top = float(border_w)
-	avatar.offset_right = float(-border_w)
-	avatar.offset_bottom = float(-border_w)
-	var inner := maxf(side - float(border_w) * 2.0, 1.0)
-	var inner_radius := maxf(float(radius) - float(border_w), inner * 0.34)
-	HudTextureButtons.apply_rounded_clip(avatar, Vector2(inner, inner), inner_radius)
+	var pad: float = ProfileFrameLayoutServiceScript.preview_image_pad(size)
+	avatar.offset_left = pad
+	avatar.offset_top = pad
+	avatar.offset_right = -pad
+	avatar.offset_bottom = -pad
+	var inner := Vector2(maxf(size.x - pad * 2.0, 1.0), maxf(size.y - pad * 2.0, 1.0))
+	HudTextureButtons.apply_rounded_clip(
+		avatar,
+		inner,
+		ProfileFrameLayoutServiceScript.avatar_clip_radius(inner)
+	)
 
 func _refresh_preview_avatars() -> void:
 	var path := ""
@@ -788,14 +680,14 @@ func _refresh_preview_avatars() -> void:
 	var tex: Texture2D = SaveManager.get_avatar_texture()
 	if not path.is_empty():
 		tex = load(path) as Texture2D
-	for avatar in [view_preview_avatar, edit_preview_avatar]:
-		if avatar != null:
-			avatar.texture = tex
-	var side := 128.0
-	if view_preview_frame != null:
-		side = maxf(view_preview_frame.custom_minimum_size.x, side)
-	_apply_preview_frame_style(view_preview_frame, view_preview_avatar, side)
-	_apply_preview_frame_style(edit_preview_frame, edit_preview_avatar, side)
+	if preview_avatar != null:
+		preview_avatar.texture = tex
+	var fill := Vector2(128, 128)
+	if preview_frame != null:
+		fill = preview_frame.size
+		if fill.x < 1.0 or fill.y < 1.0:
+			fill = Vector2(128, 128)
+	_apply_preview_frame_style(preview_frame, preview_avatar, fill)
 
 func _refresh_avatar_selection() -> void:
 	for cell in avatar_cells:
@@ -803,10 +695,14 @@ func _refresh_avatar_selection() -> void:
 			continue
 		var p := cell as Panel
 		var selected := str(p.get_meta("avatar_id", "")) == _pending_avatar_id
-		var border := SELECT_GREEN if selected else Color(0, 0, 0, 0)
-		var bg := Color(1, 1, 1, 0.06)
-		var cell_side := maxf(p.custom_minimum_size.x, 140.0)
-		p.add_theme_stylebox_override("panel", _flat_style(bg, border, int(cell_side * 0.28), 4 if selected else 0))
+		var cell_side := maxf(p.size.x, 1.0)
+		if selected:
+			p.add_theme_stylebox_override(
+				"panel",
+				_flat_style(Color(1, 1, 1, 0.0), SELECT_GREEN, int(cell_side * 0.28), 4)
+			)
+		else:
+			p.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 		var check: Variant = p.get_meta("check", null)
 		if check is CanvasItem:
 			(check as CanvasItem).visible = selected

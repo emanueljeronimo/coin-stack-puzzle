@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://c1lp5x8rbdbqf"
-path="res://.godot/imported/avatar-mujer.png-eb5edcc8b29ab92dbc295bbb27bdd44a.ctex"
+uid="uid://c4r7elc0nf1rm"
+path="res://.godot/imported/cartel-confirmar-compra.png-a201047ea02fafec2ea4a7bcb84e130c.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Imagenes/avatars/avatar-mujer.png"
-dest_files=["res://.godot/imported/avatar-mujer.png-eb5edcc8b29ab92dbc295bbb27bdd44a.ctex"]
+source_file="res://Imagenes/cartel-confirmar-compra.png"
+dest_files=["res://.godot/imported/cartel-confirmar-compra.png-a201047ea02fafec2ea4a7bcb84e130c.ctex"]
 
 [params]
 

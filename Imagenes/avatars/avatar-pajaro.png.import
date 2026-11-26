@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://5ej2ejv20587"
-path="res://.godot/imported/avatar-hombre.png-e5f702a0eb2c2f0a14a21553c08e6818.ctex"
+uid="uid://b550uxbhk0nbd"
+path="res://.godot/imported/avatar-pajaro.png-38c8d6d74dcb0e72863cde957461d568.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Imagenes/avatars/avatar-hombre.png"
-dest_files=["res://.godot/imported/avatar-hombre.png-e5f702a0eb2c2f0a14a21553c08e6818.ctex"]
+source_file="res://Imagenes/avatars/avatar-pajaro.png"
+dest_files=["res://.godot/imported/avatar-pajaro.png-38c8d6d74dcb0e72863cde957461d568.ctex"]
 
 [params]
 

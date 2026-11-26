@@ -2,15 +2,16 @@ class_name ProfileRepository
 extends RefCounted
 
 const AVATAR_OPTIONS: Array = [
-	{"id": "mariposa", "path": "res://Imagenes/avatars/avatar-mariposa.png", "label": "Mariposa"},
 	{"id": "conejo", "path": "res://Imagenes/avatars/avatar-conejo.png", "label": "Conejo"},
-	{"id": "buho", "path": "res://Imagenes/avatars/avatar-buho.png", "label": "Búho"},
-	{"id": "rana", "path": "res://Imagenes/avatars/avatar-rana.png", "label": "Rana"},
-	{"id": "hombre", "path": "res://Imagenes/avatars/avatar-hombre.png", "label": "Hombre"},
 	{"id": "gato", "path": "res://Imagenes/avatars/avatar-gato.png", "label": "Gato"},
-	{"id": "mujer", "path": "res://Imagenes/avatars/avatar-mujer.png", "label": "Mujer"},
+	{"id": "rana", "path": "res://Imagenes/avatars/avatar-rana.png", "label": "Rana"},
 	{"id": "zorro", "path": "res://Imagenes/avatars/avatar-zorro.png", "label": "Zorro"},
 	{"id": "panda", "path": "res://Imagenes/avatars/avatar-panda.png", "label": "Panda"},
+	{"id": "ciervo", "path": "res://Imagenes/avatars/avatar-ciervo.png", "label": "Ciervo"},
+	{"id": "oveja", "path": "res://Imagenes/avatars/avatar-oveja.png", "label": "Oveja"},
+	{"id": "pajaro", "path": "res://Imagenes/avatars/avatar-pajaro.png", "label": "Pájaro"},
+	{"id": "girasol", "path": "res://Imagenes/avatars/avatar-girasol.png", "label": "Girasol"},
+	{"id": "flores", "path": "res://Imagenes/avatars/avatar-flores.png", "label": "Flores"},
 ]
 
 const BORDER_COLOR_OPTIONS: Array = [
@@ -42,7 +43,7 @@ static func border_options() -> Array:
 	return BORDER_COLOR_OPTIONS.duplicate(true)
 
 static func default_avatar_id() -> String:
-	return str(AVATAR_OPTIONS[0].get("id", "mariposa"))
+	return str(AVATAR_OPTIONS[0].get("id", "conejo"))
 
 static func default_border_color_id() -> String:
 	return str(BORDER_COLOR_OPTIONS[0].get("id", "verde"))

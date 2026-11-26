@@ -9,6 +9,7 @@ const ShopTabServiceScript = preload("res://shop_tab_service.gd")
 const ShopCatalogServiceScript = preload("res://shop_catalog_service.gd")
 const GameBoosterServiceScript = preload("res://game_booster_service.gd")
 const TouchScrollServiceScript = preload("res://touch_scroll_service.gd")
+const ShopConfirmFrameLayoutServiceScript = preload("res://shop_confirm_frame_layout_service.gd")
 const DiamondIconTexture = preload("res://Imagenes/icono-diamante.png")
 const LifeIconTexture = preload("res://Imagenes/icono-vidas.png")
 const MixIconTexture = preload("res://Imagenes/icono-mezclar.png")
@@ -17,6 +18,7 @@ const GloveIconTexture = preload("res://Imagenes/icono-mano.png")
 const CartIconTexture = preload("res://Imagenes/icono-cart.png")
 const ShopTitleTexture = preload("res://Imagenes/cartel-tienda.png")
 const CloseButtonTexture = preload("res://Imagenes/boton-cerrar.png")
+const ConfirmFrameTexture = preload("res://Imagenes/cartel-confirmar-compra.png")
 const REF_WIDTH := 1080.0
 const LogoFont = preload("res://Fonts/Lobster-Regular.ttf")
 const RainbowLabelShader = preload("res://rainbow_label.gdshader")
@@ -28,13 +30,15 @@ const SHOP_CARD_BG := Color(1.00, 1.00, 1.00, 0.24)
 const SHOP_INK := Color(0.28, 0.26, 0.27, 1.0)
 const SHOP_CARD_BORDER := SHOP_INK
 const SHOP_WELL := Color(0.00, 0.00, 0.00, 0.00)
-const SHOP_CONFIRM_BG := Color(1.00, 1.00, 1.00, 0.74)
 const SHOP_TITLE := Color(1.00, 1.00, 1.00, 1.0)
 const SHOP_TEXT := Color(1.00, 1.00, 1.00, 1.0)
 const SHOP_OUTLINE := Color(0.12, 0.10, 0.16, 0.78)
 const SHOP_PRICE_BG := Color("#1F574A")
 const SHOP_PRICE_BORDER := Color("#163E35")
-const SHOP_CANCEL_BG := Color(0.68, 0.42, 0.20, 0.96)
+const CONFIRM_PILL_TEXT := Color(1.00, 0.98, 0.96, 1.0)
+const CONFIRM_TITLE_OUTLINE := Color(0.42, 0.18, 0.62, 0.92)
+const CONFIRM_ACCEPT_OUTLINE := Color(0.32, 0.12, 0.52, 0.88)
+const CONFIRM_CANCEL_OUTLINE := Color(0.52, 0.26, 0.08, 0.88)
 
 var overlay: ColorRect = null
 var card: Panel = null
@@ -59,11 +63,14 @@ var _active_tab: int = 0
 var _opened_at_msec: int = 0
 var _confirm_root: Control = null
 var _confirm_card: Panel = null
+var _confirm_frame_art: TextureRect = null
 var _confirm_icons_row: HBoxContainer = null
 var _confirm_icon_nodes: Array[TextureRect] = []
 var _confirm_title: Label = null
 var _confirm_accept_btn: Button = null
+var _confirm_accept_label: Label = null
 var _confirm_cancel_btn: Button = null
+var _confirm_cancel_label: Label = null
 var _pending_pack_id: String = ""
 var _shop_drag_pressing := false
 var _shop_drag_moved := false
@@ -974,35 +981,29 @@ func _build_buy_confirm() -> void:
 
 	var dim := ColorRect.new()
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
-	dim.color = Color(0.05, 0.04, 0.10, 0.55)
+	dim.color = Color(0.05, 0.04, 0.10, 0.72)
 	dim.mouse_filter = Control.MOUSE_FILTER_STOP
 	dim.gui_input.connect(_on_confirm_dimmer_input)
 	_confirm_root.add_child(dim)
 
 	_confirm_card = Panel.new()
 	_confirm_card.mouse_filter = Control.MOUSE_FILTER_STOP
+	_confirm_card.clip_contents = false
+	_confirm_card.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 	_confirm_root.add_child(_confirm_card)
 
-	var margin := MarginContainer.new()
-	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	margin.add_theme_constant_override("margin_left", 28)
-	margin.add_theme_constant_override("margin_top", 28)
-	margin.add_theme_constant_override("margin_right", 28)
-	margin.add_theme_constant_override("margin_bottom", 28)
-	_confirm_card.add_child(margin)
-
-	var vbox := VBoxContainer.new()
-	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	vbox.add_theme_constant_override("separation", 16)
-	margin.add_child(vbox)
+	_confirm_frame_art = TextureRect.new()
+	_confirm_frame_art.texture = ConfirmFrameTexture
+	_confirm_frame_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_confirm_frame_art.stretch_mode = TextureRect.STRETCH_SCALE
+	_confirm_frame_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_confirm_card.add_child(_confirm_frame_art)
 
 	_confirm_icons_row = HBoxContainer.new()
 	_confirm_icons_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_confirm_icons_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_confirm_icons_row.add_theme_constant_override("separation", 14)
-	_confirm_icons_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	vbox.add_child(_confirm_icons_row)
+	_confirm_card.add_child(_confirm_icons_row)
 	_confirm_icon_nodes.clear()
 	for _i in range(4):
 		var icon := TextureRect.new()
@@ -1010,6 +1011,8 @@ func _build_buy_confirm() -> void:
 		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		icon.custom_minimum_size = Vector2(72, 72)
 		icon.visible = false
 		_confirm_icons_row.add_child(icon)
@@ -1017,16 +1020,27 @@ func _build_buy_confirm() -> void:
 
 	_confirm_title = _make_outlined_label("¿Comprar?", 52)
 	_confirm_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_confirm_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_confirm_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	vbox.add_child(_confirm_title)
+	_confirm_card.add_child(_confirm_title)
 
-	_confirm_accept_btn = _make_action_button("Aceptar")
+	_confirm_accept_btn = _make_frame_pill_button()
 	_confirm_accept_btn.pressed.connect(_on_confirm_accept_pressed)
-	vbox.add_child(_confirm_accept_btn)
+	_confirm_card.add_child(_confirm_accept_btn)
+	_confirm_accept_label = _make_outlined_label("Aceptar", 46)
+	_confirm_accept_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_confirm_accept_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_confirm_accept_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_confirm_card.add_child(_confirm_accept_label)
 
-	_confirm_cancel_btn = _make_action_button("Cancelar")
+	_confirm_cancel_btn = _make_frame_pill_button()
 	_confirm_cancel_btn.pressed.connect(_on_confirm_cancel_pressed)
-	vbox.add_child(_confirm_cancel_btn)
+	_confirm_card.add_child(_confirm_cancel_btn)
+	_confirm_cancel_label = _make_outlined_label("Cancelar", 46)
+	_confirm_cancel_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_confirm_cancel_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_confirm_cancel_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_confirm_card.add_child(_confirm_cancel_label)
 
 func _show_buy_confirm(pack_id: String) -> void:
 	var pack: Dictionary = ShopCatalogServiceScript.pack_by_id(pack_id)
@@ -1090,45 +1104,78 @@ func _layout_buy_confirm() -> void:
 	if _confirm_card == null:
 		return
 	var vp := get_viewport_rect().size
-	var s: float = clampf(minf(vp.x / REF_WIDTH, vp.y / 1920.0), 0.75, 1.25)
-	var pad: float = 32.0 * s
-	var sep: float = 18.0 * s
-	var icon_h: float = 80.0 * s
-	var title_h: float = 128.0 * s
-	var btn_h: float = 86.0 * s
-	if _confirm_accept_btn != null:
-		btn_h = maxf(btn_h, _confirm_accept_btn.custom_minimum_size.y)
-	var card_w: float = minf(vp.x * 0.86, 720.0 * s)
-	var card_h: float = pad * 2.0 + icon_h + title_h + btn_h * 2.0 + sep * 3.0
-	_confirm_card.size = Vector2(card_w, card_h)
-	_confirm_card.position = Vector2((vp.x - card_w) * 0.5, (vp.y - card_h) * 0.5)
+	var tex_size := Vector2(1312, 1199)
+	if ConfirmFrameTexture != null:
+		tex_size = ConfirmFrameTexture.get_size()
+	var card_size: Vector2 = ShopConfirmFrameLayoutServiceScript.card_size(vp, tex_size)
+	_confirm_card.size = card_size
+	_confirm_card.position = Vector2((vp.x - card_size.x) * 0.5, (vp.y - card_size.y) * 0.5)
+	if _confirm_frame_art != null:
+		_confirm_frame_art.position = Vector2.ZERO
+		_confirm_frame_art.size = card_size
+	var icon_rect: Rect2 = ShopConfirmFrameLayoutServiceScript.mapped_rect(
+		card_size,
+		ShopConfirmFrameLayoutServiceScript.ICON_FRAC
+	)
 	if _confirm_icons_row != null:
-		_confirm_icons_row.add_theme_constant_override("separation", int(14.0 * s))
+		_confirm_icons_row.position = icon_rect.position
+		_confirm_icons_row.size = icon_rect.size
+		_confirm_icons_row.add_theme_constant_override("separation", int(clampf(icon_rect.size.y * 0.12, 8.0, 22.0)))
+	var icon_side: float = ShopConfirmFrameLayoutServiceScript.icon_side(icon_rect.size.y)
 	for icon in _confirm_icon_nodes:
 		if icon != null:
-			icon.custom_minimum_size = Vector2(icon_h, icon_h)
+			icon.custom_minimum_size = Vector2(icon_side, icon_side)
+	var title_rect: Rect2 = ShopConfirmFrameLayoutServiceScript.mapped_rect(
+		card_size,
+		ShopConfirmFrameLayoutServiceScript.TITLE_FRAC
+	)
 	if _confirm_title != null:
-		_confirm_title.add_theme_font_size_override("font_size", int(52.0 * s))
-		_confirm_title.add_theme_constant_override("outline_size", int(8.0 * s))
-	if _confirm_accept_btn != null:
-		_confirm_accept_btn.custom_minimum_size = Vector2(0, btn_h)
-		_confirm_accept_btn.add_theme_font_size_override("font_size", int(46.0 * s))
-	if _confirm_cancel_btn != null:
-		_confirm_cancel_btn.custom_minimum_size = Vector2(0, btn_h)
-		_confirm_cancel_btn.add_theme_font_size_override("font_size", int(46.0 * s))
-	var margin: MarginContainer = null
-	for child in _confirm_card.get_children():
-		if child is MarginContainer:
-			margin = child as MarginContainer
-			break
-	if margin != null:
-		var m: int = int(round(pad))
-		margin.add_theme_constant_override("margin_left", m)
-		margin.add_theme_constant_override("margin_top", m)
-		margin.add_theme_constant_override("margin_right", m)
-		margin.add_theme_constant_override("margin_bottom", m)
-		if margin.get_child_count() > 0 and margin.get_child(0) is VBoxContainer:
-			(margin.get_child(0) as VBoxContainer).add_theme_constant_override("separation", int(round(sep)))
+		_confirm_title.position = title_rect.position
+		_confirm_title.size = title_rect.size
+		var title_font: int = ShopConfirmFrameLayoutServiceScript.title_font_size(title_rect.size.y)
+		_confirm_title.add_theme_font_size_override("font_size", title_font)
+		_confirm_title.add_theme_constant_override("outline_size", maxi(int(round(float(title_font) * 0.16)), 6))
+	_layout_confirm_pill(
+		_confirm_accept_btn,
+		_confirm_accept_label,
+		ShopConfirmFrameLayoutServiceScript.mapped_rect(
+			card_size,
+			ShopConfirmFrameLayoutServiceScript.ACCEPT_FRAC
+		)
+	)
+	_layout_confirm_pill(
+		_confirm_cancel_btn,
+		_confirm_cancel_label,
+		ShopConfirmFrameLayoutServiceScript.mapped_rect(
+			card_size,
+			ShopConfirmFrameLayoutServiceScript.CANCEL_FRAC
+		)
+	)
+
+func _layout_confirm_pill(btn: Button, lbl: Label, rect: Rect2) -> void:
+	if btn != null:
+		btn.custom_minimum_size = Vector2.ZERO
+		btn.position = rect.position
+		btn.size = rect.size
+	if lbl != null:
+		lbl.position = rect.position
+		lbl.size = rect.size
+		var font_size: int = ShopConfirmFrameLayoutServiceScript.pill_font_size(rect.size.y)
+		lbl.add_theme_font_size_override("font_size", font_size)
+		lbl.add_theme_constant_override("outline_size", maxi(int(round(float(font_size) * 0.10)), 4))
+
+func _make_frame_pill_button() -> Button:
+	var btn := _make_action_button("")
+	btn.flat = true
+	btn.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	btn.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	var empty := StyleBoxEmpty.new()
+	btn.add_theme_stylebox_override("normal", empty)
+	btn.add_theme_stylebox_override("hover", empty)
+	btn.add_theme_stylebox_override("pressed", empty)
+	btn.add_theme_stylebox_override("focus", empty)
+	btn.add_theme_stylebox_override("disabled", empty)
+	return btn
 
 func _on_confirm_accept_pressed() -> void:
 	var pack_id: String = _pending_pack_id
@@ -1294,12 +1341,16 @@ func _apply_shop_identity() -> void:
 	if _confirm_card != null:
 		_hide_gold_fill(_confirm_card)
 		_hide_rainbow_fill(_confirm_card)
-		_confirm_card.add_theme_stylebox_override("panel", _flat_style(SHOP_CONFIRM_BG, SHOP_CARD_BORDER, 34, 2))
+		_confirm_card.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 	if _confirm_title != null:
-		_confirm_title.add_theme_color_override("font_color", SHOP_TITLE)
-		_confirm_title.add_theme_color_override("font_outline_color", SHOP_OUTLINE)
-	_apply_button_style(_confirm_accept_btn, SHOP_PRICE_BG, SHOP_PRICE_BORDER, 22, SHOP_TEXT)
-	_apply_button_style(_confirm_cancel_btn, SHOP_CANCEL_BG, SHOP_CARD_BORDER, 22, SHOP_TEXT)
+		_confirm_title.add_theme_color_override("font_color", CONFIRM_PILL_TEXT)
+		_confirm_title.add_theme_color_override("font_outline_color", CONFIRM_TITLE_OUTLINE)
+	if _confirm_accept_label != null:
+		_confirm_accept_label.add_theme_color_override("font_color", CONFIRM_PILL_TEXT)
+		_confirm_accept_label.add_theme_color_override("font_outline_color", CONFIRM_ACCEPT_OUTLINE)
+	if _confirm_cancel_label != null:
+		_confirm_cancel_label.add_theme_color_override("font_color", CONFIRM_PILL_TEXT)
+		_confirm_cancel_label.add_theme_color_override("font_outline_color", CONFIRM_CANCEL_OUTLINE)
 	_hide_rainbow_fill(_confirm_accept_btn)
 	_hide_rainbow_fill(_confirm_cancel_btn)
 

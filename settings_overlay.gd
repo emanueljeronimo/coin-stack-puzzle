@@ -3,45 +3,46 @@ extends Control
 
 signal restart_level_confirmed
 
-const REF_WIDTH := 1080.0
-const LogoFont = preload("res://Fonts/Lobster-Regular.ttf")
+const SettingsFrameLayoutServiceScript = preload("res://settings_frame_layout_service.gd")
 const BoardMusicServiceScript = preload("res://board_music_service.gd")
 const SettingsLinksServiceScript = preload("res://settings_links_service.gd")
-const CLOSE_RED := Color(0.90, 0.22, 0.24, 1.0)
-const CLOSE_RED_BORDER := Color(0.55, 0.10, 0.12, 1.0)
+const FRAME_PATH := "res://Imagenes/menu-settings.png"
+const LogoFont = preload("res://Fonts/Lobster-Regular.ttf")
+const REF_WIDTH := 1080.0
 const SELECT_GREEN := Color(0.32, 0.86, 0.28, 1.0)
-const TEXT_OUTLINE := Color(0.0, 0.0, 0.0, 1.0)
-const TITLE_OUTLINE := 12
+const TEXT_OUTLINE := Color(0.22, 0.10, 0.38, 0.88)
+const TITLE_FILL := Color(0.42, 0.20, 0.60, 1.0)
+const TITLE_OUTLINE := Color(1.00, 0.96, 0.92, 0.85)
+const PILL_TEXT := Color(0.42, 0.20, 0.60, 1.0)
+const PILL_OUTLINE := Color(1.00, 0.96, 0.92, 0.85)
+const ROW_INK := Color(0.42, 0.20, 0.60, 1.0)
 const LABEL_OUTLINE := 8
 const BUTTON_OUTLINE := 8
 
 var overlay: ColorRect = null
 var card: Panel = null
-var card_margin: MarginContainer = null
-var main_vbox: VBoxContainer = null
-var header: Control = null
+var frame_art: TextureRect = null
 var title_label: Label = null
 var close_btn: Button = null
-var toggles_well: Panel = null
-var toggles_margin: MarginContainer = null
-var toggles_box: VBoxContainer = null
 var bg_section_label: Label = null
 var themes_well: Panel = null
-var themes_margin: MarginContainer = null
-var theme_grid: GridContainer = null
 var theme_option_roots: Array[Panel] = []
-var _toggle_rows: Array[HBoxContainer] = []
 var _toggle_labels: Array[Label] = []
 var _toggle_btns: Array[Button] = []
+var _toggle_pill_labels: Array[Label] = []
 var _toggle_setters: Array[Callable] = []
 var _music_btn: Button = null
-var _actions_box: VBoxContainer = null
+var _music_pill_label: Label = null
 var _restart_btn: Button = null
+var _restart_label: Label = null
 var _contact_btn: Button = null
+var _contact_label: Label = null
 var _restore_btn: Button = null
-var _legal_row: HBoxContainer = null
+var _restore_label: Label = null
 var _terms_btn: Button = null
+var _terms_label: Label = null
 var _privacy_btn: Button = null
+var _privacy_label: Label = null
 var _status_label: Label = null
 var _restart_available := false
 var _confirm_root: Control = null
@@ -78,7 +79,7 @@ func close() -> void:
 func is_open() -> bool:
 	return visible
 
-## Solo en partida: muestra el botón Reiniciar.
+## Solo en partida: muestra el boton Reiniciar en la pastilla rosa central.
 func set_restart_available(available: bool) -> void:
 	_restart_available = available
 	_sync_restart_button_visibility()
@@ -91,153 +92,162 @@ func _on_background_theme_changed(_theme_id: String) -> void:
 func layout_for_viewport(viewport_size: Vector2) -> void:
 	if card == null:
 		return
-	var scale := viewport_size.x / REF_WIDTH
-	var card_w := viewport_size.x * 0.88
-	var outer_pad := int(22.0 * scale)
-	var top_pad := int(18.0 * scale)
-	var bottom_pad := int(18.0 * scale)
-	var sep := int(16.0 * scale)
-
-	if card_margin != null:
-		card_margin.add_theme_constant_override("margin_left", outer_pad)
-		card_margin.add_theme_constant_override("margin_top", top_pad)
-		card_margin.add_theme_constant_override("margin_right", outer_pad)
-		card_margin.add_theme_constant_override("margin_bottom", bottom_pad)
-	if main_vbox != null:
-		main_vbox.add_theme_constant_override("separation", sep)
-
-	var header_h := 72.0 * scale
-	if header != null:
-		header.custom_minimum_size = Vector2(0, header_h)
+	var tex_size := Vector2(1223, 1457)
+	if frame_art != null and frame_art.texture != null:
+		tex_size = frame_art.texture.get_size()
+	var card_size: Vector2 = SettingsFrameLayoutServiceScript.card_size(viewport_size, tex_size)
+	card.size = card_size
+	card.position = Vector2(
+		(viewport_size.x - card_size.x) * 0.5,
+		(viewport_size.y - card_size.y) * 0.5
+	)
+	if frame_art != null:
+		frame_art.position = Vector2.ZERO
+		frame_art.size = card_size
+	_place_mapped(title_label, card_size, SettingsFrameLayoutServiceScript.TITLE_FRAC)
 	if title_label != null:
-		title_label.add_theme_font_size_override("font_size", int(58 * scale))
-		title_label.add_theme_constant_override("outline_size", int(TITLE_OUTLINE * scale))
-	if close_btn != null:
-		var close_side := 64.0 * scale
-		close_btn.custom_minimum_size = Vector2(close_side, close_side)
-		close_btn.add_theme_font_size_override("font_size", int(36 * scale))
-		close_btn.add_theme_constant_override("outline_size", int(BUTTON_OUTLINE * scale))
-		close_btn.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
-		close_btn.offset_left = -close_side
-		close_btn.offset_top = -close_side * 0.5
-		close_btn.offset_right = 0
-		close_btn.offset_bottom = close_side * 0.5
-
-	var well_pad := int(14.0 * scale)
-	if toggles_margin != null:
-		toggles_margin.add_theme_constant_override("margin_left", well_pad)
-		toggles_margin.add_theme_constant_override("margin_top", well_pad)
-		toggles_margin.add_theme_constant_override("margin_right", well_pad)
-		toggles_margin.add_theme_constant_override("margin_bottom", well_pad)
-	if themes_margin != null:
-		themes_margin.add_theme_constant_override("margin_left", well_pad)
-		themes_margin.add_theme_constant_override("margin_top", well_pad)
-		themes_margin.add_theme_constant_override("margin_right", well_pad)
-		themes_margin.add_theme_constant_override("margin_bottom", well_pad)
-
-	var toggle_h := 70.0 * scale
-	var toggle_font := int(42 * scale)
-	var toggle_btn := Vector2(140.0 * scale, 58.0 * scale)
-	for i in range(_toggle_labels.size()):
-		_toggle_labels[i].add_theme_font_size_override("font_size", toggle_font)
-		_toggle_labels[i].add_theme_constant_override("outline_size", int(LABEL_OUTLINE * scale))
-	for i in range(_toggle_btns.size()):
-		_toggle_btns[i].custom_minimum_size = toggle_btn
-		_toggle_btns[i].add_theme_font_size_override("font_size", int(28 * scale))
-		_toggle_btns[i].add_theme_constant_override("outline_size", int(BUTTON_OUTLINE * scale))
-	if _music_btn != null:
-		_music_btn.custom_minimum_size = toggle_btn
-		_music_btn.add_theme_font_size_override("font_size", int(28 * scale))
-		_music_btn.add_theme_constant_override("outline_size", int(BUTTON_OUTLINE * scale))
-	for row in _toggle_rows:
-		row.custom_minimum_size = Vector2(0, toggle_h)
-	var toggles_block_h := toggle_h * 3.0 + float(sep) * 2.0 + float(well_pad) * 2.0
-	if toggles_well != null:
-		toggles_well.custom_minimum_size = Vector2(0, toggles_block_h)
-
-	var section_h := 50.0 * scale
+		var title_h: float = SettingsFrameLayoutServiceScript.mapped_rect(
+			card_size,
+			SettingsFrameLayoutServiceScript.TITLE_FRAC
+		).size.y
+		var title_font: int = SettingsFrameLayoutServiceScript.title_font_size(title_h)
+		title_label.add_theme_font_size_override("font_size", title_font)
+		title_label.add_theme_constant_override("outline_size", maxi(int(round(float(title_font) * 0.10)), 4))
+	_place_mapped(close_btn, card_size, SettingsFrameLayoutServiceScript.CLOSE_FRAC)
+	_layout_toggle_row(0, card_size, _toggle_labels[0] if _toggle_labels.size() > 0 else null, _music_btn, _music_pill_label)
+	_layout_toggle_row(1, card_size, _toggle_labels[1] if _toggle_labels.size() > 1 else null, _toggle_btns[0] if _toggle_btns.size() > 0 else null, _toggle_pill_labels[0] if _toggle_pill_labels.size() > 0 else null)
+	_layout_toggle_row(2, card_size, _toggle_labels[2] if _toggle_labels.size() > 2 else null, _toggle_btns[1] if _toggle_btns.size() > 1 else null, _toggle_pill_labels[1] if _toggle_pill_labels.size() > 1 else null)
+	_layout_action_pill(
+		_restart_btn,
+		_restart_label,
+		SettingsFrameLayoutServiceScript.mapped_rect(card_size, SettingsFrameLayoutServiceScript.SECTION_FRAC),
+		SettingsFrameLayoutServiceScript.mapped_rect(card_size, SettingsFrameLayoutServiceScript.SECTION_TEXT_FRAC)
+	)
+	_place_mapped(bg_section_label, card_size, SettingsFrameLayoutServiceScript.SECTION_TEXT_FRAC)
 	if bg_section_label != null:
-		bg_section_label.add_theme_font_size_override("font_size", int(44 * scale))
-		bg_section_label.add_theme_constant_override("outline_size", int(LABEL_OUTLINE * scale))
-		bg_section_label.custom_minimum_size = Vector2(0, section_h)
-
-	var gap := 14.0 * scale
-	if theme_grid != null:
-		theme_grid.add_theme_constant_override("h_separation", int(gap))
-		theme_grid.add_theme_constant_override("v_separation", int(gap))
-	var grid_w := card_w - float(outer_pad) * 2.0 - float(well_pad) * 2.0
-	var cell_w := (grid_w - gap * 3.0) / 4.0
-	# Miniaturas casi a todo el ancho de cada celda (sin tope chico).
-	var preview_side := cell_w * 0.92
-	var option_h := preview_side + 12.0 * scale
-	for option in theme_option_roots:
+		var section_h: float = SettingsFrameLayoutServiceScript.mapped_rect(
+			card_size,
+			SettingsFrameLayoutServiceScript.SECTION_FRAC
+		).size.y
+		var section_font: int = SettingsFrameLayoutServiceScript.action_font_size(section_h)
+		bg_section_label.add_theme_font_size_override("font_size", section_font)
+		bg_section_label.add_theme_constant_override("outline_size", maxi(int(round(float(section_font) * 0.12)), 4))
+	if themes_well != null:
+		themes_well.position = Vector2.ZERO
+		themes_well.size = card_size
+	for i in range(theme_option_roots.size()):
+		var option: Panel = theme_option_roots[i]
 		if option == null:
 			continue
-		option.custom_minimum_size = Vector2(cell_w, option_h)
-		for child in option.get_children():
-			if child is TextureButton:
-				(child as TextureButton).custom_minimum_size = Vector2(preview_side, preview_side)
-	var theme_rows := ceili(float(maxi(theme_option_roots.size(), 1)) / 4.0)
-	var grid_h := option_h * float(theme_rows) + gap * float(maxi(theme_rows - 1, 0))
-	var themes_h := grid_h + float(well_pad) * 2.0
-	if themes_well != null:
-		themes_well.custom_minimum_size = Vector2(0, themes_h)
-
-	var action_h := 74.0 * scale
-	var action_font := int(38 * scale)
-	var action_btns: Array[Button] = [_restart_btn, _contact_btn, _restore_btn]
-	var visible_actions := 0
-	for btn in action_btns:
-		if btn == null:
+		var cell_rect: Rect2 = SettingsFrameLayoutServiceScript.theme_cell_rect(card_size, i)
+		if cell_rect.size.x <= 0.0:
+			option.visible = false
 			continue
-		btn.custom_minimum_size = Vector2(0, action_h)
-		btn.add_theme_font_size_override("font_size", action_font)
-		btn.add_theme_constant_override("outline_size", int(BUTTON_OUTLINE * scale))
-		if btn.visible:
-			visible_actions += 1
-	if _actions_box != null:
-		_actions_box.add_theme_constant_override("separation", sep)
-	var actions_block_h := action_h * float(maxi(visible_actions, 1)) + float(sep) * float(maxi(visible_actions - 1, 0))
-	var legal_h := 52.0 * scale
-	if _legal_row != null:
-		_legal_row.custom_minimum_size = Vector2(0, legal_h)
-	for link in [_terms_btn, _privacy_btn]:
-		if link == null:
-			continue
-		link.add_theme_font_size_override("font_size", int(28 * scale))
-		link.add_theme_constant_override("outline_size", int(LABEL_OUTLINE * scale))
-	var status_h := 0.0
-	if _status_label != null:
-		_status_label.add_theme_font_size_override("font_size", int(26 * scale))
-		_status_label.add_theme_constant_override("outline_size", int(LABEL_OUTLINE * scale))
-		if _status_label.visible:
-			status_h = 36.0 * scale
-
-	var content_h := (
-		header_h
-		+ toggles_block_h
-		+ section_h
-		+ themes_h
-		+ actions_block_h
-		+ status_h
-		+ legal_h
-		+ float(sep) * 5.0
-		+ float(top_pad + bottom_pad)
+		option.visible = true
+		option.custom_minimum_size = Vector2.ZERO
+		_place_rect(option, cell_rect)
+		_layout_theme_preview(option, cell_rect.size)
+	_layout_action_pill(
+		_contact_btn,
+		_contact_label,
+		SettingsFrameLayoutServiceScript.mapped_rect(card_size, SettingsFrameLayoutServiceScript.CONTACT_FRAC),
+		SettingsFrameLayoutServiceScript.mapped_rect(card_size, SettingsFrameLayoutServiceScript.CONTACT_TEXT_FRAC),
+		true
 	)
-	var card_h := mini(content_h, viewport_size.y * 0.96)
-	card.size = Vector2(card_w, card_h)
-	card.position = Vector2((viewport_size.x - card_w) * 0.5, (viewport_size.y - card_h) * 0.5)
+	_layout_action_pill(
+		_restore_btn,
+		_restore_label,
+		SettingsFrameLayoutServiceScript.mapped_rect(card_size, SettingsFrameLayoutServiceScript.RESTORE_FRAC),
+		SettingsFrameLayoutServiceScript.mapped_rect(card_size, SettingsFrameLayoutServiceScript.RESTORE_TEXT_FRAC),
+		true
+	)
+	_layout_action_pill(
+		_terms_btn,
+		_terms_label,
+		SettingsFrameLayoutServiceScript.mapped_rect(card_size, SettingsFrameLayoutServiceScript.TERMS_FRAC),
+		SettingsFrameLayoutServiceScript.mapped_rect(card_size, SettingsFrameLayoutServiceScript.TERMS_TEXT_FRAC),
+		true
+	)
+	_layout_action_pill(
+		_privacy_btn,
+		_privacy_label,
+		SettingsFrameLayoutServiceScript.mapped_rect(card_size, SettingsFrameLayoutServiceScript.PRIVACY_FRAC),
+		SettingsFrameLayoutServiceScript.mapped_rect(card_size, SettingsFrameLayoutServiceScript.PRIVACY_TEXT_FRAC),
+		true
+	)
+	_place_mapped(_status_label, card_size, SettingsFrameLayoutServiceScript.STATUS_FRAC)
+	var status_h: float = SettingsFrameLayoutServiceScript.mapped_rect(
+		card_size,
+		SettingsFrameLayoutServiceScript.STATUS_FRAC
+	).size.y
+	var status_font: int = SettingsFrameLayoutServiceScript.legal_font_size(status_h)
+	if _status_label != null:
+		_status_label.add_theme_font_size_override("font_size", status_font)
+		_status_label.add_theme_constant_override("outline_size", maxi(int(round(float(status_font) * 0.10)), 3))
+	_layout_confirm_card(viewport_size.x / REF_WIDTH)
 
-	if _confirm_title != null:
-		_confirm_title.add_theme_font_size_override("font_size", int(42 * scale))
-		_confirm_title.add_theme_constant_override("outline_size", int(LABEL_OUTLINE * scale))
-	if _confirm_salir_btn != null:
-		_confirm_salir_btn.custom_minimum_size = Vector2(0, 76.0 * scale)
-		_confirm_salir_btn.add_theme_font_size_override("font_size", int(38 * scale))
-	if _confirm_atras_btn != null:
-		_confirm_atras_btn.custom_minimum_size = Vector2(0, 76.0 * scale)
-		_confirm_atras_btn.add_theme_font_size_override("font_size", int(38 * scale))
-	_layout_confirm_card(scale)
+func _layout_toggle_row(index: int, card_size: Vector2, label: Label, btn: Button, pill_label: Label) -> void:
+	if index < 0 or index >= SettingsFrameLayoutServiceScript.TOGGLE_LABEL_FRACS.size():
+		return
+	var label_rect: Rect2 = SettingsFrameLayoutServiceScript.mapped_rect(
+		card_size,
+		SettingsFrameLayoutServiceScript.TOGGLE_LABEL_FRACS[index]
+	)
+	var pill_rect: Rect2 = SettingsFrameLayoutServiceScript.mapped_rect(
+		card_size,
+		SettingsFrameLayoutServiceScript.TOGGLE_PILL_FRACS[index]
+	)
+	_place_rect(label, label_rect)
+	if label != null:
+		var label_font: int = SettingsFrameLayoutServiceScript.toggle_label_font_size(label_rect.size.y)
+		label.add_theme_font_size_override("font_size", label_font)
+		label.add_theme_constant_override("outline_size", maxi(int(round(float(label_font) * 0.12)), 3))
+	_place_rect(btn, pill_rect)
+	_place_rect(pill_label, pill_rect)
+	if btn != null:
+		btn.custom_minimum_size = Vector2.ZERO
+	if pill_label != null:
+		var pill_font: int = SettingsFrameLayoutServiceScript.toggle_pill_font_size(pill_rect.size.y)
+		pill_label.add_theme_font_size_override("font_size", pill_font)
+		pill_label.add_theme_constant_override("outline_size", maxi(int(round(float(pill_font) * 0.12)), 3))
+
+func _layout_action_pill(btn: Button, lbl: Label, hit_rect: Rect2, text_rect: Rect2, grid: bool = false) -> void:
+	if btn != null:
+		btn.custom_minimum_size = Vector2.ZERO
+		btn.position = hit_rect.position
+		btn.size = hit_rect.size
+	if lbl != null:
+		lbl.position = text_rect.position
+		lbl.size = text_rect.size
+		var font_size: int = (
+			SettingsFrameLayoutServiceScript.grid_action_font_size(hit_rect.size.y)
+			if grid
+			else SettingsFrameLayoutServiceScript.action_font_size(hit_rect.size.y)
+		)
+		lbl.add_theme_font_size_override("font_size", font_size)
+		lbl.add_theme_constant_override("outline_size", maxi(int(round(float(font_size) * 0.12)), 4))
+
+func _layout_theme_preview(option: Panel, size: Vector2) -> void:
+	var preview: Variant = option.get_meta("preview", null)
+	if not (preview is TextureButton):
+		return
+	var btn := preview as TextureButton
+	var pad: float = clampf(minf(size.x, size.y) * 0.06, 3.0, 8.0)
+	btn.offset_left = pad
+	btn.offset_top = pad
+	btn.offset_right = -pad
+	btn.offset_bottom = -pad
+	var inner := Vector2(maxf(size.x - pad * 2.0, 1.0), maxf(size.y - pad * 2.0, 1.0))
+	HudTextureButtons.apply_rounded_clip(btn, inner, minf(inner.x, inner.y) * 0.18)
+
+func _place_mapped(node: Control, card_size: Vector2, frac: Rect2) -> void:
+	_place_rect(node, SettingsFrameLayoutServiceScript.mapped_rect(card_size, frac))
+
+func _place_rect(node: Control, rect: Rect2) -> void:
+	if node == null:
+		return
+	node.position = rect.position
+	node.size = rect.size
 
 func _build_ui() -> void:
 	overlay = ColorRect.new()
@@ -249,142 +259,131 @@ func _build_ui() -> void:
 
 	card = Panel.new()
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
+	card.clip_contents = false
+	card.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 	add_child(card)
 
-	card_margin = MarginContainer.new()
-	card_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	card_margin.add_theme_constant_override("margin_left", 14)
-	card_margin.add_theme_constant_override("margin_top", 16)
-	card_margin.add_theme_constant_override("margin_right", 14)
-	card_margin.add_theme_constant_override("margin_bottom", 16)
-	card.add_child(card_margin)
-
-	main_vbox = VBoxContainer.new()
-	main_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	main_vbox.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	main_vbox.add_theme_constant_override("separation", 12)
-	card_margin.add_child(main_vbox)
-
-	# Header: título centrado + X rojo (mismo formato que perfil).
-	header = Control.new()
-	header.custom_minimum_size = Vector2(0, 58)
-	header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	main_vbox.add_child(header)
+	frame_art = TextureRect.new()
+	if ResourceLoader.exists(FRAME_PATH):
+		frame_art.texture = load(FRAME_PATH) as Texture2D
+	frame_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	frame_art.stretch_mode = TextureRect.STRETCH_SCALE
+	frame_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(frame_art)
 
 	title_label = _make_outlined_label("Ajustes", 52)
-	title_label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	header.add_child(title_label)
+	title_label.clip_text = false
+	card.add_child(title_label)
 
-	close_btn = Button.new()
-	close_btn.text = "✕"
-	close_btn.focus_mode = Control.FOCUS_NONE
-	close_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	close_btn.custom_minimum_size = Vector2(56, 56)
-	close_btn.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
-	close_btn.offset_left = -56
-	close_btn.offset_top = -28
-	close_btn.offset_right = 0
-	close_btn.offset_bottom = 28
-	if LogoFont != null:
-		close_btn.add_theme_font_override("font", LogoFont)
+	close_btn = _make_empty_button()
 	close_btn.pressed.connect(close)
-	GameState.hook_button_sound(close_btn)
-	header.add_child(close_btn)
+	card.add_child(close_btn)
 
-	toggles_well = Panel.new()
-	toggles_well.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	toggles_well.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	main_vbox.add_child(toggles_well)
+	_add_row_label("Música")
+	_music_btn = _make_empty_button()
+	_music_btn.pressed.connect(_on_music_pressed)
+	card.add_child(_music_btn)
+	_music_pill_label = _make_outlined_label("Chill", 26)
+	_music_pill_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_music_pill_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	card.add_child(_music_pill_label)
 
-	toggles_margin = MarginContainer.new()
-	toggles_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	toggles_margin.add_theme_constant_override("margin_left", 10)
-	toggles_margin.add_theme_constant_override("margin_top", 10)
-	toggles_margin.add_theme_constant_override("margin_right", 10)
-	toggles_margin.add_theme_constant_override("margin_bottom", 10)
-	toggles_well.add_child(toggles_margin)
-
-	toggles_box = VBoxContainer.new()
-	toggles_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	toggles_box.add_theme_constant_override("separation", 10)
-	toggles_margin.add_child(toggles_box)
-
-	_add_music_row(toggles_box)
-	_add_toggle_row(toggles_box, "Sonidos", _get_sounds_enabled, _set_sounds_enabled)
-	_add_toggle_row(toggles_box, "Vibración", _get_vibration_enabled, _set_vibration_enabled)
+	_add_toggle_row("Sonidos", _get_sounds_enabled, _set_sounds_enabled)
+	_add_toggle_row("Vibración", _get_vibration_enabled, _set_vibration_enabled)
 
 	bg_section_label = _make_outlined_label("Fondo", 40)
 	bg_section_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	bg_section_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	main_vbox.add_child(bg_section_label)
+	bg_section_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	card.add_child(bg_section_label)
+
+	_restart_btn = _make_empty_button()
+	_restart_btn.pressed.connect(_on_restart_pressed)
+	_restart_btn.visible = false
+	card.add_child(_restart_btn)
+	_restart_label = _make_outlined_label("Reiniciar nivel", 40)
+	_restart_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_restart_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_restart_label.visible = false
+	card.add_child(_restart_label)
 
 	themes_well = Panel.new()
-	themes_well.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	themes_well.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	main_vbox.add_child(themes_well)
-
-	themes_margin = MarginContainer.new()
-	themes_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	themes_margin.add_theme_constant_override("margin_left", 10)
-	themes_margin.add_theme_constant_override("margin_top", 10)
-	themes_margin.add_theme_constant_override("margin_right", 10)
-	themes_margin.add_theme_constant_override("margin_bottom", 10)
-	themes_well.add_child(themes_margin)
-
-	theme_grid = GridContainer.new()
-	theme_grid.columns = 4
-	theme_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	theme_grid.add_theme_constant_override("h_separation", 10)
-	theme_grid.add_theme_constant_override("v_separation", 10)
-	themes_margin.add_child(theme_grid)
+	themes_well.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	themes_well.clip_contents = false
+	themes_well.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	card.add_child(themes_well)
 
 	for theme in GameState.get_background_themes():
 		var option := _build_theme_option(theme)
-		theme_grid.add_child(option)
+		themes_well.add_child(option)
 		theme_option_roots.append(option)
 
-	_actions_box = VBoxContainer.new()
-	_actions_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_actions_box.add_theme_constant_override("separation", 12)
-	main_vbox.add_child(_actions_box)
-
-	_restart_btn = _make_action_button("Reiniciar nivel")
-	_restart_btn.pressed.connect(_on_restart_pressed)
-	_restart_btn.visible = false
-	_actions_box.add_child(_restart_btn)
-
-	_contact_btn = _make_action_button("Contacto")
+	_contact_btn = _make_empty_button()
 	_contact_btn.pressed.connect(_on_contact_pressed)
-	_actions_box.add_child(_contact_btn)
+	card.add_child(_contact_btn)
+	_contact_label = _make_outlined_label("Contacto", 40)
+	_contact_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_contact_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	card.add_child(_contact_label)
 
-	_restore_btn = _make_action_button("Restaurar compras")
+	_restore_btn = _make_empty_button()
 	_restore_btn.pressed.connect(_on_restore_pressed)
-	_actions_box.add_child(_restore_btn)
+	card.add_child(_restore_btn)
+	_restore_label = _make_outlined_label("Restaurar compras", 40)
+	_restore_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_restore_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	card.add_child(_restore_label)
+
+	_terms_btn = _make_empty_button()
+	_terms_btn.pressed.connect(_on_terms_pressed)
+	card.add_child(_terms_btn)
+	_terms_label = _make_outlined_label("Términos y cond.", 32)
+	_terms_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_terms_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	card.add_child(_terms_label)
+
+	_privacy_btn = _make_empty_button()
+	_privacy_btn.pressed.connect(_on_privacy_pressed)
+	card.add_child(_privacy_btn)
+	_privacy_label = _make_outlined_label("Privacidad", 32)
+	_privacy_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_privacy_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	card.add_child(_privacy_label)
 
 	_status_label = _make_outlined_label("", 24)
 	_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_status_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_status_label.visible = false
-	main_vbox.add_child(_status_label)
-
-	_legal_row = HBoxContainer.new()
-	_legal_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_legal_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	_legal_row.add_theme_constant_override("separation", 18)
-	main_vbox.add_child(_legal_row)
-
-	_terms_btn = _make_link_button("Términos y cond.")
-	_terms_btn.pressed.connect(_on_terms_pressed)
-	_legal_row.add_child(_terms_btn)
-
-	_privacy_btn = _make_link_button("Privacy Policy")
-	_privacy_btn.pressed.connect(_on_privacy_pressed)
-	_legal_row.add_child(_privacy_btn)
+	card.add_child(_status_label)
 
 	_build_restart_confirm()
 	_apply_theme_colors()
+
+func _add_row_label(text: String) -> void:
+	var lbl := _make_outlined_label(text, 30)
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	card.add_child(lbl)
+	_toggle_labels.append(lbl)
+
+func _add_toggle_row(label_text: String, getter: Callable, setter: Callable) -> void:
+	_add_row_label(label_text)
+	var btn := _make_empty_button()
+	var toggle_idx := _toggle_btns.size()
+	btn.toggle_mode = true
+	btn.pressed.connect(_on_toggle_pressed.bind(toggle_idx))
+	card.add_child(btn)
+	_toggle_btns.append(btn)
+	_toggle_setters.append(setter)
+	var pill := _make_outlined_label("ON", 26)
+	pill.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	pill.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	card.add_child(pill)
+	_toggle_pill_labels.append(pill)
+	btn.button_pressed = bool(getter.call())
+	_apply_toggle_style(btn, btn.button_pressed)
 
 func _build_restart_confirm() -> void:
 	_confirm_root = Control.new()
@@ -434,6 +433,10 @@ func _build_restart_confirm() -> void:
 func _sync_restart_button_visibility() -> void:
 	if _restart_btn != null:
 		_restart_btn.visible = _restart_available
+	if _restart_label != null:
+		_restart_label.visible = _restart_available
+	if bg_section_label != null:
+		bg_section_label.visible = not _restart_available
 	if visible:
 		layout_for_viewport(get_viewport_rect().size)
 
@@ -525,14 +528,31 @@ func _on_confirm_salir_pressed() -> void:
 	restart_level_confirmed.emit()
 
 func _make_outlined_label(text: String, font_size: int) -> Label:
-	return UiStyleUtils.make_outlined_label(
-		text,
-		font_size,
-		LogoFont,
-		Color(0.88, 0.86, 0.83),
-		TEXT_OUTLINE,
-		LABEL_OUTLINE
-	)
+	var lbl := Label.new()
+	lbl.text = text
+	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	lbl.add_theme_font_size_override("font_size", font_size)
+	lbl.add_theme_color_override("font_color", PILL_TEXT)
+	lbl.add_theme_color_override("font_outline_color", PILL_OUTLINE)
+	lbl.add_theme_constant_override("outline_size", 5)
+	if LogoFont != null:
+		lbl.add_theme_font_override("font", LogoFont)
+	return lbl
+
+func _make_empty_button() -> Button:
+	var btn := Button.new()
+	btn.text = ""
+	btn.flat = true
+	btn.focus_mode = Control.FOCUS_NONE
+	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	var empty := StyleBoxEmpty.new()
+	btn.add_theme_stylebox_override("normal", empty)
+	btn.add_theme_stylebox_override("hover", empty)
+	btn.add_theme_stylebox_override("pressed", empty)
+	btn.add_theme_stylebox_override("focus", empty)
+	btn.add_theme_stylebox_override("disabled", empty)
+	GameState.hook_button_sound(btn)
+	return btn
 
 func _make_action_button(text: String) -> Button:
 	var btn := Button.new()
@@ -546,21 +566,6 @@ func _make_action_button(text: String) -> Button:
 	btn.add_theme_font_size_override("font_size", 34)
 	btn.add_theme_color_override("font_outline_color", TEXT_OUTLINE)
 	btn.add_theme_constant_override("outline_size", BUTTON_OUTLINE)
-	GameState.hook_button_sound(btn)
-	return btn
-
-func _make_link_button(text: String) -> Button:
-	var btn := Button.new()
-	btn.text = text
-	btn.focus_mode = Control.FOCUS_NONE
-	btn.flat = true
-	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	if LogoFont != null:
-		btn.add_theme_font_override("font", LogoFont)
-	btn.add_theme_font_size_override("font_size", 26)
-	btn.add_theme_color_override("font_outline_color", TEXT_OUTLINE)
-	btn.add_theme_constant_override("outline_size", LABEL_OUTLINE)
 	GameState.hook_button_sound(btn)
 	return btn
 
@@ -578,161 +583,61 @@ func _apply_button_style(btn: Button, bg: Color, border: Color, radius: int, fon
 		BUTTON_OUTLINE
 	)
 
-func _apply_link_style(btn: Button, color: Color) -> void:
-	if btn == null:
-		return
-	btn.add_theme_color_override("font_color", color)
-	btn.add_theme_color_override("font_hover_color", color.lightened(0.12))
-	btn.add_theme_color_override("font_pressed_color", color.darkened(0.08))
-	btn.add_theme_color_override("font_outline_color", TEXT_OUTLINE)
-	btn.add_theme_constant_override("outline_size", LABEL_OUTLINE)
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0, 0, 0, 0)
-	style.border_color = color
-	style.border_width_bottom = 3
-	style.content_margin_left = 4
-	style.content_margin_right = 4
-	style.content_margin_top = 4
-	style.content_margin_bottom = 6
-	btn.add_theme_stylebox_override("normal", style)
-	btn.add_theme_stylebox_override("hover", style)
-	btn.add_theme_stylebox_override("pressed", style)
-	btn.add_theme_stylebox_override("focus", style)
-
 func _apply_theme_colors() -> void:
+	if card != null:
+		card.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	if themes_well != null:
+		themes_well.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	if title_label != null:
+		title_label.add_theme_color_override("font_color", TITLE_FILL)
+		title_label.add_theme_color_override("font_outline_color", TITLE_OUTLINE)
+	for lbl in _toggle_labels:
+		if lbl != null:
+			lbl.add_theme_color_override("font_color", ROW_INK)
+			lbl.add_theme_color_override("font_outline_color", TITLE_OUTLINE)
+	for lbl in [_music_pill_label]:
+		if lbl != null:
+			lbl.add_theme_color_override("font_color", PILL_TEXT)
+			lbl.add_theme_color_override("font_outline_color", PILL_OUTLINE)
+	for lbl in _toggle_pill_labels:
+		if lbl != null:
+			lbl.add_theme_color_override("font_color", PILL_TEXT)
+			lbl.add_theme_color_override("font_outline_color", PILL_OUTLINE)
+	for lbl in [bg_section_label, _restart_label, _contact_label, _restore_label, _terms_label, _privacy_label]:
+		if lbl != null:
+			lbl.add_theme_color_override("font_color", PILL_TEXT)
+			lbl.add_theme_color_override("font_outline_color", PILL_OUTLINE)
+	if _status_label != null:
+		_status_label.add_theme_color_override("font_color", ROW_INK)
+		_status_label.add_theme_color_override("font_outline_color", TITLE_OUTLINE)
+
 	var p: Dictionary = GameState.get_ui_palette()
 	var card_bg: Color = p.get("settings_card_bg", Color(0.62, 0.52, 0.82, 0.98))
 	card_bg = card_bg.lightened(0.18)
-	var card_border: Color = p.get("settings_card_border", Color(0.42, 0.28, 0.58, 0.95))
-	card_border = card_border.darkened(0.35)
-	var inset: Color = p.get("settings_btn_off", Color(0.34, 0.26, 0.48, 0.95))
-	inset.a = 0.98
-	var well: Color = inset.darkened(0.12)
-	well.a = 0.98
-
-	if card != null:
-		card.add_theme_stylebox_override("panel", _flat_style(card_bg, card_border, 30, 4))
-	if toggles_well != null:
-		toggles_well.add_theme_stylebox_override("panel", _flat_style(well, card_border.darkened(0.15), 20, 2))
-	if themes_well != null:
-		themes_well.add_theme_stylebox_override("panel", _flat_style(well, card_border.darkened(0.15), 20, 2))
-
-	_apply_button_style(close_btn, CLOSE_RED, CLOSE_RED_BORDER, 14, Color(0.90, 0.88, 0.85))
 	var btn_on: Color = p.get("settings_btn_on", Color(0.58, 0.80, 0.48, 0.98))
 	var btn_border: Color = p.get("settings_btn_border", Color(0.75, 0.88, 0.58, 1.0))
-	var text_marble := Color(0.88, 0.86, 0.83)
-	# Confirm reiniciar: borde del color del botón CTA (Salir / Continuar del tema).
+	var card_border: Color = p.get("settings_card_border", Color(0.42, 0.28, 0.58, 0.95))
 	if _confirm_card != null:
 		_confirm_card.add_theme_stylebox_override("panel", _flat_style(card_bg, btn_on, 30, 5))
-	if title_label != null:
-		title_label.add_theme_color_override("font_color", p.get("settings_title", text_marble))
-		title_label.add_theme_color_override("font_outline_color", TEXT_OUTLINE)
-	if bg_section_label != null:
-		bg_section_label.add_theme_color_override("font_color", p.get("settings_section", text_marble))
-		bg_section_label.add_theme_color_override("font_outline_color", TEXT_OUTLINE)
 	if _confirm_title != null:
-		_confirm_title.add_theme_color_override("font_color", p.get("settings_title", text_marble))
-		_confirm_title.add_theme_color_override("font_outline_color", TEXT_OUTLINE)
-	for lbl in _toggle_labels:
-		if lbl != null:
-			lbl.add_theme_color_override("font_color", p.get("settings_label", text_marble))
-			lbl.add_theme_color_override("font_outline_color", TEXT_OUTLINE)
-	_apply_button_style(_contact_btn, btn_on, btn_border, 26, text_marble)
-	_apply_button_style(_restore_btn, btn_on, btn_border, 26, text_marble)
-	_apply_button_style(_restart_btn, p.get("settings_btn_off", Color(0.40, 0.50, 0.40, 0.95)), card_border, 26, text_marble)
-	_apply_button_style(_confirm_salir_btn, btn_on, btn_border, 26, text_marble)
-	_apply_button_style(_confirm_atras_btn, p.get("settings_btn_off", Color(0.40, 0.50, 0.40, 0.95)), card_border, 26, text_marble)
-	var link_color: Color = p.get("settings_title", text_marble)
-	_apply_link_style(_terms_btn, link_color)
-	_apply_link_style(_privacy_btn, link_color)
-	if _status_label != null:
-		_status_label.add_theme_color_override("font_color", p.get("settings_label", text_marble))
-		_status_label.add_theme_color_override("font_outline_color", TEXT_OUTLINE)
+		_confirm_title.add_theme_color_override("font_color", TITLE_FILL)
+		_confirm_title.add_theme_color_override("font_outline_color", TITLE_OUTLINE)
+	_apply_button_style(_confirm_salir_btn, btn_on, btn_border, 26, TITLE_FILL)
+	_apply_button_style(_confirm_atras_btn, p.get("settings_btn_off", Color(0.40, 0.50, 0.40, 0.95)), card_border, 26, TITLE_FILL)
 
+	_apply_music_style()
 	for i in range(_toggle_btns.size()):
 		_apply_toggle_style(_toggle_btns[i], _toggle_btns[i].button_pressed)
-	_apply_music_style()
 	_refresh_theme_selection()
 	_apply_rainbow_ui_fills()
 
 func _apply_rainbow_ui_fills() -> void:
-	if card != null:
-		HudTextureButtons.apply_optional_rainbow_fill(card, 30, card.size, 4)
 	if _confirm_card != null:
 		HudTextureButtons.apply_optional_rainbow_fill(_confirm_card, 30, _confirm_card.size, 5)
-	if _contact_btn != null:
-		HudTextureButtons.apply_optional_rainbow_fill(_contact_btn, 26, _contact_btn.size, 3)
-	if _restore_btn != null:
-		HudTextureButtons.apply_optional_rainbow_fill(_restore_btn, 26, _restore_btn.size, 3)
-	if _restart_btn != null:
-		HudTextureButtons.apply_optional_rainbow_fill(_restart_btn, 26, _restart_btn.size, 3)
 	if _confirm_salir_btn != null:
 		HudTextureButtons.apply_optional_rainbow_fill(_confirm_salir_btn, 22, _confirm_salir_btn.size, 3)
 	if _confirm_atras_btn != null:
 		HudTextureButtons.apply_optional_rainbow_fill(_confirm_atras_btn, 22, _confirm_atras_btn.size, 3)
-	for btn in _toggle_btns:
-		if btn != null:
-			HudTextureButtons.apply_optional_rainbow_fill(btn, 14, btn.size, 3)
-	if _music_btn != null:
-		HudTextureButtons.apply_optional_rainbow_fill(_music_btn, 14, _music_btn.size, 3)
-
-func _add_music_row(parent: VBoxContainer) -> void:
-	var row := HBoxContainer.new()
-	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_theme_constant_override("separation", 16)
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	parent.add_child(row)
-	_toggle_rows.append(row)
-
-	var lbl := _make_outlined_label("Música", 30)
-	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(lbl)
-	_toggle_labels.append(lbl)
-
-	_music_btn = Button.new()
-	_music_btn.focus_mode = Control.FOCUS_NONE
-	_music_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	_music_btn.pressed.connect(_on_music_pressed)
-	GameState.hook_button_sound(_music_btn)
-	if LogoFont != null:
-		_music_btn.add_theme_font_override("font", LogoFont)
-	row.add_child(_music_btn)
-	_apply_music_style()
-
-func _add_toggle_row(
-	parent: VBoxContainer,
-	label_text: String,
-	getter: Callable,
-	setter: Callable
-) -> void:
-	var row := HBoxContainer.new()
-	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_theme_constant_override("separation", 16)
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	parent.add_child(row)
-	_toggle_rows.append(row)
-
-	var lbl := _make_outlined_label(label_text, 30)
-	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(lbl)
-	_toggle_labels.append(lbl)
-
-	var toggle_idx := _toggle_btns.size()
-	var btn := Button.new()
-	btn.focus_mode = Control.FOCUS_NONE
-	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	btn.toggle_mode = true
-	btn.pressed.connect(_on_toggle_pressed.bind(toggle_idx))
-	GameState.hook_button_sound(btn)
-	if LogoFont != null:
-		btn.add_theme_font_override("font", LogoFont)
-	row.add_child(btn)
-	_toggle_btns.append(btn)
-	_toggle_setters.append(setter)
-	btn.button_pressed = bool(getter.call())
-	_apply_toggle_style(btn, btn.button_pressed)
 
 func _get_sounds_enabled() -> bool:
 	return GameState.sounds_enabled
@@ -760,29 +665,9 @@ func _on_music_pressed() -> void:
 	_apply_music_style()
 
 func _apply_music_style() -> void:
-	if _music_btn == null:
+	if _music_pill_label == null:
 		return
-	var enabled: bool = GameState.music_enabled
-	_music_btn.text = BoardMusicServiceScript.button_label(GameState.music_track_id)
-	var p: Dictionary = GameState.get_ui_palette()
-	var text_marble := Color(0.88, 0.86, 0.83)
-	if enabled:
-		_apply_button_style(
-			_music_btn,
-			p.get("settings_btn_on", Color(0.58, 0.80, 0.48, 0.98)),
-			p.get("settings_btn_border", Color(0.75, 0.88, 0.58, 1.0)),
-			14,
-			text_marble
-		)
-	else:
-		_apply_button_style(
-			_music_btn,
-			p.get("settings_btn_off", Color(0.40, 0.50, 0.40, 0.95)),
-			p.get("settings_card_border", Color(0.52, 0.60, 0.48, 0.9)).darkened(0.2),
-			14,
-			text_marble
-		)
-	HudTextureButtons.apply_optional_rainbow_fill(_music_btn, 14, _music_btn.size, 3)
+	_music_pill_label.text = BoardMusicServiceScript.button_label(GameState.music_track_id)
 
 func _refresh_toggle_states() -> void:
 	if _toggle_btns.size() < 2:
@@ -796,39 +681,24 @@ func _sync_toggle_btn(index: int, on: bool) -> void:
 	_apply_toggle_style(_toggle_btns[index], on)
 
 func _apply_toggle_style(btn: Button, is_on: bool) -> void:
-	btn.text = "ON" if is_on else "OFF"
-	var p: Dictionary = GameState.get_ui_palette()
-	var text_marble := Color(0.88, 0.86, 0.83)
-	if is_on:
-		_apply_button_style(
-			btn,
-			p.get("settings_btn_on", Color(0.58, 0.80, 0.48, 0.98)),
-			p.get("settings_btn_border", Color(0.75, 0.88, 0.58, 1.0)),
-			14,
-			text_marble
-		)
-	else:
-		_apply_button_style(
-			btn,
-			p.get("settings_btn_off", Color(0.40, 0.50, 0.40, 0.95)),
-			p.get("settings_card_border", Color(0.52, 0.60, 0.48, 0.9)).darkened(0.2),
-			14,
-			text_marble
-		)
-	HudTextureButtons.apply_optional_rainbow_fill(btn, 14, btn.size, 3)
+	var idx := _toggle_btns.find(btn)
+	if idx >= 0 and idx < _toggle_pill_labels.size() and _toggle_pill_labels[idx] != null:
+		_toggle_pill_labels[idx].text = "ON" if is_on else "OFF"
 
 func _build_theme_option(theme: Dictionary) -> Panel:
 	var theme_id := str(theme.get("id", ""))
 	var wrap := Panel.new()
 	wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	wrap.clip_contents = true
 	wrap.set_meta("theme_id", theme_id)
+	wrap.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 
 	var preview := TextureButton.new()
 	preview.set_anchors_preset(Control.PRESET_FULL_RECT)
-	preview.offset_left = 6
-	preview.offset_top = 6
-	preview.offset_right = -6
-	preview.offset_bottom = -6
+	preview.offset_left = 4
+	preview.offset_top = 4
+	preview.offset_right = -4
+	preview.offset_bottom = -4
 	preview.texture_normal = load(str(theme.get("path", ""))) as Texture2D
 	preview.ignore_texture_size = true
 	preview.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_COVERED
@@ -838,12 +708,17 @@ func _build_theme_option(theme: Dictionary) -> Panel:
 	preview.pressed.connect(_on_theme_option_pressed.bind(theme_id))
 	GameState.hook_button_sound(preview)
 	wrap.add_child(preview)
+	wrap.set_meta("preview", preview)
 	return wrap
 
 func _apply_theme_option_style(option: Panel, selected: bool) -> void:
-	var border := SELECT_GREEN if selected else Color(0, 0, 0, 0)
-	var bg := Color(1, 1, 1, 0.10) if selected else Color(1, 1, 1, 0.04)
-	option.add_theme_stylebox_override("panel", _flat_style(bg, border, 14, 4 if selected else 0))
+	if selected:
+		option.add_theme_stylebox_override(
+			"panel",
+			_flat_style(Color(1, 1, 1, 0.0), SELECT_GREEN, 14, 4)
+		)
+	else:
+		option.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 
 func _refresh_theme_selection() -> void:
 	var current := GameState.background_theme_id

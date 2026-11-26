@@ -169,9 +169,13 @@ func _test_combo_pack() -> void:
 	var diamond_icons: PackedStringArray = ShopCatalogServiceScript.confirm_icon_keys(
 		ShopCatalogServiceScript.pack_by_id("diamonds_1000")
 	)
-	if diamond_icons.size() != 1 or diamond_icons[0] != "diamonds":
+	if diamond_icons.size() != 4:
 		_fail("diamond_confirm_icons", str(diamond_icons))
 		return
+	for key in diamond_icons:
+		if key != "diamonds":
+			_fail("diamond_confirm_icons", str(diamond_icons))
+			return
 	var mixed: Dictionary = ShopCatalogServiceScript.apply_mix_uses({"mix": 1, "hammer": 0}, 3)
 	if int(mixed.get("mix", 0)) != 4:
 		_fail("apply_mix", str(mixed))
