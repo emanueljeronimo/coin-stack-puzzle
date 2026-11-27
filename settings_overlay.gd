@@ -16,6 +16,9 @@ const TITLE_OUTLINE := Color(1.00, 0.96, 0.92, 0.85)
 const PILL_TEXT := Color(0.42, 0.20, 0.60, 1.0)
 const PILL_OUTLINE := Color(1.00, 0.96, 0.92, 0.85)
 const ROW_INK := Color(0.42, 0.20, 0.60, 1.0)
+const THEME_SLOT_LILAC := Color(0.863, 0.745, 0.992, 1.0)
+const THEME_SLOT_BORDER := Color(0.58, 0.38, 0.88, 1.0)
+const THEME_SLOT_BORDER_W := 6
 const LABEL_OUTLINE := 8
 const BUTTON_OUTLINE := 8
 
@@ -25,6 +28,8 @@ var frame_art: TextureRect = null
 var title_label: Label = null
 var close_btn: Button = null
 var bg_section_label: Label = null
+var _about_btn: Button = null
+var _about_ui: AboutOverlay = null
 var themes_well: Panel = null
 var theme_option_roots: Array[Panel] = []
 var _toggle_labels: Array[Label] = []
@@ -53,6 +58,7 @@ var _confirm_atras_btn: Button = null
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
+	clip_contents = false
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	visible = false
 	_build_ui()
@@ -73,6 +79,8 @@ func open() -> void:
 
 func close() -> void:
 	_hide_restart_confirm()
+	if _about_ui != null:
+		_about_ui.close()
 	visible = false
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
@@ -121,17 +129,21 @@ func layout_for_viewport(viewport_size: Vector2) -> void:
 		_restart_btn,
 		_restart_label,
 		SettingsFrameLayoutServiceScript.mapped_rect(card_size, SettingsFrameLayoutServiceScript.SECTION_FRAC),
-		SettingsFrameLayoutServiceScript.mapped_rect(card_size, SettingsFrameLayoutServiceScript.SECTION_TEXT_FRAC)
+		SettingsFrameLayoutServiceScript.mapped_rect(card_size, SettingsFrameLayoutServiceScript.SECTION_TEXT_FRAC),
+		true
 	)
+	_place_mapped(_about_btn, card_size, SettingsFrameLayoutServiceScript.SECTION_FRAC)
 	_place_mapped(bg_section_label, card_size, SettingsFrameLayoutServiceScript.SECTION_TEXT_FRAC)
 	if bg_section_label != null:
 		var section_h: float = SettingsFrameLayoutServiceScript.mapped_rect(
 			card_size,
-			SettingsFrameLayoutServiceScript.SECTION_FRAC
+			SettingsFrameLayoutServiceScript.SECTION_TEXT_FRAC
 		).size.y
-		var section_font: int = SettingsFrameLayoutServiceScript.action_font_size(section_h)
+		var section_font: int = SettingsFrameLayoutServiceScript.section_font_size(section_h)
 		bg_section_label.add_theme_font_size_override("font_size", section_font)
 		bg_section_label.add_theme_constant_override("outline_size", maxi(int(round(float(section_font) * 0.12)), 4))
+	if _about_ui != null and _about_ui.visible:
+		_about_ui.layout_for_viewport(viewport_size)
 	if themes_well != null:
 		themes_well.position = Vector2.ZERO
 		themes_well.size = card_size
@@ -147,6 +159,10 @@ func layout_for_viewport(viewport_size: Vector2) -> void:
 		option.custom_minimum_size = Vector2.ZERO
 		_place_rect(option, cell_rect)
 		_layout_theme_preview(option, cell_rect.size)
+		_apply_theme_option_style(
+			option,
+			str(option.get_meta("theme_id", "")) == GameState.background_theme_id
+		)
 	_layout_action_pill(
 		_contact_btn,
 		_contact_label,
@@ -229,16 +245,18 @@ func _layout_action_pill(btn: Button, lbl: Label, hit_rect: Rect2, text_rect: Re
 
 func _layout_theme_preview(option: Panel, size: Vector2) -> void:
 	var preview: Variant = option.get_meta("preview", null)
-	if not (preview is TextureButton):
+	if not (preview is TextureRect):
 		return
-	var btn := preview as TextureButton
-	var pad: float = clampf(minf(size.x, size.y) * 0.06, 3.0, 8.0)
-	btn.offset_left = pad
-	btn.offset_top = pad
-	btn.offset_right = -pad
-	btn.offset_bottom = -pad
+	var photo := preview as TextureRect
+	var pad: float = float(THEME_SLOT_BORDER_W)
+	photo.offset_left = pad
+	photo.offset_top = pad
+	photo.offset_right = -pad
+	photo.offset_bottom = -pad
 	var inner := Vector2(maxf(size.x - pad * 2.0, 1.0), maxf(size.y - pad * 2.0, 1.0))
-	HudTextureButtons.apply_rounded_clip(btn, inner, minf(inner.x, inner.y) * 0.18)
+	var outer_radius: float = maxf(minf(size.x, size.y) * 0.22, 16.0)
+	var image_radius: float = maxf(outer_radius - pad, 10.0)
+	HudTextureButtons.apply_rounded_clip(photo, inner, image_radius)
 
 func _place_mapped(node: Control, card_size: Vector2, frac: Rect2) -> void:
 	_place_rect(node, SettingsFrameLayoutServiceScript.mapped_rect(card_size, frac))
@@ -293,9 +311,14 @@ func _build_ui() -> void:
 	_add_toggle_row("Sonidos", _get_sounds_enabled, _set_sounds_enabled)
 	_add_toggle_row("Vibración", _get_vibration_enabled, _set_vibration_enabled)
 
-	bg_section_label = _make_outlined_label("Fondo", 40)
+	_about_btn = _make_empty_button()
+	_about_btn.pressed.connect(_on_about_pressed)
+	card.add_child(_about_btn)
+	bg_section_label = _make_outlined_label("Coin Stack Puzzle\nversion 1.1", 36)
 	bg_section_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	bg_section_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	bg_section_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	bg_section_label.clip_text = false
 	card.add_child(bg_section_label)
 
 	_restart_btn = _make_empty_button()
@@ -322,7 +345,7 @@ func _build_ui() -> void:
 	_contact_btn = _make_empty_button()
 	_contact_btn.pressed.connect(_on_contact_pressed)
 	card.add_child(_contact_btn)
-	_contact_label = _make_outlined_label("Contacto", 40)
+	_contact_label = _make_outlined_label("Enviar comentarios", 40)
 	_contact_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_contact_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	card.add_child(_contact_label)
@@ -338,7 +361,7 @@ func _build_ui() -> void:
 	_terms_btn = _make_empty_button()
 	_terms_btn.pressed.connect(_on_terms_pressed)
 	card.add_child(_terms_btn)
-	_terms_label = _make_outlined_label("Términos y cond.", 32)
+	_terms_label = _make_outlined_label("Términos y condiciones", 32)
 	_terms_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_terms_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	card.add_child(_terms_label)
@@ -346,7 +369,7 @@ func _build_ui() -> void:
 	_privacy_btn = _make_empty_button()
 	_privacy_btn.pressed.connect(_on_privacy_pressed)
 	card.add_child(_privacy_btn)
-	_privacy_label = _make_outlined_label("Privacidad", 32)
+	_privacy_label = _make_outlined_label("Política de privacidad", 32)
 	_privacy_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_privacy_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	card.add_child(_privacy_label)
@@ -437,6 +460,8 @@ func _sync_restart_button_visibility() -> void:
 		_restart_label.visible = _restart_available
 	if bg_section_label != null:
 		bg_section_label.visible = not _restart_available
+	if _about_btn != null:
+		_about_btn.visible = not _restart_available
 	if visible:
 		layout_for_viewport(get_viewport_rect().size)
 
@@ -689,36 +714,54 @@ func _build_theme_option(theme: Dictionary) -> Panel:
 	var theme_id := str(theme.get("id", ""))
 	var wrap := Panel.new()
 	wrap.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	wrap.clip_contents = true
+	wrap.clip_contents = false
 	wrap.set_meta("theme_id", theme_id)
-	wrap.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	wrap.add_theme_stylebox_override(
+		"panel",
+		_flat_style(THEME_SLOT_LILAC, THEME_SLOT_BORDER, 22, THEME_SLOT_BORDER_W)
+	)
 
-	var preview := TextureButton.new()
-	preview.set_anchors_preset(Control.PRESET_FULL_RECT)
-	preview.offset_left = 4
-	preview.offset_top = 4
-	preview.offset_right = -4
-	preview.offset_bottom = -4
-	preview.texture_normal = load(str(theme.get("path", ""))) as Texture2D
-	preview.ignore_texture_size = true
-	preview.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_COVERED
-	preview.clip_contents = true
-	preview.focus_mode = Control.FOCUS_NONE
-	preview.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	preview.pressed.connect(_on_theme_option_pressed.bind(theme_id))
-	GameState.hook_button_sound(preview)
-	wrap.add_child(preview)
-	wrap.set_meta("preview", preview)
+	var photo := TextureRect.new()
+	photo.set_anchors_preset(Control.PRESET_FULL_RECT)
+	photo.offset_left = float(THEME_SLOT_BORDER_W)
+	photo.offset_top = float(THEME_SLOT_BORDER_W)
+	photo.offset_right = -float(THEME_SLOT_BORDER_W)
+	photo.offset_bottom = -float(THEME_SLOT_BORDER_W)
+	photo.texture = load(str(theme.get("path", ""))) as Texture2D
+	photo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	photo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	photo.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	wrap.add_child(photo)
+
+	var hit := Button.new()
+	hit.set_anchors_preset(Control.PRESET_FULL_RECT)
+	hit.text = ""
+	hit.flat = true
+	hit.focus_mode = Control.FOCUS_NONE
+	hit.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	var empty := StyleBoxEmpty.new()
+	hit.add_theme_stylebox_override("normal", empty)
+	hit.add_theme_stylebox_override("hover", empty)
+	hit.add_theme_stylebox_override("pressed", empty)
+	hit.add_theme_stylebox_override("focus", empty)
+	hit.add_theme_stylebox_override("disabled", empty)
+	hit.pressed.connect(_on_theme_option_pressed.bind(theme_id))
+	GameState.hook_button_sound(hit)
+	wrap.add_child(hit)
+
+	wrap.set_meta("preview", photo)
 	return wrap
 
 func _apply_theme_option_style(option: Panel, selected: bool) -> void:
-	if selected:
-		option.add_theme_stylebox_override(
-			"panel",
-			_flat_style(Color(1, 1, 1, 0.0), SELECT_GREEN, 14, 4)
-		)
-	else:
-		option.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	var slot_min: float = minf(option.size.x, option.size.y)
+	var radius: int = 22
+	if slot_min > 1.0:
+		radius = maxi(int(round(slot_min * 0.22)), 16)
+	var border: Color = SELECT_GREEN if selected else THEME_SLOT_BORDER
+	option.add_theme_stylebox_override(
+		"panel",
+		_flat_style(THEME_SLOT_LILAC, border, radius, THEME_SLOT_BORDER_W)
+	)
 
 func _refresh_theme_selection() -> void:
 	var current := GameState.background_theme_id
@@ -731,8 +774,24 @@ func _on_theme_option_pressed(theme_id: String) -> void:
 	GameState.set_background_theme(theme_id)
 	_refresh_theme_selection()
 
+func _ensure_about_overlay() -> void:
+	if _about_ui != null:
+		return
+	_about_ui = AboutOverlay.new()
+	_about_ui.visible = false
+	_about_ui.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_about_ui.z_index = 40
+	add_child(_about_ui)
+
+func _on_about_pressed() -> void:
+	_ensure_about_overlay()
+	if _about_ui != null:
+		_about_ui.open()
+
 func _on_dimmer_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		if _about_ui != null and _about_ui.is_open():
+			return
 		if _confirm_root != null and _confirm_root.visible:
 			_hide_restart_confirm()
 			return

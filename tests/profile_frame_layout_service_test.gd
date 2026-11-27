@@ -101,6 +101,13 @@ func _test_edit_layout() -> void:
 	if Service.EDIT_CELL_FRACS[5].end.y > Service.EDIT_ACTION_FRAC.position.y:
 		_fail("edit_grid_overlaps_save", str(Service.EDIT_CELL_FRACS[5]))
 		return
+	if Service.EDIT_CELL_FRACS[0].size.x < 0.136:
+		_fail("edit_cells_too_small", str(Service.EDIT_CELL_FRACS[0]))
+		return
+	var cell_gap: float = Service.EDIT_CELL_FRACS[1].position.x - Service.EDIT_CELL_FRACS[0].end.x
+	if cell_gap > 0.030:
+		_fail("edit_cells_too_spaced", str(cell_gap))
+		return
 	if Service.EDIT_ACTION_FRAC.position.y < 0.70:
 		_fail("edit_save_not_bottom", str(Service.EDIT_ACTION_FRAC))
 		return
@@ -110,8 +117,22 @@ func _test_edit_layout() -> void:
 	if Service.EDIT_ACTION_TEXT_FRAC.end.y > Service.EDIT_ACTION_FRAC.end.y:
 		_fail("edit_save_text_too_low", str(Service.EDIT_ACTION_TEXT_FRAC))
 		return
+	var edit_title_c: Vector2 = Service.EDIT_TITLE_FRAC.position + Service.EDIT_TITLE_FRAC.size * 0.5
+	var view_title_c: Vector2 = Service.TITLE_FRAC.position + Service.TITLE_FRAC.size * 0.5
+	if edit_title_c.y <= view_title_c.y:
+		_fail("edit_title_not_lower", str(edit_title_c.y))
+		return
+	if edit_title_c.x < 0.48 or edit_title_c.x > 0.53:
+		_fail("edit_title_not_cloud_center_x", str(edit_title_c.x))
+		return
+	if edit_title_c.y < 0.12 or edit_title_c.y > 0.16:
+		_fail("edit_title_not_cloud_center_y", str(edit_title_c.y))
+		return
+	if Service.EDIT_TITLE_FRAC.end.y > Service.EDIT_AVATAR_FRAC.position.y:
+		_fail("edit_title_overlaps_avatar", str(Service.EDIT_TITLE_FRAC.end.y))
+		return
 	var pad: float = Service.edit_cell_image_pad(120.0)
-	if pad < 3.0 or pad > 8.0:
+	if pad < 1.5 or pad > 5.0:
 		_fail("edit_cell_image_pad", str(pad))
 		return
 	_ok("edit_layout")
@@ -136,6 +157,9 @@ func _test_content_scales() -> void:
 		return
 	if Service.name_font_size(90.0) < 46:
 		_fail("name_font_too_small", str(Service.name_font_size(90.0)))
+		return
+	if Service.edit_name_font_size(90.0) < 66:
+		_fail("edit_name_font_too_small", str(Service.edit_name_font_size(90.0)))
 		return
 	if Service.stat_font_size(78.0) < 44:
 		_fail("stat_font_too_small", str(Service.stat_font_size(78.0)))

@@ -3,6 +3,7 @@ extends RefCounted
 
 ## Fracciones de menu-perfil.png (1325x1187).
 const TITLE_FRAC := Rect2(0.19, 0.062, 0.62, 0.112)
+const EDIT_TITLE_FRAC := Rect2(0.19, 0.082, 0.62, 0.104)
 const CLOSE_FRAC := Rect2(0.828, 0.086, 0.128, 0.142)
 const AVATAR_FRAC := Rect2(0.170, 0.248, 0.164, 0.156)
 const NAME_FRAC := Rect2(0.352, 0.278, 0.520, 0.108)
@@ -17,24 +18,25 @@ const STAT_CHIP_FRACS: Array[Rect2] = [
 	Rect2(0.728, 0.674, 0.158, 0.090),
 ]
 const EDIT_AVATAR_FRAC := Rect2(0.112, 0.250, 0.148, 0.148)
-const EDIT_NAME_FRAC := Rect2(0.322, 0.286, 0.572, 0.096)
+const EDIT_NAME_FRAC := Rect2(0.318, 0.290, 0.580, 0.088)
 const EDIT_ACTION_FRAC := Rect2(0.108, 0.772, 0.784, 0.092)
 const EDIT_ACTION_TEXT_FRAC := Rect2(0.108, 0.778, 0.784, 0.078)
 const EDIT_CELL_FRACS: Array[Rect2] = [
-	Rect2(0.110, 0.450, 0.128, 0.124),
-	Rect2(0.278, 0.450, 0.125, 0.124),
-	Rect2(0.441, 0.450, 0.122, 0.124),
-	Rect2(0.603, 0.450, 0.123, 0.124),
-	Rect2(0.766, 0.450, 0.128, 0.124),
-	Rect2(0.110, 0.612, 0.128, 0.122),
-	Rect2(0.278, 0.612, 0.125, 0.122),
-	Rect2(0.441, 0.612, 0.122, 0.122),
-	Rect2(0.603, 0.612, 0.123, 0.122),
-	Rect2(0.766, 0.612, 0.128, 0.122),
+	Rect2(0.105, 0.440, 0.142, 0.142),
+	Rect2(0.265, 0.440, 0.142, 0.142),
+	Rect2(0.425, 0.440, 0.142, 0.142),
+	Rect2(0.585, 0.440, 0.142, 0.142),
+	Rect2(0.745, 0.440, 0.142, 0.142),
+	Rect2(0.105, 0.598, 0.142, 0.140),
+	Rect2(0.265, 0.598, 0.142, 0.140),
+	Rect2(0.425, 0.598, 0.142, 0.140),
+	Rect2(0.585, 0.598, 0.142, 0.140),
+	Rect2(0.745, 0.598, 0.142, 0.140),
 ]
 const FALLBACK_ASPECT := 1.116
 const TITLE_FONT_RATIO := 0.78
 const NAME_FONT_RATIO := 0.56
+const EDIT_NAME_FONT_RATIO := 0.78
 const ACTION_FONT_RATIO := 0.62
 const STAT_FONT_RATIO := 0.62
 const CHIP_FONT_RATIO := 0.58
@@ -42,7 +44,7 @@ const CHIP_ICON_RATIO := 0.38
 const AVATAR_CLIP_RATIO := 0.18
 const PREVIEW_IMAGE_INSET_RATIO := 0.05
 const PREVIEW_BORDER_RATIO := 0.045
-const EDIT_CELL_IMAGE_INSET_RATIO := 0.04
+const EDIT_CELL_IMAGE_INSET_RATIO := 0.02
 
 static func card_size(viewport: Vector2, tex_size: Vector2) -> Vector2:
 	var aspect: float = FALLBACK_ASPECT
@@ -76,6 +78,9 @@ static func title_font_size(title_h: float) -> int:
 static func name_font_size(name_h: float) -> int:
 	return int(clampf(name_h * NAME_FONT_RATIO, 36.0, 72.0))
 
+static func edit_name_font_size(name_h: float) -> int:
+	return int(clampf(name_h * EDIT_NAME_FONT_RATIO, 48.0, 88.0))
+
 static func action_font_size(action_h: float) -> int:
 	return int(clampf(action_h * ACTION_FONT_RATIO, 34.0, 72.0))
 
@@ -104,4 +109,4 @@ static func edit_cell_rect(card: Vector2, index: int) -> Rect2:
 	return mapped_rect(card, EDIT_CELL_FRACS[index])
 
 static func edit_cell_image_pad(cell_side: float) -> float:
-	return clampf(cell_side * EDIT_CELL_IMAGE_INSET_RATIO, 3.0, 8.0)
+	return clampf(cell_side * EDIT_CELL_IMAGE_INSET_RATIO, 1.5, 5.0)

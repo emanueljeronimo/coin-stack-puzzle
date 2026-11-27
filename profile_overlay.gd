@@ -15,7 +15,8 @@ const TITLE_FILL := Color(0.42, 0.20, 0.60, 1.0)
 const TITLE_OUTLINE := Color(1.00, 0.96, 0.92, 0.85)
 const PILL_TEXT := Color(1.00, 0.98, 0.96, 1.0)
 const PILL_OUTLINE := Color(0.62, 0.18, 0.48, 0.90)
-const NAME_FILL := Color(1.00, 0.98, 0.96, 1.0)
+const LILAC_INK := Color(0.58, 0.36, 0.84, 1.0)
+const LILAC_OUTLINE := Color(1.00, 0.96, 0.92, 0.90)
 const STAT_INK := Color(0.42, 0.20, 0.60, 1.0)
 const PAGE_VIEW := 0
 const PAGE_EDIT := 1
@@ -103,11 +104,16 @@ func layout_for_viewport(viewport_size: Vector2) -> void:
 		frame_art.texture = frame_tex
 		frame_art.position = Vector2.ZERO
 		frame_art.size = card_size
-	_place_mapped(title_label, card_size, ProfileFrameLayoutServiceScript.TITLE_FRAC)
+	var title_frac: Rect2 = (
+		ProfileFrameLayoutServiceScript.EDIT_TITLE_FRAC
+		if editing
+		else ProfileFrameLayoutServiceScript.TITLE_FRAC
+	)
+	_place_mapped(title_label, card_size, title_frac)
 	if title_label != null:
 		var title_h: float = ProfileFrameLayoutServiceScript.mapped_rect(
 			card_size,
-			ProfileFrameLayoutServiceScript.TITLE_FRAC
+			title_frac
 		).size.y
 		var title_font: int = ProfileFrameLayoutServiceScript.title_font_size(title_h)
 		title_label.add_theme_font_size_override("font_size", title_font)
@@ -117,7 +123,8 @@ func layout_for_viewport(viewport_size: Vector2) -> void:
 		_layout_identity(
 			card_size,
 			ProfileFrameLayoutServiceScript.EDIT_AVATAR_FRAC,
-			ProfileFrameLayoutServiceScript.EDIT_NAME_FRAC
+			ProfileFrameLayoutServiceScript.EDIT_NAME_FRAC,
+			true
 		)
 		_layout_action_pill(
 			save_btn,
@@ -140,28 +147,32 @@ func layout_for_viewport(viewport_size: Vector2) -> void:
 		)
 		_layout_stats(card_size)
 
-func _layout_identity(card_size: Vector2, avatar_frac: Rect2, name_frac: Rect2) -> void:
+func _layout_identity(card_size: Vector2, avatar_frac: Rect2, name_frac: Rect2, edit_name: bool = false) -> void:
 	var avatar_rect: Rect2 = ProfileFrameLayoutServiceScript.mapped_rect(card_size, avatar_frac)
 	_place_rect(preview_frame, avatar_rect)
 	_layout_preview_frame(preview_frame, preview_avatar, avatar_rect.size)
 	var name_rect: Rect2 = ProfileFrameLayoutServiceScript.mapped_rect(card_size, name_frac)
 	_place_rect(view_name_label, name_rect)
-	var name_font: int = ProfileFrameLayoutServiceScript.name_font_size(name_rect.size.y)
+	var name_font: int = (
+		ProfileFrameLayoutServiceScript.edit_name_font_size(name_rect.size.y)
+		if edit_name
+		else ProfileFrameLayoutServiceScript.name_font_size(name_rect.size.y)
+	)
 	if view_name_label != null:
 		view_name_label.add_theme_font_size_override("font_size", name_font)
 		view_name_label.add_theme_constant_override("outline_size", maxi(int(round(float(name_font) * 0.12)), 4))
-	var pencil_side: float = minf(name_rect.size.y * 0.82, 56.0)
+	var pencil_side: float = minf(name_rect.size.y * 0.72, 52.0)
 	var pencil_rect := Rect2(
-		name_rect.position.x + name_rect.size.x - pencil_side,
+		name_rect.position.x + name_rect.size.x - pencil_side - 6.0,
 		name_rect.position.y + (name_rect.size.y - pencil_side) * 0.5,
 		pencil_side,
 		pencil_side
 	)
 	var edit_name_rect := Rect2(
 		name_rect.position,
-		Vector2(maxf(name_rect.size.x - pencil_side - 8.0, 40.0), name_rect.size.y)
+		Vector2(maxf(name_rect.size.x - pencil_side - 10.0, 40.0), name_rect.size.y)
 	)
-	_place_rect(name_label, edit_name_rect)
+	_place_rect(name_label, name_rect)
 	_place_rect(name_edit, edit_name_rect)
 	_place_rect(edit_name_btn, pencil_rect)
 	if name_label != null:
@@ -514,12 +525,14 @@ func _apply_theme_colors() -> void:
 		title_label.add_theme_color_override("font_outline_color", TITLE_OUTLINE)
 	for lbl in [view_name_label, name_label]:
 		if lbl != null:
-			lbl.add_theme_color_override("font_color", NAME_FILL)
-			lbl.add_theme_color_override("font_outline_color", TEXT_OUTLINE)
-	for lbl in [edit_profile_label, save_label]:
-		if lbl != null:
-			lbl.add_theme_color_override("font_color", PILL_TEXT)
-			lbl.add_theme_color_override("font_outline_color", PILL_OUTLINE)
+			lbl.add_theme_color_override("font_color", LILAC_INK)
+			lbl.add_theme_color_override("font_outline_color", LILAC_OUTLINE)
+	if edit_profile_label != null:
+		edit_profile_label.add_theme_color_override("font_color", PILL_TEXT)
+		edit_profile_label.add_theme_color_override("font_outline_color", PILL_OUTLINE)
+	if save_label != null:
+		save_label.add_theme_color_override("font_color", LILAC_INK)
+		save_label.add_theme_color_override("font_outline_color", LILAC_OUTLINE)
 	for lbl in _stat_labels:
 		lbl.add_theme_color_override("font_color", STAT_INK)
 		lbl.add_theme_color_override("font_outline_color", TITLE_OUTLINE)
@@ -535,11 +548,11 @@ func _apply_theme_colors() -> void:
 		var edit_style := _flat_style(Color(0.42, 0.24, 0.62, 0.18), Color(0.85, 0.78, 0.95, 0.0), 12, 0)
 		name_edit.add_theme_stylebox_override("normal", edit_style)
 		name_edit.add_theme_stylebox_override("focus", edit_style)
-		name_edit.add_theme_color_override("font_color", NAME_FILL)
-		name_edit.add_theme_color_override("font_placeholder_color", Color(0.92, 0.88, 0.96, 0.55))
+		name_edit.add_theme_color_override("font_color", LILAC_INK)
+		name_edit.add_theme_color_override("font_placeholder_color", Color(0.72, 0.58, 0.90, 0.70))
 	if edit_name_btn != null:
-		edit_name_btn.add_theme_color_override("font_color", PILL_TEXT)
-		edit_name_btn.add_theme_color_override("font_outline_color", TEXT_OUTLINE)
+		edit_name_btn.add_theme_color_override("font_color", LILAC_INK)
+		edit_name_btn.add_theme_color_override("font_outline_color", LILAC_OUTLINE)
 	_refresh_preview_avatars()
 
 func _set_page(page: int) -> void:

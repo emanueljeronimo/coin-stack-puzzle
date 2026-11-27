@@ -50,6 +50,7 @@ TEST_SCRIPTS=(
   "res://tests/board_music_service_test.gd"
   "res://tests/settings_links_service_test.gd"
   "res://tests/settings_frame_layout_service_test.gd"
+  "res://tests/about_frame_layout_service_test.gd"
   "res://tests/shop_tab_service_test.gd"
   "res://tests/shop_catalog_service_test.gd"
   "res://tests/shop_confirm_frame_layout_service_test.gd"

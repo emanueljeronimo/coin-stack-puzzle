@@ -16,7 +16,7 @@ func _run() -> void:
 	_test_toggle_pills_right()
 	_test_theme_grid()
 	_test_card_fits_viewport()
-	_test_slots_on_taller_art()
+	_test_slots_on_new_art()
 	_test_content_scales()
 	print("=== RESULT: %d passed, %d failed ===" % [_passed, _failed])
 	quit(1 if _failed > 0 else 0)
@@ -37,8 +37,11 @@ func _test_stack_order() -> void:
 	if Service.TOGGLE_LABEL_FRACS[1].position.y <= Service.TOGGLE_LABEL_FRACS[0].end.y:
 		_fail("toggles_not_stacked", str(Service.TOGGLE_LABEL_FRACS[1]))
 		return
-	if Service.TOGGLE_LABEL_FRACS[2].end.y > Service.SECTION_FRAC.position.y:
-		_fail("toggles_overlap_section", str(Service.TOGGLE_LABEL_FRACS[2].end.y))
+	if Service.TOGGLE_PILL_FRACS[2].end.x > Service.SECTION_FRAC.position.x:
+		_fail("toggles_overlap_section", str(Service.TOGGLE_PILL_FRACS[2].end.x))
+		return
+	if Service.TOGGLE_LABEL_FRACS[2].end.y > Service.THEME_WELL_FRAC.position.y:
+		_fail("toggles_overlap_themes", str(Service.TOGGLE_LABEL_FRACS[2].end.y))
 		return
 	if Service.SECTION_FRAC.end.y > Service.THEME_WELL_FRAC.position.y:
 		_fail("section_overlaps_themes", str(Service.SECTION_FRAC.end.y))
@@ -54,6 +57,9 @@ func _test_stack_order() -> void:
 		return
 	if Service.PRIVACY_FRAC.position.x <= Service.TERMS_FRAC.end.x:
 		_fail("terms_overlaps_privacy", str(Service.PRIVACY_FRAC))
+		return
+	if Service.SECTION_TEXT_FRAC.position.x < Service.SECTION_FRAC.position.x:
+		_fail("section_text_too_left", str(Service.SECTION_TEXT_FRAC))
 		return
 	if Service.SECTION_TEXT_FRAC.position.y < Service.SECTION_FRAC.position.y:
 		_fail("section_text_too_high", str(Service.SECTION_TEXT_FRAC))
@@ -98,8 +104,11 @@ func _test_toggle_pills_right() -> void:
 		if pill_left < label_right - 0.02:
 			_fail("pill_not_right", "%d %s" % [i, str(Service.TOGGLE_PILL_FRACS[i])])
 			return
-		if Service.TOGGLE_PILL_FRACS[i].position.x < 0.70:
-			_fail("pill_not_far_right", str(Service.TOGGLE_PILL_FRACS[i]))
+		if Service.TOGGLE_PILL_FRACS[i].position.x < 0.46:
+			_fail("pill_not_row_end", str(Service.TOGGLE_PILL_FRACS[i]))
+			return
+		if Service.TOGGLE_PILL_FRACS[i].end.x > Service.SECTION_FRAC.position.x:
+			_fail("pill_hits_version_box", str(Service.TOGGLE_PILL_FRACS[i]))
 			return
 	_ok("toggle_pills_right")
 
@@ -124,6 +133,22 @@ func _test_theme_grid() -> void:
 	if r4.end.y > well.end.y + 0.5:
 		_fail("theme_overflows_well", str(r4.end.y))
 		return
+	if Service.THEME_SLOT_FRACS.size() != Service.THEME_SLOTS:
+		_fail("theme_slot_count", str(Service.THEME_SLOT_FRACS.size()))
+		return
+	var first: Rect2 = Service.THEME_SLOT_FRACS[0]
+	var last: Rect2 = Service.THEME_SLOT_FRACS[Service.THEME_SLOTS - 1]
+	if first.position.x < Service.THEME_WELL_FRAC.position.x - 0.002:
+		_fail("first_slot_left_of_well", str(first))
+		return
+	if last.end.x > Service.THEME_WELL_FRAC.end.x + 0.002:
+		_fail("last_slot_right_of_well", str(last))
+		return
+	var left_margin: float = Service.THEME_WELL_FRAC.position.x
+	var right_margin: float = 1.0 - Service.THEME_WELL_FRAC.end.x
+	if absf(left_margin - right_margin) > 0.012:
+		_fail("theme_block_not_centered", "%s %s" % [str(left_margin), str(right_margin)])
+		return
 	_ok("theme_grid")
 
 func _test_card_fits_viewport() -> void:
@@ -137,20 +162,23 @@ func _test_card_fits_viewport() -> void:
 		return
 	_ok("card_fits_viewport")
 
-func _test_slots_on_taller_art() -> void:
-	if Service.TOGGLE_LABEL_FRACS[0].position.y > 0.20:
+func _test_slots_on_new_art() -> void:
+	if Service.TOGGLE_LABEL_FRACS[0].position.y > 0.18:
 		_fail("toggle_not_upper", str(Service.TOGGLE_LABEL_FRACS[0]))
 		return
-	if Service.SECTION_FRAC.position.y < 0.32 or Service.SECTION_FRAC.position.y > 0.38:
-		_fail("section_not_mid", str(Service.SECTION_FRAC))
+	if Service.SECTION_FRAC.position.x < 0.55:
+		_fail("section_not_right", str(Service.SECTION_FRAC))
 		return
-	if Service.CONTACT_FRAC.position.y < 0.80:
+	if absf(Service.SECTION_FRAC.position.y - Service.TOGGLE_LABEL_FRACS[0].position.y) > 0.02:
+		_fail("section_not_beside_toggles", str(Service.SECTION_FRAC.position.y))
+		return
+	if Service.CONTACT_FRAC.position.y < 0.78:
 		_fail("actions_not_bottom", str(Service.CONTACT_FRAC))
 		return
 	if Service.THEME_WELL_FRAC.size.y < 0.30:
 		_fail("theme_well_too_short", str(Service.THEME_WELL_FRAC.size.y))
 		return
-	_ok("slots_on_taller_art")
+	_ok("slots_on_new_art")
 
 func _test_content_scales() -> void:
 	if Service.title_font_size(120.0) < 70:
@@ -158,6 +186,9 @@ func _test_content_scales() -> void:
 		return
 	if Service.action_font_size(80.0) < 44:
 		_fail("action_font_too_small", str(Service.action_font_size(80.0)))
+		return
+	if Service.section_font_size(140.0) < 32:
+		_fail("section_font_too_small", str(Service.section_font_size(140.0)))
 		return
 	if Service.toggle_label_font_size(70.0) < 36:
 		_fail("toggle_label_too_small", str(Service.toggle_label_font_size(70.0)))
@@ -168,7 +199,7 @@ func _test_content_scales() -> void:
 	if Service.legal_font_size(48.0) < 24:
 		_fail("legal_font_too_small", str(Service.legal_font_size(48.0)))
 		return
-	if Service.grid_action_font_size(70.0) < 28:
+	if Service.grid_action_font_size(70.0) < 38:
 		_fail("grid_action_too_small", str(Service.grid_action_font_size(70.0)))
 		return
 	_ok("content_scales")
